@@ -1,17 +1,26 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, MoreVertical, Paperclip, X } from 'lucide-react';
+import { Send, User, MoreVertical, Paperclip, X } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import yokoLogo from './assets/logo.png';
 import './App.css';
 
+const WEBHOOK_UPLOAD = import.meta.env.VITE_WEBHOOK_UPLOAD;
+const WEBHOOK_AI = import.meta.env.VITE_WEBHOOK_AI;
+const WEBHOOK_AUTH = import.meta.env.VITE_WEBHOOK_AUTH;
+const CHANNEL = import.meta.env.VITE_CHANNEL;
+
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [messages, setMessages] = useState([
-    { id: 1, text: '¡Hola! Soy Yoko, tu asistente personal de IA. ¿En qué puedo ayudarte hoy?', sender: 'yoko' }
-  ]);
+  const [dni, setDni] = useState('');
+  const [sessionId, setSessionId] = useState('');
+  const [loginError, setLoginError] = useState('');
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [files, setFiles] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
-  
+
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
 
@@ -25,12 +34,57 @@ function App() {
     }
   }, [messages, isLoggedIn]);
 
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    if (dni.length !== 8) {
+      setLoginError('Ingresa tu DNI de 8 dígitos.');
+      return;
+    }
+
+    setIsAuthenticating(true);
+    setLoginError('');
+
+    try {
+      const response = await fetch(WEBHOOK_AUTH, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dni }),
+      });
+
+      if (!response.ok) throw new Error('Error de red');
+
+      const data = await response.json();
+
+      if (data.authorized) {
+        const nombre = data.nombre || '';
+        setSessionId(`${dni}-${Date.now()}`);
+        setMessages([{
+          id: crypto.randomUUID(),
+          text: `¡Hola${nombre ? `, ${nombre}` : ''}! Soy Yoko, tu asistente personal de IA. ¿En qué puedo ayudarte hoy?`,
+          sender: 'yoko',
+        }]);
+        setIsLoggedIn(true);
+      } else {
+        setLoginError('DNI no autorizado. Contacta al administrador.');
+      }
+    } catch (error) {
+      setLoginError('Error al verificar. Intenta de nuevo.');
+    } finally {
+      setIsAuthenticating(false);
+    }
+  };
+
+  const handleDniChange = (e) => {
+    const value = e.target.value.replace(/\D/g, '').slice(0, 8);
+    setDni(value);
+    if (loginError) setLoginError('');
+  };
+
   const handleFileSelect = (e) => {
     if (e.target.files) {
       const selectedFiles = Array.from(e.target.files);
       setFiles(prev => [...prev, ...selectedFiles]);
     }
-    // Resetear el input para permitir seleccionar el mismo archivo de nuevo si se borra
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -44,16 +98,17 @@ function App() {
 
     const userText = input;
     const currentFiles = [...files];
-    
-    // Mostrar mensaje del usuario en la UI
+
     let messageText = userText;
     if (currentFiles.length > 0) {
-      messageText += messageText ? `\n[${currentFiles.length} archivo(s) adjunto(s)]` : `[${currentFiles.length} archivo(s) adjunto(s)]`;
+      messageText += messageText
+        ? `\n[${currentFiles.length} archivo(s) adjunto(s)]`
+        : `[${currentFiles.length} archivo(s) adjunto(s)]`;
     }
-    
-    const userMessage = { id: Date.now(), text: messageText, sender: 'user' };
+
+    const userMessage = { id: crypto.randomUUID(), text: messageText, sender: 'user' };
     setMessages((prev) => [...prev, userMessage]);
-    
+
     setInput('');
     setFiles([]);
 
@@ -63,10 +118,10 @@ function App() {
     if (currentFiles.length > 0) {
       batchId = `Lote-${Date.now()}`;
       setIsUploading(true);
-      
-      const uploadMsgId = Date.now() + 1;
-      setMessages((prev) => [...prev, { id: uploadMsgId, text: `Preparando subida...`, sender: 'yoko', isLoading: true }]);
-      
+
+      const uploadMsgId = crypto.randomUUID();
+      setMessages((prev) => [...prev, { id: uploadMsgId, text: 'Preparando subida...', sender: 'yoko', isLoading: true }]);
+
       try {
         for (let i = 0; i < currentFiles.length; i++) {
           const file = currentFiles[i];
@@ -74,51 +129,54 @@ function App() {
           formData.append('file', file);
           formData.append('batchId', batchId);
           formData.append('fileName', file.name);
-          
-          setMessages((prev) => prev.map(msg => 
+
+          setMessages((prev) => prev.map(msg =>
             msg.id === uploadMsgId ? { ...msg, text: `Subiendo archivo ${i + 1} de ${currentFiles.length}...` } : msg
           ));
 
-          await fetch('https://hook.us2.make.com/6x3b6hxrufzyy086hyq4kaxbak0386dl', {
+          const uploadRes = await fetch(WEBHOOK_UPLOAD, {
             method: 'POST',
             body: formData,
           });
+
+          if (!uploadRes.ok) {
+            throw new Error(`Error al subir archivo ${i + 1}: HTTP ${uploadRes.status}`);
+          }
         }
-        
-        // Quitar mensaje de subida
+
         setMessages((prev) => prev.filter(msg => msg.id !== uploadMsgId));
         setIsUploading(false);
-        
+
       } catch (error) {
         console.error('Error subiendo archivos:', error);
-        setMessages((prev) => prev.map(msg => 
+        setMessages((prev) => prev.map(msg =>
           msg.id === uploadMsgId ? { ...msg, text: 'Hubo un error al subir los archivos.', isLoading: false } : msg
         ));
         setIsUploading(false);
-        return; // Detener flujo si falla la subida
+        return;
       }
     }
 
     // Fase 2: Procesamiento de IA (Webhook B)
-    const loadingId = Date.now() + 2;
-    setMessages((prev) => [...prev, { id: loadingId, text: 'Pensando...', sender: 'yoko', isLoading: true }]);
+    const loadingId = crypto.randomUUID();
+    setMessages((prev) => [...prev, { id: loadingId, text: '', sender: 'yoko', isLoading: true }]);
 
     try {
-      const payload = { 
+      const payload = {
+        canal: CHANNEL,
         message: userText,
-        has_attachment: batchId !== null
+        has_attachment: batchId !== null,
+        session_id: sessionId,
       };
       if (batchId) payload.batchId = batchId;
 
-      const response = await fetch('https://hook.us2.make.com/1dkv51qxgy6ji0b2hne8ixqjyfdbogeq', {
+      const response = await fetch(WEBHOOK_AI, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
 
-      if (!response.ok) throw new Error('Error de red al conectar con Make');
+      if (!response.ok) throw new Error(`Error de red al conectar con Make: HTTP ${response.status}`);
 
       const contentType = response.headers.get('content-type');
       let yokoText = '';
@@ -131,16 +189,16 @@ function App() {
       }
 
       if (yokoText === 'Accepted') {
-         yokoText = 'He recibido tu mensaje (Make respondió "Accepted"). Recuerda configurar el módulo "Webhook Response".';
+        yokoText = 'He recibido tu mensaje (Make respondió "Accepted"). Recuerda configurar el módulo "Webhook Response".';
       }
 
-      setMessages((prev) => prev.map(msg => 
+      setMessages((prev) => prev.map(msg =>
         msg.id === loadingId ? { ...msg, text: yokoText, isLoading: false } : msg
       ));
 
     } catch (error) {
       console.error('Error webhook:', error);
-      setMessages((prev) => prev.map(msg => 
+      setMessages((prev) => prev.map(msg =>
         msg.id === loadingId ? { ...msg, text: 'Lo siento, hubo un problema al conectar con el servidor.', isLoading: false } : msg
       ));
     }
@@ -155,12 +213,30 @@ function App() {
           </div>
           <h1 className="login-title">Yoko</h1>
           <p className="login-subtitle">Asistente de IA para Procesos</p>
-          <button 
-            className="login-btn" 
-            onClick={() => setIsLoggedIn(true)}
-          >
-            Iniciar Sesión
-          </button>
+          <form onSubmit={handleLogin} className="login-form">
+            <input
+              type="text"
+              inputMode="numeric"
+              value={dni}
+              onChange={handleDniChange}
+              placeholder="Ingresa tu DNI"
+              className="login-input"
+              maxLength={8}
+              autoFocus
+            />
+            {loginError && <p className="login-error">{loginError}</p>}
+            <button
+              type="submit"
+              className="login-btn"
+              disabled={isAuthenticating || dni.length !== 8}
+            >
+              {isAuthenticating ? (
+                <span className="login-loading">
+                  <span /><span /><span />
+                </span>
+              ) : 'Ingresar'}
+            </button>
+          </form>
         </div>
       </div>
     );
@@ -169,7 +245,6 @@ function App() {
   return (
     <div className="app-container">
       <div className="chat-wrapper glass-panel">
-        {/* Header */}
         <header className="chat-header border-b">
           <div className="header-info">
             <div className="avatar yoko-avatar">
@@ -185,15 +260,26 @@ function App() {
           </button>
         </header>
 
-        {/* Messages Area */}
         <main className="messages-area">
           {messages.map((msg) => (
-            <div 
-              key={msg.id} 
+            <div
+              key={msg.id}
               className={`message-wrapper animate-fade-in ${msg.sender === 'user' ? 'user' : 'yoko'}`}
             >
-              <div className="message-bubble" style={{ whiteSpace: 'pre-wrap' }}>
-                {msg.text}
+              <div className="message-bubble">
+                {msg.isLoading ? (
+                  <div className="loading-dots">
+                    <span /><span /><span />
+                  </div>
+                ) : msg.sender === 'user' ? (
+                  <div style={{ whiteSpace: 'pre-wrap' }}>{msg.text}</div>
+                ) : (
+                  <div className="markdown-content">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {msg.text}
+                    </ReactMarkdown>
+                  </div>
+                )}
               </div>
               <span className="message-icon">
                 {msg.sender === 'user' ? (
@@ -207,7 +293,6 @@ function App() {
           <div ref={messagesEndRef} />
         </main>
 
-        {/* Input Area */}
         <footer className="chat-footer border-t">
           {files.length > 0 && (
             <div className="files-preview">
@@ -222,22 +307,21 @@ function App() {
             </div>
           )}
           <form onSubmit={handleSend} className="input-form">
-            <button 
-              type="button" 
+            <button
+              type="button"
               className="attach-button"
               onClick={() => fileInputRef.current?.click()}
               disabled={isUploading}
             >
               <Paperclip size={20} />
             </button>
-            <input 
-              type="file" 
-              multiple 
-              hidden 
+            <input
+              type="file"
+              multiple
+              hidden
               ref={fileInputRef}
               onChange={handleFileSelect}
             />
-            
             <input
               type="text"
               value={input}
@@ -246,10 +330,10 @@ function App() {
               className="chat-input"
               disabled={isUploading}
             />
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               className="send-button"
-              disabled={( !input.trim() && files.length === 0 ) || isUploading}
+              disabled={(!input.trim() && files.length === 0) || isUploading}
             >
               <Send size={18} />
             </button>
