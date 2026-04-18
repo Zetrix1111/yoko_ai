@@ -1,15 +1,16 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 :root {
-  --bg-color: #0f172a;
-  --glass-bg: rgba(30, 41, 59, 0.7);
-  --glass-border: rgba(255, 255, 255, 0.08);
-  --primary: #3b82f6;
-  --primary-hover: #2563eb;
-  --text-main: #f8fafc;
-  --text-muted: #94a3b8;
-  --user-msg-bg: linear-gradient(135deg, #3b82f6, #8b5cf6);
-  --yoko-msg-bg: rgba(51, 65, 85, 0.8);
+  --bg-color: #FDFBF7; /* Tono mucho más bajito y suave */
+  --surface-color: #FFFFFF;
+  --surface-variant: #F3EFEA;
+  --primary: #C5737A; /* Tono rojizo más bajo y sutil */
+  --primary-hover: #A85A61;
+  --text-main: #3D3935;
+  --text-muted: #8A8379;
+  --user-msg-bg: #F7EBEB;
+  --yoko-msg-bg: #FFFFFF;
+  --border-color: rgba(0, 0, 0, 0.05);
 }
 
 * {
@@ -26,9 +27,6 @@ body {
   display: flex;
   justify-content: center;
   align-items: center;
-  background-image: 
-    radial-gradient(circle at 15% 50%, rgba(59, 130, 246, 0.15), transparent 25%),
-    radial-gradient(circle at 85% 30%, rgba(139, 92, 246, 0.15), transparent 25%);
 }
 
 #root {
@@ -37,21 +35,7 @@ body {
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 1rem;
 }
-
-/* Glassmorphism Utilities */
-.glass-panel {
-  background: var(--glass-bg);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid var(--glass-border);
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-  border-radius: 24px;
-}
-
-.border-b { border-bottom: 1px solid var(--glass-border); }
-.border-t { border-top: 1px solid var(--glass-border); }
 
 /* Animations */
 @keyframes fadeIn {
@@ -67,8 +51,7 @@ body {
 .app-container {
   width: 100%;
   max-width: 900px;
-  height: 90vh;
-  max-height: 800px;
+  height: 100vh;
   display: flex;
   flex-direction: column;
 }
@@ -77,7 +60,8 @@ body {
   display: flex;
   flex-direction: column;
   height: 100%;
-  overflow: hidden;
+  width: 100%;
+  background: transparent;
 }
 
 /* Header */
@@ -86,7 +70,8 @@ body {
   justify-content: space-between;
   align-items: center;
   padding: 1.25rem 1.5rem;
-  background: rgba(15, 23, 42, 0.4);
+  background: transparent;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .header-info {
@@ -106,19 +91,25 @@ body {
 }
 
 .yoko-avatar {
-  background: linear-gradient(135deg, #ec4899, #8b5cf6);
-  box-shadow: 0 0 15px rgba(236, 72, 153, 0.4);
+  background: #FFFFFF;
+}
+
+.logo-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
 }
 
 .agent-name {
   font-size: 1.125rem;
   font-weight: 600;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.2px;
 }
 
 .agent-status {
   font-size: 0.875rem;
-  color: #10b981;
+  color: #059669;
   display: flex;
   align-items: center;
   gap: 0.375rem;
@@ -129,9 +120,8 @@ body {
   display: block;
   width: 8px;
   height: 8px;
-  background-color: #10b981;
+  background-color: #059669;
   border-radius: 50%;
-  box-shadow: 0 0 8px #10b981;
 }
 
 .icon-btn {
@@ -145,7 +135,7 @@ body {
 }
 
 .icon-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--surface-variant);
   color: var(--text-main);
 }
 
@@ -157,6 +147,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+  background-color: transparent;
 }
 
 .message-wrapper {
@@ -182,9 +173,10 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.1);
+  background: #FFFFFF;
   color: var(--text-muted);
   flex-shrink: 0;
+  overflow: hidden;
 }
 
 .message-wrapper.user .message-icon {
@@ -192,12 +184,18 @@ body {
   color: white;
 }
 
+.message-logo-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .message-bubble {
   padding: 1rem 1.25rem;
-  border-radius: 18px;
+  border-radius: 20px;
   font-size: 0.95rem;
   line-height: 1.5;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
 }
 
 .message-wrapper.user .message-bubble {
@@ -208,28 +206,32 @@ body {
 .message-wrapper.yoko .message-bubble {
   background: var(--yoko-msg-bg);
   border-bottom-left-radius: 4px;
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--border-color);
 }
 
 /* Footer / Input */
 .chat-footer {
   padding: 1.25rem 1.5rem;
-  background: rgba(15, 23, 42, 0.4);
+  background: transparent;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
 }
 
 .input-form {
   display: flex;
   align-items: center;
-  background: rgba(15, 23, 42, 0.6);
-  border: 1px solid var(--glass-border);
+  background: var(--surface-variant);
+  border: 1px solid transparent;
   border-radius: 9999px;
-  padding: 0.5rem 0.5rem 0.5rem 1.5rem;
-  transition: border-color 0.3s, box-shadow 0.3s;
+  padding: 0.5rem 0.5rem 0.5rem 0.5rem;
+  transition: background-color 0.3s, border-color 0.3s;
 }
 
 .input-form:focus-within {
-  border-color: rgba(59, 130, 246, 0.5);
-  box-shadow: 0 0 15px rgba(59, 130, 246, 0.2);
+  background: var(--surface-color);
+  border-color: var(--primary);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.02);
 }
 
 .chat-input {
@@ -239,6 +241,7 @@ body {
   color: var(--text-main);
   font-size: 1rem;
   outline: none;
+  padding: 0 0.5rem;
 }
 
 .chat-input::placeholder {
@@ -265,7 +268,7 @@ body {
 }
 
 .send-button:disabled {
-  background: rgba(255, 255, 255, 0.1);
+  background: transparent;
   color: var(--text-muted);
   cursor: not-allowed;
 }
@@ -278,9 +281,140 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--surface-variant);
   border-radius: 10px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: #E8DFD3;
+}
+
+/* Attachment UI */
+.files-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  max-height: 100px;
+  overflow-y: auto;
+  padding: 0 0.5rem;
+}
+
+.file-pill {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--surface-variant);
+  border: 1px solid var(--border-color);
+  padding: 0.25rem 0.5rem 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  color: var(--text-main);
+}
+
+.file-name {
+  max-width: 150px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.remove-file-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.125rem;
+  border-radius: 50%;
+}
+
+.remove-file-btn:hover {
+  color: var(--primary);
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.attach-button {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem;
+  margin-right: 0.25rem;
+  border-radius: 50%;
+  transition: all 0.2s;
+}
+
+.attach-button:hover:not(:disabled) {
+  color: var(--text-main);
+  background: var(--surface-variant);
+}
+
+.attach-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Login Screen */
+.login-container {
+  align-items: center;
+}
+
+.login-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 3.5rem 2.5rem;
+  width: 100%;
+  max-width: 420px;
+  border-radius: 28px;
+  text-align: center;
+  background: var(--surface-color);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03), 0 1px 3px rgba(0, 0, 0, 0.02);
+  border: 1px solid var(--border-color);
+}
+
+.login-logo-wrapper {
+  width: 90px;
+  height: 90px;
+  margin-bottom: 1.5rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.login-title {
+  font-size: 2.2rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+  color: var(--text-main);
+}
+
+.login-subtitle {
+  color: var(--text-muted);
+  margin-bottom: 2.5rem;
+  font-size: 1rem;
+}
+
+.login-btn {
+  background: var(--primary);
+  color: white;
+  border: none;
+  padding: 0.85rem 2.5rem;
+  border-radius: 9999px;
+  font-weight: 500;
+  font-size: 1.05rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  width: 100%;
+  box-shadow: 0 2px 8px rgba(197, 115, 122, 0.2);
+}
+
+.login-btn:hover {
+  background: var(--primary-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(197, 115, 122, 0.3);
 }
