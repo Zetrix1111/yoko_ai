@@ -6,8 +6,8 @@ import yokoLogo from './assets/logo.png';
 import './App.css';
 
 // Rutas internas — los webhooks y API keys viven en el servidor
-const API_LOGIN  = '/api/login';
-const API_CHAT   = '/api/chat';
+const API_LOGIN = '/api/login';
+const API_CHAT = '/api/chat';
 const API_UPLOAD = '/api/upload';
 
 function App() {
@@ -213,7 +213,7 @@ function App() {
             <img src={yokoLogo} alt="Yoko Logo" className="logo-image" />
           </div>
           <h1 className="login-title">Yoko</h1>
-          <p className="login-subtitle">Asistente de IA para Procesos</p>
+          <p className="login-subtitle">Agente de IA</p>
           <form onSubmit={handleLogin} className="login-form">
             <input
               type="text"
@@ -257,8 +257,8 @@ function App() {
                 <p className="agent-status">En línea</p>
               </div>
             </div>
-            <button 
-              className="icon-btn lg:hidden" 
+            <button
+              className="icon-btn lg:hidden"
               onClick={() => setShowMobileModules(!showMobileModules)}
             >
               <LayoutGrid size={20} />
@@ -352,14 +352,14 @@ function App() {
               <h2 className="sidebar-title">Módulos</h2>
               <p className="sidebar-subtitle">Próximamente</p>
             </div>
-            <button 
-              className="icon-btn lg:hidden" 
+            <button
+              className="icon-btn lg:hidden"
               onClick={() => setShowMobileModules(false)}
             >
               <X size={20} />
             </button>
           </div>
-          
+
           <div className="modules-grid">
             <div className="module-card">
               <div className="module-icon-wrapper approvals">
@@ -380,10 +380,10 @@ function App() {
               </div>
             </div>
 
-            <a 
-              href="https://airtable.com/app9s5KuEvlAlZJgl/pagCkSqpB7QdLr6Ja/form" 
-              target="_blank" 
-              rel="noopener noreferrer" 
+            <a
+              href="https://airtable.com/app9s5KuEvlAlZJgl/pagCkSqpB7QdLr6Ja/form"
+              target="_blank"
+              rel="noopener noreferrer"
               className="module-card"
             >
               <div className="module-icon-wrapper banking">
@@ -399,7 +399,7 @@ function App() {
                 <Wallet size={20} />
               </div>
               <div className="module-content">
-                <h3 className="module-name">Gestión de caja chica</h3>
+                <h3 className="module-name">Seguimiento caja chica</h3>
               </div>
             </div>
           </div>
