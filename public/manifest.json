@@ -1,0 +1,24 @@
+{
+  "short_name": "Yoko AI",
+  "name": "Yoko AI - Asistente de Procesos",
+  "icons": [
+    {
+      "src": "/logo-pwa.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo-pwa-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#FDFBF7",
+  "background_color": "#FDFBF7",
+  "description": "Tu asistente personal de IA para gestión de procesos corporativos.",
+  "orientation": "portrait"
+}

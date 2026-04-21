@@ -1,14 +1,14 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, User, MoreVertical, Paperclip, X } from 'lucide-react';
+import { Send, User, MoreVertical, Paperclip, X, CheckSquare, ShieldAlert, CreditCard, Wallet, LayoutGrid } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import yokoLogo from './assets/logo.png';
 import './App.css';
 
-const WEBHOOK_UPLOAD = import.meta.env.VITE_WEBHOOK_UPLOAD;
-const WEBHOOK_AI = import.meta.env.VITE_WEBHOOK_AI;
-const WEBHOOK_AUTH = import.meta.env.VITE_WEBHOOK_AUTH;
-const CHANNEL = import.meta.env.VITE_CHANNEL;
+// Rutas internas — los webhooks y API keys viven en el servidor
+const API_LOGIN  = '/api/login';
+const API_CHAT   = '/api/chat';
+const API_UPLOAD = '/api/upload';
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -20,6 +20,7 @@ function App() {
   const [input, setInput] = useState('');
   const [files, setFiles] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [showMobileModules, setShowMobileModules] = useState(false);
 
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -45,7 +46,7 @@ function App() {
     setLoginError('');
 
     try {
-      const response = await fetch(WEBHOOK_AUTH, {
+      const response = await fetch(API_LOGIN, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dni }),
@@ -134,7 +135,7 @@ function App() {
             msg.id === uploadMsgId ? { ...msg, text: `Subiendo archivo ${i + 1} de ${currentFiles.length}...` } : msg
           ));
 
-          const uploadRes = await fetch(WEBHOOK_UPLOAD, {
+          const uploadRes = await fetch(API_UPLOAD, {
             method: 'POST',
             body: formData,
           });
@@ -162,15 +163,15 @@ function App() {
     setMessages((prev) => [...prev, { id: loadingId, text: '', sender: 'yoko', isLoading: true }]);
 
     try {
+      // canal es agregado por el servidor en api/chat.js
       const payload = {
-        canal: CHANNEL,
         message: userText,
         has_attachment: batchId !== null,
         session_id: sessionId,
       };
       if (batchId) payload.batchId = batchId;
 
-      const response = await fetch(WEBHOOK_AI, {
+      const response = await fetch(API_CHAT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -244,101 +245,169 @@ function App() {
 
   return (
     <div className="app-container">
-      <div className="chat-wrapper glass-panel">
-        <header className="chat-header border-b">
-          <div className="header-info">
-            <div className="avatar yoko-avatar">
-              <img src={yokoLogo} alt="Yoko Logo" className="logo-image" />
+      <div className="main-layout">
+        <div className="chat-wrapper glass-panel">
+          <header className="chat-header border-b">
+            <div className="header-info">
+              <div className="avatar yoko-avatar">
+                <img src={yokoLogo} alt="Yoko Logo" className="logo-image" />
+              </div>
+              <div>
+                <h1 className="agent-name">Yoko</h1>
+                <p className="agent-status">En línea</p>
+              </div>
             </div>
+            <button 
+              className="icon-btn lg:hidden" 
+              onClick={() => setShowMobileModules(!showMobileModules)}
+            >
+              <LayoutGrid size={20} />
+            </button>
+          </header>
+
+          <main className="messages-area">
+            {messages.map((msg) => (
+              <div
+                key={msg.id}
+                className={`message-wrapper animate-fade-in ${msg.sender === 'user' ? 'user' : 'yoko'}`}
+              >
+                <div className="message-bubble">
+                  {msg.isLoading ? (
+                    <div className="loading-dots">
+                      <span /><span /><span />
+                    </div>
+                  ) : msg.sender === 'user' ? (
+                    <div style={{ whiteSpace: 'pre-wrap' }}>{msg.text}</div>
+                  ) : (
+                    <div className="markdown-content">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {msg.text}
+                      </ReactMarkdown>
+                    </div>
+                  )}
+                </div>
+                <span className="message-icon">
+                  {msg.sender === 'user' ? (
+                    <User size={14} />
+                  ) : (
+                    <img src={yokoLogo} alt="Yoko" className="message-logo-image" />
+                  )}
+                </span>
+              </div>
+            ))}
+            <div ref={messagesEndRef} />
+          </main>
+
+          <footer className="chat-footer border-t">
+            {files.length > 0 && (
+              <div className="files-preview">
+                {files.map((file, idx) => (
+                  <div key={idx} className="file-pill">
+                    <span className="file-name">{file.name}</span>
+                    <button type="button" className="remove-file-btn" onClick={() => removeFile(idx)}>
+                      <X size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <form onSubmit={handleSend} className="input-form">
+              <button
+                type="button"
+                className="attach-button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+              >
+                <Paperclip size={20} />
+              </button>
+              <input
+                type="file"
+                multiple
+                hidden
+                ref={fileInputRef}
+                onChange={handleFileSelect}
+              />
+              <input
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Escribe tu mensaje a Yoko..."
+                className="chat-input"
+                disabled={isUploading}
+              />
+              <button
+                type="submit"
+                className="send-button"
+                disabled={(!input.trim() && files.length === 0) || isUploading}
+              >
+                <Send size={18} />
+              </button>
+            </form>
+          </footer>
+        </div>
+
+        <aside className={`modules-sidebar ${showMobileModules ? 'show-mobile' : 'hidden lg:flex'}`}>
+          <div className="sidebar-header flex justify-between items-center">
             <div>
-              <h1 className="agent-name">Yoko</h1>
-              <p className="agent-status">En línea</p>
+              <h2 className="sidebar-title">Módulos</h2>
+              <p className="sidebar-subtitle">Próximamente</p>
+            </div>
+            <button 
+              className="icon-btn lg:hidden" 
+              onClick={() => setShowMobileModules(false)}
+            >
+              <X size={20} />
+            </button>
+          </div>
+          
+          <div className="modules-grid">
+            <div className="module-card">
+              <div className="module-icon-wrapper approvals">
+                <CheckSquare size={20} />
+              </div>
+              <div className="module-content">
+                <h3 className="module-name">Módulo aprobaciones</h3>
+                <span className="module-badge">Nuevo</span>
+              </div>
+            </div>
+
+            <div className="module-card">
+              <div className="module-icon-wrapper alert">
+                <ShieldAlert size={20} />
+              </div>
+              <div className="module-content">
+                <h3 className="module-name">Alerta segura</h3>
+              </div>
+            </div>
+
+            <a 
+              href="https://airtable.com/app9s5KuEvlAlZJgl/pagCkSqpB7QdLr6Ja/form" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="module-card"
+            >
+              <div className="module-icon-wrapper banking">
+                <CreditCard size={20} />
+              </div>
+              <div className="module-content">
+                <h3 className="module-name">Añadir cuenta bancaria</h3>
+              </div>
+            </a>
+
+            <div className="module-card">
+              <div className="module-icon-wrapper cash">
+                <Wallet size={20} />
+              </div>
+              <div className="module-content">
+                <h3 className="module-name">Gestión de caja chica</h3>
+              </div>
             </div>
           </div>
-          <button className="icon-btn">
-            <MoreVertical size={20} />
-          </button>
-        </header>
 
-        <main className="messages-area">
-          {messages.map((msg) => (
-            <div
-              key={msg.id}
-              className={`message-wrapper animate-fade-in ${msg.sender === 'user' ? 'user' : 'yoko'}`}
-            >
-              <div className="message-bubble">
-                {msg.isLoading ? (
-                  <div className="loading-dots">
-                    <span /><span /><span />
-                  </div>
-                ) : msg.sender === 'user' ? (
-                  <div style={{ whiteSpace: 'pre-wrap' }}>{msg.text}</div>
-                ) : (
-                  <div className="markdown-content">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                      {msg.text}
-                    </ReactMarkdown>
-                  </div>
-                )}
-              </div>
-              <span className="message-icon">
-                {msg.sender === 'user' ? (
-                  <User size={14} />
-                ) : (
-                  <img src={yokoLogo} alt="Yoko" className="message-logo-image" />
-                )}
-              </span>
-            </div>
-          ))}
-          <div ref={messagesEndRef} />
-        </main>
-
-        <footer className="chat-footer border-t">
-          {files.length > 0 && (
-            <div className="files-preview">
-              {files.map((file, idx) => (
-                <div key={idx} className="file-pill">
-                  <span className="file-name">{file.name}</span>
-                  <button type="button" className="remove-file-btn" onClick={() => removeFile(idx)}>
-                    <X size={14} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-          <form onSubmit={handleSend} className="input-form">
-            <button
-              type="button"
-              className="attach-button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isUploading}
-            >
-              <Paperclip size={20} />
-            </button>
-            <input
-              type="file"
-              multiple
-              hidden
-              ref={fileInputRef}
-              onChange={handleFileSelect}
-            />
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Escribe tu mensaje a Yoko..."
-              className="chat-input"
-              disabled={isUploading}
-            />
-            <button
-              type="submit"
-              className="send-button"
-              disabled={(!input.trim() && files.length === 0) || isUploading}
-            >
-              <Send size={18} />
-            </button>
-          </form>
-        </footer>
+          <div className="sidebar-footer glass-panel">
+            <p>Más funciones en desarrollo...</p>
+          </div>
+        </aside>
       </div>
     </div>
   );
