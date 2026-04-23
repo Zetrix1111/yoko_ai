@@ -8,4 +8,13 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
+  server: {
+    proxy: {
+      '/api': {
+        target: 'https://yokochat.vercel.app',
+        changeOrigin: true,
+        secure: true,
+      },
+    },
+  },
 })

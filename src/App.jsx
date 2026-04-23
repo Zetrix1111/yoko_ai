@@ -1,416 +1,78 @@
-import { useState, useRef, useEffect } from 'react';
-import { Send, User, MoreVertical, Paperclip, X, CheckSquare, ShieldAlert, CreditCard, Wallet, LayoutGrid } from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import yokoLogo from './assets/logo.png';
+import { useState } from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import './App.css';
 
-// Rutas internas — los webhooks y API keys viven en el servidor
-const API_LOGIN = '/api/login';
-const API_CHAT = '/api/chat';
-const API_UPLOAD = '/api/upload';
+import { useAuth } from './features/auth/useAuth';
+import LoginScreen from './features/auth/LoginScreen';
+import ChatScreen from './features/chat/ChatScreen';
+import ModulesSidebar from './features/modules/ModulesSidebar';
+import AprobacionesScreen from './features/modules/aprobaciones/AprobacionesScreen';
+import AlertaSeguraScreen from './features/modules/alerta-segura/AlertaSeguraScreen';
+import CuentaBancariaScreen from './features/modules/cuenta-bancaria/CuentaBancariaScreen';
+import CajaChicaScreen from './features/modules/caja-chica/CajaChicaScreen';
+import SolicitudCajaChicaScreen from './features/modules/solicitud-caja-chica/SolicitudCajaChicaScreen';
 
-function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [dni, setDni] = useState('');
-  const [sessionId, setSessionId] = useState('');
-  const [loginError, setLoginError] = useState('');
-  const [isAuthenticating, setIsAuthenticating] = useState(false);
-  const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState('');
-  const [files, setFiles] = useState([]);
-  const [isUploading, setIsUploading] = useState(false);
+function AuthenticatedApp({ user }) {
   const [showMobileModules, setShowMobileModules] = useState(false);
-
-  const messagesEndRef = useRef(null);
-  const fileInputRef = useRef(null);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  useEffect(() => {
-    if (isLoggedIn) {
-      scrollToBottom();
-    }
-  }, [messages, isLoggedIn]);
-
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    if (dni.length !== 8) {
-      setLoginError('Ingresa tu DNI de 8 dígitos.');
-      return;
-    }
-
-    setIsAuthenticating(true);
-    setLoginError('');
-
-    try {
-      const response = await fetch(API_LOGIN, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dni }),
-      });
-
-      if (!response.ok) throw new Error('Error de red');
-
-      const data = await response.json();
-
-      if (data.authorized) {
-        const nombre = data.nombre || '';
-        setSessionId(`${dni}-${Date.now()}`);
-        setMessages([{
-          id: crypto.randomUUID(),
-          text: `¡Hola${nombre ? `, ${nombre}` : ''}! Soy Yoko, tu asistente personal de IA. ¿En qué puedo ayudarte hoy?`,
-          sender: 'yoko',
-        }]);
-        setIsLoggedIn(true);
-      } else {
-        setLoginError('DNI no autorizado. Contacta al administrador.');
-      }
-    } catch (error) {
-      setLoginError('Error al verificar. Intenta de nuevo.');
-    } finally {
-      setIsAuthenticating(false);
-    }
-  };
-
-  const handleDniChange = (e) => {
-    const value = e.target.value.replace(/\D/g, '').slice(0, 8);
-    setDni(value);
-    if (loginError) setLoginError('');
-  };
-
-  const handleFileSelect = (e) => {
-    if (e.target.files) {
-      const selectedFiles = Array.from(e.target.files);
-      setFiles(prev => [...prev, ...selectedFiles]);
-    }
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
-
-  const removeFile = (indexToRemove) => {
-    setFiles(prev => prev.filter((_, index) => index !== indexToRemove));
-  };
-
-  const handleSend = async (e) => {
-    e.preventDefault();
-    if (!input.trim() && files.length === 0) return;
-
-    const userText = input;
-    const currentFiles = [...files];
-
-    let messageText = userText;
-    if (currentFiles.length > 0) {
-      messageText += messageText
-        ? `\n[${currentFiles.length} archivo(s) adjunto(s)]`
-        : `[${currentFiles.length} archivo(s) adjunto(s)]`;
-    }
-
-    const userMessage = { id: crypto.randomUUID(), text: messageText, sender: 'user' };
-    setMessages((prev) => [...prev, userMessage]);
-
-    setInput('');
-    setFiles([]);
-
-    let batchId = null;
-
-    // Fase 1: Subida de archivos (Webhook A)
-    if (currentFiles.length > 0) {
-      batchId = `Lote-${Date.now()}`;
-      setIsUploading(true);
-
-      const uploadMsgId = crypto.randomUUID();
-      setMessages((prev) => [...prev, { id: uploadMsgId, text: 'Preparando subida...', sender: 'yoko', isLoading: true }]);
-
-      try {
-        for (let i = 0; i < currentFiles.length; i++) {
-          const file = currentFiles[i];
-          const formData = new FormData();
-          formData.append('file', file);
-          formData.append('batchId', batchId);
-          formData.append('fileName', file.name);
-
-          setMessages((prev) => prev.map(msg =>
-            msg.id === uploadMsgId ? { ...msg, text: `Subiendo archivo ${i + 1} de ${currentFiles.length}...` } : msg
-          ));
-
-          const uploadRes = await fetch(API_UPLOAD, {
-            method: 'POST',
-            body: formData,
-          });
-
-          if (!uploadRes.ok) {
-            throw new Error(`Error al subir archivo ${i + 1}: HTTP ${uploadRes.status}`);
-          }
-        }
-
-        setMessages((prev) => prev.filter(msg => msg.id !== uploadMsgId));
-        setIsUploading(false);
-
-      } catch (error) {
-        console.error('Error subiendo archivos:', error);
-        setMessages((prev) => prev.map(msg =>
-          msg.id === uploadMsgId ? { ...msg, text: 'Hubo un error al subir los archivos.', isLoading: false } : msg
-        ));
-        setIsUploading(false);
-        return;
-      }
-    }
-
-    // Fase 2: Procesamiento de IA (Webhook B)
-    const loadingId = crypto.randomUUID();
-    setMessages((prev) => [...prev, { id: loadingId, text: '', sender: 'yoko', isLoading: true }]);
-
-    try {
-      // canal es agregado por el servidor en api/chat.js
-      const payload = {
-        message: userText,
-        has_attachment: batchId !== null,
-        session_id: sessionId,
-      };
-      if (batchId) payload.batchId = batchId;
-
-      const response = await fetch(API_CHAT, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) throw new Error(`Error de red al conectar con Make: HTTP ${response.status}`);
-
-      const contentType = response.headers.get('content-type');
-      let yokoText = '';
-
-      if (contentType && contentType.includes('application/json')) {
-        const data = await response.json();
-        yokoText = data.response || data.text || data.message || data.respuesta || JSON.stringify(data);
-      } else {
-        yokoText = await response.text();
-      }
-
-      if (yokoText === 'Accepted') {
-        yokoText = 'He recibido tu mensaje (Make respondió "Accepted"). Recuerda configurar el módulo "Webhook Response".';
-      }
-
-      setMessages((prev) => prev.map(msg =>
-        msg.id === loadingId ? { ...msg, text: yokoText, isLoading: false } : msg
-      ));
-
-    } catch (error) {
-      console.error('Error webhook:', error);
-      setMessages((prev) => prev.map(msg =>
-        msg.id === loadingId ? { ...msg, text: 'Lo siento, hubo un problema al conectar con el servidor.', isLoading: false } : msg
-      ));
-    }
-  };
-
-  if (!isLoggedIn) {
-    return (
-      <div className="app-container login-container">
-        <div className="login-card glass-panel animate-fade-in">
-          <div className="login-logo-wrapper yoko-avatar">
-            <img src={yokoLogo} alt="Yoko Logo" className="logo-image" />
-          </div>
-          <h1 className="login-title">Yoko</h1>
-          <p className="login-subtitle">Agente de IA</p>
-          <form onSubmit={handleLogin} className="login-form">
-            <input
-              type="text"
-              inputMode="numeric"
-              value={dni}
-              onChange={handleDniChange}
-              placeholder="Ingresa tu DNI"
-              className="login-input"
-              maxLength={8}
-              autoFocus
-            />
-            {loginError && <p className="login-error">{loginError}</p>}
-            <button
-              type="submit"
-              className="login-btn"
-              disabled={isAuthenticating || dni.length !== 8}
-            >
-              {isAuthenticating ? (
-                <span className="login-loading">
-                  <span /><span /><span />
-                </span>
-              ) : 'Ingresar'}
-            </button>
-          </form>
-        </div>
-      </div>
-    );
-  }
+  const openModules = () => setShowMobileModules(true);
+  const closeModules = () => setShowMobileModules(false);
 
   return (
     <div className="app-container">
       <div className="main-layout">
-        <div className="chat-wrapper glass-panel">
-          <header className="chat-header border-b">
-            <div className="header-info">
-              <div className="avatar yoko-avatar">
-                <img src={yokoLogo} alt="Yoko Logo" className="logo-image" />
-              </div>
-              <div>
-                <h1 className="agent-name">Yoko</h1>
-                <p className="agent-status">En línea</p>
-              </div>
-            </div>
-            <button
-              className="icon-btn lg:hidden"
-              onClick={() => setShowMobileModules(!showMobileModules)}
-            >
-              <LayoutGrid size={20} />
-            </button>
-          </header>
-
-          <main className="messages-area">
-            {messages.map((msg) => (
-              <div
-                key={msg.id}
-                className={`message-wrapper animate-fade-in ${msg.sender === 'user' ? 'user' : 'yoko'}`}
-              >
-                <div className="message-bubble">
-                  {msg.isLoading ? (
-                    <div className="loading-dots">
-                      <span /><span /><span />
-                    </div>
-                  ) : msg.sender === 'user' ? (
-                    <div style={{ whiteSpace: 'pre-wrap' }}>{msg.text}</div>
-                  ) : (
-                    <div className="markdown-content">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                        {msg.text}
-                      </ReactMarkdown>
-                    </div>
-                  )}
-                </div>
-                <span className="message-icon">
-                  {msg.sender === 'user' ? (
-                    <User size={14} />
-                  ) : (
-                    <img src={yokoLogo} alt="Yoko" className="message-logo-image" />
-                  )}
-                </span>
-              </div>
-            ))}
-            <div ref={messagesEndRef} />
-          </main>
-
-          <footer className="chat-footer border-t">
-            {files.length > 0 && (
-              <div className="files-preview">
-                {files.map((file, idx) => (
-                  <div key={idx} className="file-pill">
-                    <span className="file-name">{file.name}</span>
-                    <button type="button" className="remove-file-btn" onClick={() => removeFile(idx)}>
-                      <X size={14} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-            <form onSubmit={handleSend} className="input-form">
-              <button
-                type="button"
-                className="attach-button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isUploading}
-              >
-                <Paperclip size={20} />
-              </button>
-              <input
-                type="file"
-                multiple
-                hidden
-                ref={fileInputRef}
-                onChange={handleFileSelect}
-              />
-              <input
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="Escribe tu mensaje a Yoko..."
-                className="chat-input"
-                disabled={isUploading}
-              />
-              <button
-                type="submit"
-                className="send-button"
-                disabled={(!input.trim() && files.length === 0) || isUploading}
-              >
-                <Send size={18} />
-              </button>
-            </form>
-          </footer>
-        </div>
-
-        <aside className={`modules-sidebar ${showMobileModules ? 'show-mobile' : 'hidden lg:flex'}`}>
-          <div className="sidebar-header flex justify-between items-center">
-            <div>
-              <h2 className="sidebar-title">Módulos</h2>
-              <p className="sidebar-subtitle">Próximamente</p>
-            </div>
-            <button
-              className="icon-btn lg:hidden"
-              onClick={() => setShowMobileModules(false)}
-            >
-              <X size={20} />
-            </button>
-          </div>
-
-          <div className="modules-grid">
-            <div className="module-card">
-              <div className="module-icon-wrapper approvals">
-                <CheckSquare size={20} />
-              </div>
-              <div className="module-content">
-                <h3 className="module-name">Módulo aprobaciones</h3>
-                <span className="module-badge">Nuevo</span>
-              </div>
-            </div>
-
-            <div className="module-card">
-              <div className="module-icon-wrapper alert">
-                <ShieldAlert size={20} />
-              </div>
-              <div className="module-content">
-                <h3 className="module-name">Alerta segura</h3>
-              </div>
-            </div>
-
-            <a
-              href="https://airtable.com/app9s5KuEvlAlZJgl/pagCkSqpB7QdLr6Ja/form"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="module-card"
-            >
-              <div className="module-icon-wrapper banking">
-                <CreditCard size={20} />
-              </div>
-              <div className="module-content">
-                <h3 className="module-name">Añadir cuenta bancaria</h3>
-              </div>
-            </a>
-
-            <div className="module-card">
-              <div className="module-icon-wrapper cash">
-                <Wallet size={20} />
-              </div>
-              <div className="module-content">
-                <h3 className="module-name">Seguimiento caja chica</h3>
-              </div>
-            </div>
-          </div>
-
-          <div className="sidebar-footer glass-panel">
-            <p>Más funciones en desarrollo...</p>
-          </div>
-        </aside>
+        <Routes>
+          <Route
+            path="/"
+            element={<ChatScreen user={user} onOpenModules={openModules} />}
+          />
+          <Route
+            path="/modulos/aprobaciones"
+            element={<AprobacionesScreen user={user} onOpenModules={openModules} />}
+          />
+          <Route
+            path="/modulos/alerta-segura"
+            element={<AlertaSeguraScreen user={user} onOpenModules={openModules} />}
+          />
+          <Route
+            path="/modulos/cuenta-bancaria"
+            element={<CuentaBancariaScreen user={user} onOpenModules={openModules} />}
+          />
+          <Route
+            path="/modulos/caja-chica"
+            element={<CajaChicaScreen user={user} onOpenModules={openModules} />}
+          />
+          <Route
+            path="/modulos/solicitud-caja-chica"
+            element={<SolicitudCajaChicaScreen user={user} onOpenModules={openModules} />}
+          />
+          <Route
+            path="*"
+            element={<ChatScreen user={user} onOpenModules={openModules} />}
+          />
+        </Routes>
+        <ModulesSidebar show={showMobileModules} onClose={closeModules} />
       </div>
     </div>
   );
 }
 
-export default App;
+export default function App() {
+  const { user, error, isAuthenticating, login, clearError } = useAuth();
+
+  if (!user) {
+    return (
+      <LoginScreen
+        onLogin={login}
+        error={error}
+        isAuthenticating={isAuthenticating}
+        clearError={clearError}
+      />
+    );
+  }
+
+  return (
+    <BrowserRouter>
+      <AuthenticatedApp user={user} />
+    </BrowserRouter>
+  );
+}
