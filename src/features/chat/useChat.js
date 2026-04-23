@@ -33,7 +33,9 @@ export function useChat(user) {
 
     // Fase 1: subida de archivos
     if (files.length > 0) {
-      batchId = `Lote-${Date.now()}`;
+      // Usamos session_id como batchId para que Make pueda matchear
+      // ambos webhooks (adjuntos + chat) con el mismo identificador.
+      batchId = user?.sessionId || `Lote-${Date.now()}`;
       setIsUploading(true);
 
       const uploadMsgId = crypto.randomUUID();

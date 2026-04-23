@@ -11,7 +11,19 @@
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js');
+        navigator.serviceWorker
+          .register('/sw.js', { updateViaCache: 'none' })
+          .then((reg) => {
+            // Revisa si hay una versión nueva en cada carga
+            reg.update();
+            // Cuando un SW nuevo tome control, recarga para que se vean los cambios
+            let reloaded = false;
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+              if (reloaded) return;
+              reloaded = true;
+              location.reload();
+            });
+          });
       });
     }
   </script>
