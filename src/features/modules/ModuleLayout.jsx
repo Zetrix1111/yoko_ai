@@ -1,9 +1,9 @@
-import { ArrowLeft, LayoutGrid } from 'lucide-react';
+import { ArrowLeft, LayoutGrid, LogOut } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 // Wrapper común para pantallas de módulos. Usa la misma estética del chat.
 // La otra persona solo necesita pasar title + children (el formulario).
-export default function ModuleLayout({ title, subtitle, children, onOpenModules }) {
+export default function ModuleLayout({ title, subtitle, children, onOpenModules, onLogout }) {
   const navigate = useNavigate();
 
   return (
@@ -18,9 +18,21 @@ export default function ModuleLayout({ title, subtitle, children, onOpenModules 
             {subtitle && <p className="agent-status">{subtitle}</p>}
           </div>
         </div>
-        <button className="icon-btn lg:hidden" onClick={onOpenModules}>
-          <LayoutGrid size={20} />
-        </button>
+        <div className="header-actions">
+          {onLogout && (
+            <button
+              className="icon-btn"
+              onClick={onLogout}
+              title="Cerrar sesión"
+              aria-label="Cerrar sesión"
+            >
+              <LogOut size={20} />
+            </button>
+          )}
+          <button className="icon-btn lg:hidden" onClick={onOpenModules}>
+            <LayoutGrid size={20} />
+          </button>
+        </div>
       </header>
       <main className="messages-area">
         {children}

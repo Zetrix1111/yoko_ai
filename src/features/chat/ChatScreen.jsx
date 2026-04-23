@@ -1,11 +1,11 @@
 import { useRef, useEffect, useState } from 'react';
-import { LayoutGrid, UploadCloud } from 'lucide-react';
+import { LayoutGrid, UploadCloud, LogOut } from 'lucide-react';
 import yokoLogo from '../../assets/logo.png';
 import MessageBubble from './MessageBubble';
 import ChatInput from './ChatInput';
 import { useChat } from './useChat';
 
-export default function ChatScreen({ user, onOpenModules }) {
+export default function ChatScreen({ user, onOpenModules, onLogout }) {
   const { messages, sendMessage, isUploading } = useChat(user);
   const [files, setFiles] = useState([]);
   const [isDragging, setIsDragging] = useState(false);
@@ -78,9 +78,19 @@ export default function ChatScreen({ user, onOpenModules }) {
             <p className="agent-status">En línea</p>
           </div>
         </div>
-        <button className="icon-btn lg:hidden" onClick={onOpenModules}>
-          <LayoutGrid size={20} />
-        </button>
+        <div className="header-actions">
+          <button
+            className="icon-btn"
+            onClick={onLogout}
+            title="Cerrar sesión"
+            aria-label="Cerrar sesión"
+          >
+            <LogOut size={20} />
+          </button>
+          <button className="icon-btn lg:hidden" onClick={onOpenModules}>
+            <LayoutGrid size={20} />
+          </button>
+        </div>
       </header>
 
       <main className="messages-area">

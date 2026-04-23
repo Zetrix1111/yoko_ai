@@ -12,43 +12,24 @@ import CuentaBancariaScreen from './features/modules/cuenta-bancaria/CuentaBanca
 import CajaChicaScreen from './features/modules/caja-chica/CajaChicaScreen';
 import SolicitudCajaChicaScreen from './features/modules/solicitud-caja-chica/SolicitudCajaChicaScreen';
 
-function AuthenticatedApp({ user }) {
+function AuthenticatedApp({ user, onLogout }) {
   const [showMobileModules, setShowMobileModules] = useState(false);
   const openModules = () => setShowMobileModules(true);
   const closeModules = () => setShowMobileModules(false);
+
+  const common = { user, onOpenModules: openModules, onLogout };
 
   return (
     <div className="app-container">
       <div className="main-layout">
         <Routes>
-          <Route
-            path="/"
-            element={<ChatScreen user={user} onOpenModules={openModules} />}
-          />
-          <Route
-            path="/modulos/aprobaciones"
-            element={<AprobacionesScreen user={user} onOpenModules={openModules} />}
-          />
-          <Route
-            path="/modulos/alerta-segura"
-            element={<AlertaSeguraScreen user={user} onOpenModules={openModules} />}
-          />
-          <Route
-            path="/modulos/cuenta-bancaria"
-            element={<CuentaBancariaScreen user={user} onOpenModules={openModules} />}
-          />
-          <Route
-            path="/modulos/caja-chica"
-            element={<CajaChicaScreen user={user} onOpenModules={openModules} />}
-          />
-          <Route
-            path="/modulos/solicitud-caja-chica"
-            element={<SolicitudCajaChicaScreen user={user} onOpenModules={openModules} />}
-          />
-          <Route
-            path="*"
-            element={<ChatScreen user={user} onOpenModules={openModules} />}
-          />
+          <Route path="/"                                   element={<ChatScreen {...common} />} />
+          <Route path="/modulos/aprobaciones"               element={<AprobacionesScreen {...common} />} />
+          <Route path="/modulos/alerta-segura"              element={<AlertaSeguraScreen {...common} />} />
+          <Route path="/modulos/cuenta-bancaria"            element={<CuentaBancariaScreen {...common} />} />
+          <Route path="/modulos/caja-chica"                 element={<CajaChicaScreen {...common} />} />
+          <Route path="/modulos/solicitud-caja-chica"       element={<SolicitudCajaChicaScreen {...common} />} />
+          <Route path="*"                                   element={<ChatScreen {...common} />} />
         </Routes>
         <ModulesSidebar show={showMobileModules} onClose={closeModules} />
       </div>
@@ -57,7 +38,7 @@ function AuthenticatedApp({ user }) {
 }
 
 export default function App() {
-  const { user, error, isAuthenticating, login, clearError } = useAuth();
+  const { user, error, isAuthenticating, login, logout, clearError } = useAuth();
 
   if (!user) {
     return (
@@ -72,7 +53,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <AuthenticatedApp user={user} />
+      <AuthenticatedApp user={user} onLogout={logout} />
     </BrowserRouter>
   );
 }

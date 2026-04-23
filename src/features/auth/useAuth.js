@@ -2,14 +2,33 @@ import { useState, useEffect, useCallback } from 'react';
 import { postJson, API } from '../../shared/api';
 
 const STORAGE_KEY = 'yoko_auth';
+const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 días
+
+function now() { return Date.now(); }
 
 function loadStoredAuth() {
   try {
-    const raw = sessionStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : null;
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    // Sesión vencida → ignorar y limpiar
+    if (!parsed?.expiresAt || parsed.expiresAt < now()) {
+      localStorage.removeItem(STORAGE_KEY);
+      return null;
+    }
+    return parsed;
   } catch {
+    localStorage.removeItem(STORAGE_KEY);
     return null;
   }
+}
+
+function saveAuth(user) {
+  // Refrescamos `expiresAt` a now + 30 días en cada guardado,
+  // de modo que cada vez que el user abra la app, extiende la sesión.
+  const payload = { ...user, expiresAt: now() + SESSION_TTL_MS };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+  return payload;
 }
 
 export function useAuth() {
@@ -17,11 +36,24 @@ export function useAuth() {
   const [error, setError] = useState('');
   const [isAuthenticating, setIsAuthenticating] = useState(false);
 
+  // Refresca TTL cada vez que la app se monta con un user activo.
   useEffect(() => {
     if (user) {
-      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(user));
+      const refreshed = saveAuth(user);
+      // Solo actualiza el estado si cambió (evita loop infinito)
+      if (refreshed.expiresAt !== user.expiresAt) {
+        setUser(refreshed);
+      }
     } else {
-      sessionStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(STORAGE_KEY);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Mantén localStorage sincronizado con cambios manuales de user.
+  useEffect(() => {
+    if (user) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
     }
   }, [user]);
 
@@ -35,12 +67,13 @@ export function useAuth() {
     try {
       const data = await postJson(API.LOGIN, { dni });
       if (data.authorized) {
-        setUser({
+        const fresh = saveAuth({
           dni,
           nombre: data.nombre || '',
           cargo: data.cargo || '',
-          sessionId: `${dni}-${Date.now()}`,
+          sessionId: `${dni}-${now()}`,
         });
+        setUser(fresh);
         return true;
       }
       setError('DNI no autorizado. Contacta al administrador.');
@@ -54,6 +87,7 @@ export function useAuth() {
   }, []);
 
   const logout = useCallback(() => {
+    localStorage.removeItem(STORAGE_KEY);
     setUser(null);
   }, []);
 

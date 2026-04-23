@@ -35,6 +35,7 @@ class handler(BaseHTTPRequestHandler):
                 "message":        body.get("message", ""),
                 "has_attachment": bool(body.get("has_attachment", False)),
                 "session_id":     body.get("session_id", ""),
+                "message_id":     body.get("message_id", ""),
             }
             if body.get("batchId"):
                 payload["batchId"] = body["batchId"]

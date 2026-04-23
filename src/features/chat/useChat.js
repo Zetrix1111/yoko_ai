@@ -29,13 +29,15 @@ export function useChat(user) {
       sender: 'user',
     }]);
 
+    // Un ID único por turno (mensaje). Todos los archivos de ESTE envío
+    // comparten este ID. Make lo usa para matchear: los files que llegan
+    // al webhook de uploads vs. el mensaje que llega al webhook del chat.
+    const messageId = crypto.randomUUID();
     let batchId = null;
 
     // Fase 1: subida de archivos
     if (files.length > 0) {
-      // Usamos session_id como batchId para que Make pueda matchear
-      // ambos webhooks (adjuntos + chat) con el mismo identificador.
-      batchId = user?.sessionId || `Lote-${Date.now()}`;
+      batchId = messageId;
       setIsUploading(true);
 
       const uploadMsgId = crypto.randomUUID();
@@ -90,6 +92,7 @@ export function useChat(user) {
         message: text,
         has_attachment: batchId !== null,
         session_id: user?.sessionId || '',
+        message_id: messageId,
       };
       if (batchId) payload.batchId = batchId;
 
