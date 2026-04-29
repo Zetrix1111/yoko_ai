@@ -1,0 +1,12 @@
+{
+  "id": "demo",
+  "name": "Demo Corp",
+  "agent": {
+    "name": "Aria"
+  },
+  "modules": [
+    "aprobaciones",
+    "solicitud-caja-chica",
+    "caja-chica"
+  ]
+}

@@ -8,10 +8,13 @@
 //   3) En su Vercel project nuevo, setear VITE_TENANT_ID=<id> + sus env vars (Airtable/Make/OpenAI)
 
 import cmejiaConfig from './cmejia/config.json';
-import cmejiaLogo from './cmejia/logo.png';
+import cmejiaLogo   from './cmejia/logo.png';
+import demoConfig   from './demo/config.json';
+import demoLogo     from './demo/logo.png';
 
 const TENANTS = {
   cmejia: { config: cmejiaConfig, logo: cmejiaLogo },
+  demo:   { config: demoConfig,   logo: demoLogo   },
 };
 
 const FALLBACK_ID = 'cmejia';
