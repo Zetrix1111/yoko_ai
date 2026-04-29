@@ -4,7 +4,7 @@ import ModuleLayout from '../ModuleLayout';
 // Endpoint backend: POST /api/caja_chica  (api/caja_chica.py)
 export default function CajaChicaScreen({ user, onOpenModules, onLogout }) {
   return (
-    <ModuleLayout title="Seguimiento caja chica" onOpenModules={onOpenModules} onLogout={onLogout}>
+    <ModuleLayout title="Caja Chica Inteligente" onOpenModules={onOpenModules} onLogout={onLogout}>
       {/* Construye aquí el formulario. */}
     </ModuleLayout>
   );
