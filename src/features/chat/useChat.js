@@ -1,10 +1,12 @@
 import { useState, useCallback } from 'react';
 import { postJson, postForm, API } from '../../shared/api';
+import { tenantConfig } from '../../tenants';
 
 export function useChat(user) {
+  const agentName = tenantConfig.agent.name;
   const greeting = user?.nombre
-    ? `¡Hola, ${user.nombre}! Soy Yoko, tu asistente personal de IA. ¿En qué puedo ayudarte hoy?`
-    : '¡Hola! Soy Yoko, tu asistente personal de IA. ¿En qué puedo ayudarte hoy?';
+    ? `¡Hola, ${user.nombre}! Soy ${agentName}, tu asistente personal de IA. ¿En qué puedo ayudarte hoy?`
+    : `¡Hola! Soy ${agentName}, tu asistente personal de IA. ¿En qué puedo ayudarte hoy?`;
 
   const [messages, setMessages] = useState([{
     id: crypto.randomUUID(),

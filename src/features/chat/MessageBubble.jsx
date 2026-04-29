@@ -1,7 +1,7 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { User } from 'lucide-react';
-import yokoLogo from '../../assets/logo.png';
+import { tenantConfig, tenantLogo } from '../../tenants';
 
 export default function MessageBubble({ message }) {
   const isUser = message.sender === 'user';
@@ -21,7 +21,7 @@ export default function MessageBubble({ message }) {
       <span className="message-icon">
         {isUser
           ? <User size={14} />
-          : <img src={yokoLogo} alt="Yoko" className="message-logo-image" />}
+          : <img src={tenantLogo} alt={tenantConfig.agent.name} className="message-logo-image" />}
       </span>
     </div>
   );

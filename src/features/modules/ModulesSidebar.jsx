@@ -1,12 +1,16 @@
 import { NavLink } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { MODULES } from './modulesConfig';
+import { isModuleEnabled } from '../../tenants';
 import QuickLinksRail from '../quick-links/QuickLinksRail';
 
 export default function ModulesSidebar({ show, onClose }) {
   const handleClick = () => {
     if (onClose) onClose();
   };
+
+  // Solo mostramos los módulos que el tenant tiene habilitados en su config.json
+  const enabledModules = MODULES.filter((m) => isModuleEnabled(m.id));
 
   return (
     <aside className={`modules-sidebar ${show ? 'show-mobile' : 'hidden lg:flex'}`}>
@@ -22,7 +26,7 @@ export default function ModulesSidebar({ show, onClose }) {
       </div>
 
       <div className="modules-grid">
-        {MODULES.map(({ id, path, name, Icon, iconClass, badge }) => (
+        {enabledModules.map(({ id, path, name, Icon, iconClass, badge }) => (
           <NavLink key={id} to={path} onClick={handleClick} className="module-card">
             <div className={`module-icon-wrapper ${iconClass}`}>
               <Icon size={20} />

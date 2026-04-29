@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { Send, Paperclip, X, Mic, Square, Loader2 } from 'lucide-react';
 import { useSpeechToText } from './useSpeechToText';
+import { tenantConfig } from '../../tenants';
 
 export default function ChatInput({ onSend, disabled, files, setFiles }) {
   const [text, setText] = useState('');
@@ -91,7 +92,7 @@ export default function ChatInput({ onSend, disabled, files, setFiles }) {
               ? 'Grabando... toca el cuadrado para detener'
               : isProcessing
                 ? 'Transcribiendo tu audio...'
-                : 'Escribe tu mensaje a Yoko...'
+                : `Escribe tu mensaje a ${tenantConfig.agent.name}...`
           }
           className="chat-input"
           disabled={inputsDisabled}

@@ -1,0 +1,14 @@
+{
+  "id": "cmejia",
+  "name": "C. Mejía Contratistas",
+  "agent": {
+    "name": "Yoko"
+  },
+  "modules": [
+    "aprobaciones",
+    "caja-chica",
+    "solicitud-caja-chica",
+    "cuenta-bancaria",
+    "alerta-segura"
+  ]
+}

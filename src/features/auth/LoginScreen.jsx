@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import yokoLogo from '../../assets/logo.png';
+import { tenantConfig, tenantLogo } from '../../tenants';
 
 export default function LoginScreen({ onLogin, error, isAuthenticating, clearError }) {
   const [dni, setDni] = useState('');
@@ -19,9 +19,9 @@ export default function LoginScreen({ onLogin, error, isAuthenticating, clearErr
     <div className="app-container login-container">
       <div className="login-card glass-panel animate-fade-in">
         <div className="login-logo-wrapper yoko-avatar">
-          <img src={yokoLogo} alt="Yoko Logo" className="logo-image" />
+          <img src={tenantLogo} alt={`${tenantConfig.agent.name} Logo`} className="logo-image" />
         </div>
-        <h1 className="login-title">Yoko</h1>
+        <h1 className="login-title">{tenantConfig.agent.name}</h1>
         <p className="login-subtitle">Agente de IA</p>
         <form onSubmit={handleSubmit} className="login-form">
           <input

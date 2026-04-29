@@ -1,6 +1,6 @@
 import { useRef, useEffect, useState } from 'react';
 import { LayoutGrid, UploadCloud, LogOut } from 'lucide-react';
-import yokoLogo from '../../assets/logo.png';
+import { tenantConfig, tenantLogo } from '../../tenants';
 import MessageBubble from './MessageBubble';
 import ChatInput from './ChatInput';
 import { useChat } from './useChat';
@@ -71,10 +71,10 @@ export default function ChatScreen({ user, onOpenModules, onLogout }) {
       <header className="chat-header border-b">
         <div className="header-info">
           <div className="avatar yoko-avatar">
-            <img src={yokoLogo} alt="Yoko Logo" className="logo-image" />
+            <img src={tenantLogo} alt={`${tenantConfig.agent.name} Logo`} className="logo-image" />
           </div>
           <div>
-            <h1 className="agent-name">Yoko</h1>
+            <h1 className="agent-name">{tenantConfig.agent.name}</h1>
             <p className="agent-status">En línea</p>
           </div>
         </div>
