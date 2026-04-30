@@ -36,4 +36,6 @@ export const API = {
   SOLICITUD_CAJA_CHICA: '/api/solicitud_caja_chica',
   PAGOS_INTELIGENTES: '/api/pagos_inteligentes',
   FACTURAS_INTELIGENTES: '/api/facturas_inteligentes',
+  FACTURAS_PROCESAR: '/api/facturas_procesar',
+  FACTURAS_CONCAR: '/api/facturas_concar',
 };

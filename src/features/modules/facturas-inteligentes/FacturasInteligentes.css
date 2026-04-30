@@ -1,0 +1,478 @@
+/* ─────────────────────────────────────────────
+   Facturas Inteligentes — estilos del módulo
+   ───────────────────────────────────────────── */
+
+.fact-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  width: 100%;
+  max-width: 880px;
+  margin: 0 auto;
+}
+
+/* ── Stepper ── */
+.fact-stepper {
+  display: flex;
+  align-items: flex-start;
+  padding: 1.25rem 1.5rem;
+  background: var(--md-surface);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 16px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+
+.fact-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.fact-step-circle {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--md-surface-variant);
+  color: var(--md-on-surface-variant);
+  font-weight: 600;
+  font-size: 0.875rem;
+  border: 2px solid transparent;
+  transition: background 0.3s, color 0.3s, box-shadow 0.3s;
+}
+
+.fact-step.active .fact-step-circle {
+  background: var(--md-primary);
+  color: var(--md-on-primary);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--md-primary) 18%, transparent);
+}
+
+.fact-step.done .fact-step-circle {
+  background: var(--md-success);
+  color: white;
+}
+
+.fact-step-label {
+  font-size: 0.78rem;
+  color: var(--md-on-surface-variant);
+  font-weight: 500;
+  text-align: center;
+}
+
+.fact-step.active .fact-step-label,
+.fact-step.done .fact-step-label {
+  color: var(--md-on-surface);
+  font-weight: 600;
+}
+
+.fact-step-line {
+  flex: 1;
+  height: 2px;
+  background: var(--md-outline-variant);
+  margin-top: 16px;
+  min-width: 24px;
+  transition: background 0.3s;
+}
+
+.fact-step-line.done {
+  background: var(--md-success);
+}
+
+/* ── Cards ── */
+.fact-card {
+  background: var(--md-surface);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 20px;
+  padding: 1.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  animation: fact-card-enter 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes fact-card-enter {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.fact-card-header h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--md-on-surface);
+  margin: 0 0 0.25rem 0;
+}
+
+.fact-card-header p {
+  font-size: 0.9rem;
+  color: var(--md-on-surface-variant);
+  margin: 0;
+}
+
+/* ── Form rows ── */
+.fact-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+@media (max-width: 640px) {
+  .fact-form-row { grid-template-columns: 1fr; }
+}
+
+.fact-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.fact-field label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--md-on-surface);
+}
+
+.fact-input,
+.fact-select {
+  padding: 0.7rem 1rem;
+  border: 1.5px solid var(--md-outline-variant);
+  border-radius: 12px;
+  background: var(--md-surface);
+  color: var(--md-on-surface);
+  font-family: inherit;
+  font-size: 0.95rem;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.fact-input:focus,
+.fact-select:focus {
+  border-color: var(--md-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--md-primary) 15%, transparent);
+}
+
+.fact-input:disabled,
+.fact-select:disabled {
+  background: var(--md-surface-variant);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+/* ── Drop zone ── */
+.fact-dropzone {
+  border: 2px dashed var(--md-outline-variant);
+  border-radius: 16px;
+  padding: 2rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--md-surface-variant);
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  text-align: center;
+}
+
+.fact-dropzone:hover,
+.fact-dropzone.dragging {
+  border-color: var(--md-primary);
+  background: color-mix(in srgb, var(--md-primary) 6%, var(--md-surface));
+}
+
+.fact-dropzone-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--md-primary) 12%, transparent);
+  color: var(--md-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fact-dropzone-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--md-on-surface);
+}
+
+.fact-dropzone-hint {
+  font-size: 0.78rem;
+  color: var(--md-on-surface-variant);
+}
+
+/* ── File list ── */
+.fact-file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.fact-file-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.875rem;
+  background: var(--md-surface-variant);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 10px;
+}
+
+.fact-file-name {
+  flex: 1;
+  font-size: 0.85rem;
+  color: var(--md-on-surface);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fact-file-size {
+  font-size: 0.72rem;
+  color: var(--md-on-surface-variant);
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.fact-file-remove {
+  background: transparent;
+  border: none;
+  color: var(--md-on-surface-variant);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 50%;
+  transition: background 0.2s, color 0.2s;
+}
+
+.fact-file-remove:hover:not(:disabled) {
+  color: var(--md-error);
+  background: var(--md-state-hover);
+}
+
+/* ── Buttons ── */
+.fact-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.85rem 1.4rem;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
+  font-family: inherit;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.fact-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.fact-btn-primary {
+  background: var(--md-primary);
+  color: var(--md-on-primary);
+  box-shadow: 0 2px 8px rgba(197, 115, 122, 0.22);
+}
+
+.fact-btn-primary:not(:disabled):hover {
+  background: var(--md-primary-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(197, 115, 122, 0.32);
+}
+
+.fact-btn-secondary {
+  background: var(--md-surface);
+  color: var(--md-primary);
+  border: 1.5px solid var(--md-primary);
+}
+
+.fact-btn-secondary:not(:disabled):hover {
+  background: color-mix(in srgb, var(--md-primary) 8%, var(--md-surface));
+}
+
+.fact-btn-ghost {
+  background: var(--md-surface-variant);
+  color: var(--md-on-surface);
+}
+
+.fact-btn-ghost:not(:disabled):hover {
+  background: var(--md-surface-container);
+}
+
+.fact-btn-row {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+/* ── Status checklist ── */
+.fact-status-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.5rem 0;
+}
+
+.fact-status-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.4rem 0.25rem;
+  font-size: 0.9rem;
+  color: var(--md-on-surface-variant);
+}
+
+.fact-status-item.done {
+  color: var(--md-success);
+}
+
+.fact-status-item.current {
+  color: var(--md-primary);
+  font-weight: 600;
+}
+
+.fact-status-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: var(--md-surface-variant);
+}
+
+.fact-status-item.done .fact-status-icon {
+  background: var(--md-success);
+  color: white;
+}
+
+.fact-status-item.current .fact-status-icon {
+  background: color-mix(in srgb, var(--md-primary) 15%, transparent);
+  color: var(--md-primary);
+}
+
+/* ── Banners ── */
+.fact-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  border-radius: 12px;
+  font-size: 0.9rem;
+}
+
+.fact-banner-success {
+  background: color-mix(in srgb, var(--md-success) 10%, var(--md-surface));
+  border: 1px solid color-mix(in srgb, var(--md-success) 25%, transparent);
+  color: var(--md-on-surface);
+}
+
+.fact-banner-info {
+  background: color-mix(in srgb, var(--md-primary) 8%, var(--md-surface));
+  border: 1px solid color-mix(in srgb, var(--md-primary) 20%, transparent);
+  color: var(--md-on-surface);
+}
+
+.fact-banner-error {
+  background: color-mix(in srgb, var(--md-error) 8%, var(--md-surface));
+  border: 1px solid color-mix(in srgb, var(--md-error) 25%, transparent);
+  color: var(--md-on-surface);
+}
+
+.fact-banner-icon { flex-shrink: 0; margin-top: 2px; }
+.fact-banner-success .fact-banner-icon { color: var(--md-success); }
+.fact-banner-info    .fact-banner-icon { color: var(--md-primary); }
+.fact-banner-error   .fact-banner-icon { color: var(--md-error); }
+
+.fact-banner-title {
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+/* ── Loading ── */
+.fact-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 3rem 1rem;
+  color: var(--md-on-surface-variant);
+}
+
+.fact-spinner {
+  width: 44px;
+  height: 44px;
+  border: 3px solid var(--md-outline-variant);
+  border-top-color: var(--md-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.fact-loading-title {
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--md-on-surface);
+  text-align: center;
+}
+
+.fact-loading-subtitle {
+  font-size: 0.85rem;
+  margin-top: 4px;
+  text-align: center;
+}
+
+/* ── Meta panel (proceso_id, empresa_id) ── */
+.fact-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem 1.25rem;
+  background: var(--md-surface-variant);
+  border-radius: 12px;
+  font-size: 0.85rem;
+}
+
+.fact-meta-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.fact-meta-label {
+  color: var(--md-on-surface-variant);
+}
+
+.fact-meta-value {
+  color: var(--md-on-surface);
+  font-weight: 500;
+  font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+  font-size: 0.78rem;
+  word-break: break-all;
+  text-align: right;
+}
+
+/* ── Mobile tweaks ── */
+@media (max-width: 640px) {
+  .fact-card { padding: 1.25rem; border-radius: 16px; }
+  .fact-stepper { padding: 1rem 0.75rem; }
+  .fact-step-label { font-size: 0.7rem; }
+  .fact-step-line { min-width: 12px; margin-top: 14px; }
+  .fact-btn-row { flex-direction: column; align-items: stretch; }
+  .fact-btn-row .fact-btn { width: 100%; }
+}
