@@ -9,23 +9,35 @@
   <link rel="manifest" href="/manifest.json" />
   <title>Yoko AI</title>
   <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
+    // En localhost desinstalamos cualquier SW activo (PWA solo tiene sentido en prod)
+    // En prod registramos el SW con auto-update.
+    (function () {
+      var isLocal = ['localhost', '127.0.0.1', '::1'].indexOf(location.hostname) !== -1;
+
+      if (!('serviceWorker' in navigator)) return;
+
+      if (isLocal) {
+        // Desinstala SW viejos que hayan quedado en localhost
+        navigator.serviceWorker.getRegistrations().then(function (regs) {
+          regs.forEach(function (r) { r.unregister(); });
+        });
+        return;
+      }
+
+      window.addEventListener('load', function () {
         navigator.serviceWorker
           .register('/sw.js', { updateViaCache: 'none' })
-          .then((reg) => {
-            // Revisa si hay una versión nueva en cada carga
+          .then(function (reg) {
             reg.update();
-            // Cuando un SW nuevo tome control, recarga para que se vean los cambios
-            let reloaded = false;
-            navigator.serviceWorker.addEventListener('controllerchange', () => {
+            var reloaded = false;
+            navigator.serviceWorker.addEventListener('controllerchange', function () {
               if (reloaded) return;
               reloaded = true;
               location.reload();
             });
           });
       });
-    }
+    })();
   </script>
 </head>
 
