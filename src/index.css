@@ -891,6 +891,8 @@ body {
 .module-icon-wrapper.banking   { background: linear-gradient(135deg, #81D4FA, #0288D1); }
 .module-icon-wrapper.cash      { background: linear-gradient(135deg, #A5D6A7, #388E3C); }
 .module-icon-wrapper.request   { background: linear-gradient(135deg, #CE93D8, #7B1FA2); }
+.module-icon-wrapper.payment   { background: linear-gradient(135deg, #FFE082, #F57F17); }
+.module-icon-wrapper.invoice   { background: linear-gradient(135deg, #80DEEA, #00838F); }
 
 .module-content {
   flex: 1;

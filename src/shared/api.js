@@ -34,4 +34,6 @@ export const API = {
   CUENTA_BANCARIA: '/api/cuenta_bancaria',
   CAJA_CHICA: '/api/caja_chica',
   SOLICITUD_CAJA_CHICA: '/api/solicitud_caja_chica',
+  PAGOS_INTELIGENTES: '/api/pagos_inteligentes',
+  FACTURAS_INTELIGENTES: '/api/facturas_inteligentes',
 };

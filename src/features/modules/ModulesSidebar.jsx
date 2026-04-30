@@ -17,8 +17,8 @@ export default function ModulesSidebar({ show, onClose }) {
       <QuickLinksRail />
       <div className="sidebar-header flex justify-between items-center">
         <div>
-          <h2 className="sidebar-title">Módulos</h2>
-          <p className="sidebar-subtitle">Selecciona uno</p>
+          <h2 className="sidebar-title">Procesos</h2>
+          <p className="sidebar-subtitle">Selecciona un proceso</p>
         </div>
         <button className="icon-btn lg:hidden" onClick={onClose}>
           <X size={20} />

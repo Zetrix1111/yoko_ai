@@ -92,7 +92,7 @@ export default function ChatInput({ onSend, disabled, files, setFiles }) {
               ? 'Grabando... toca el cuadrado para detener'
               : isProcessing
                 ? 'Transcribiendo tu audio...'
-                : `Escribe tu mensaje a ${tenantConfig.agent.name}...`
+                : `Escribe una instrucción o adjunta un archivo...`
           }
           className="chat-input"
           disabled={inputsDisabled}

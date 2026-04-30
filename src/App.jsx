@@ -14,6 +14,8 @@ import AlertaSeguraScreen from './features/modules/alerta-segura/AlertaSeguraScr
 import CuentaBancariaScreen from './features/modules/cuenta-bancaria/CuentaBancariaScreen';
 import CajaChicaScreen from './features/modules/caja-chica/CajaChicaScreen';
 import SolicitudCajaChicaScreen from './features/modules/solicitud-caja-chica/SolicitudCajaChicaScreen';
+import PagosInteligentesScreen from './features/modules/pagos-inteligentes/PagosInteligentesScreen';
+import FacturasInteligentesScreen from './features/modules/facturas-inteligentes/FacturasInteligentesScreen';
 
 // Mapeo: id de módulo → componente que renderiza su pantalla.
 // Para enchufar un módulo nuevo, solo agrega aquí su entrada.
@@ -23,6 +25,8 @@ const MODULE_COMPONENTS = {
   'cuenta-bancaria':        CuentaBancariaScreen,
   'caja-chica':             CajaChicaScreen,
   'solicitud-caja-chica':   SolicitudCajaChicaScreen,
+  'pagos-inteligentes':     PagosInteligentesScreen,
+  'facturas-inteligentes':  FacturasInteligentesScreen,
 };
 
 function AuthenticatedApp({ user, onLogout }) {

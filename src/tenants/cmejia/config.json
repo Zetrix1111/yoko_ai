@@ -5,10 +5,12 @@
     "name": "Yoko"
   },
   "modules": [
+    "alerta-segura",
     "aprobaciones",
     "caja-chica",
     "solicitud-caja-chica",
-    "cuenta-bancaria",
-    "alerta-segura"
+    "pagos-inteligentes",
+    "facturas-inteligentes",
+    "cuenta-bancaria"
   ]
 }
