@@ -2,6 +2,10 @@
 // 1) crea la carpeta src/features/modules/<nombre>/ con su Screen.jsx
 // 2) agrega un registro aquí (path único + icono de lucide-react)
 // 3) engancha la ruta en src/App.jsx (MODULE_COMPONENTS)
+//
+// Submenús (opcional): si un módulo declara `submenus`, la sidebar
+// muestra un acordeón. Cada submenú navega a `${path}?section=<id>`.
+// La pantalla del módulo lee ?section= con useSearchParams.
 import {
   ShieldAlert,
   CheckSquare,
@@ -11,6 +15,10 @@ import {
   FileText,
   CreditCard,
   PiggyBank,
+  LayoutDashboard,
+  ShieldCheck,
+  BarChart3,
+  Settings,
 } from 'lucide-react';
 
 export const MODULES = [
@@ -42,6 +50,15 @@ export const MODULES = [
     name: 'Gestión de Caja Chica',
     Icon: PiggyBank,
     iconClass: 'finance',
+    submenus: [
+      { id: 'inicio',        label: 'Inicio',        Icon: LayoutDashboard },
+      { id: 'solicitudes',   label: 'Solicitudes',   Icon: FileText        },
+      { id: 'aprobaciones',  label: 'Aprobaciones',  Icon: ShieldCheck     },
+      { id: 'pagos',         label: 'Pagos',         Icon: CreditCard      },
+      { id: 'rendiciones',   label: 'Rendiciones',   Icon: Receipt         },
+      { id: 'reportes',      label: 'Reportes',      Icon: BarChart3       },
+      { id: 'configuracion', label: 'Configuración', Icon: Settings        },
+    ],
   },
   {
     id: 'solicitud-caja-chica',

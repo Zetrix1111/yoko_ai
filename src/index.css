@@ -895,6 +895,110 @@ body {
 .module-icon-wrapper.invoice   { background: linear-gradient(135deg, #80DEEA, #00838F); }
 .module-icon-wrapper.finance   { background: linear-gradient(135deg, #93C5FD, #1D4ED8); }
 
+/* ─────────────────────────────────────────────
+   Accordion (módulos con submenús)
+   ───────────────────────────────────────────── */
+.module-accordion {
+  display: flex;
+  flex-direction: column;
+}
+
+/* El "parent" del acordeón es un <button>, igualamos look al module-card NavLink */
+.module-card-parent {
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.module-card-parent.is-current {
+  background: rgba(255, 255, 255, 0.7);
+  border-color: var(--md-primary);
+  box-shadow: 0 6px 18px rgba(197, 115, 122, 0.10);
+}
+
+.module-card-parent:hover {
+  /* Anula el translateX del module-card hover normal porque acá tenemos chevron y queremos
+     que el item se sienta estático al expandir. */
+  transform: none !important;
+}
+
+.module-chevron {
+  margin-left: auto;
+  flex-shrink: 0;
+  color: var(--md-on-surface-variant);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.module-chevron.open {
+  transform: rotate(90deg);
+  color: var(--md-primary);
+}
+
+.modules-submenu {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  padding: 0 0.25rem 0 1.5rem;
+  transition:
+    max-height 0.32s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.2s ease,
+    margin 0.2s ease,
+    padding 0.2s ease;
+}
+
+.modules-submenu.open {
+  max-height: 600px;
+  opacity: 1;
+  margin: 0.5rem 0 0.25rem;
+  padding: 0 0.25rem 0.25rem 1.5rem;
+}
+
+.module-submenu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 10px;
+  font-size: 0.82rem;
+  color: var(--md-on-surface-variant);
+  text-decoration: none;
+  font-weight: 500;
+  transition: background 0.15s, color 0.15s, padding-left 0.15s;
+  position: relative;
+}
+
+.module-submenu-item::before {
+  content: '';
+  position: absolute;
+  left: -0.6rem;
+  top: 50%;
+  width: 6px;
+  height: 1px;
+  background: var(--md-outline-variant);
+  transform: translateY(-50%);
+}
+
+.module-submenu-item:hover {
+  background: var(--md-state-hover);
+  color: var(--md-on-surface);
+}
+
+.module-submenu-item.active {
+  background: color-mix(in srgb, var(--md-primary) 12%, transparent);
+  color: var(--md-primary);
+  font-weight: 600;
+}
+
+.module-submenu-item.active::before {
+  background: var(--md-primary);
+  width: 8px;
+  height: 2px;
+}
+
 .module-content {
   flex: 1;
   display: flex;
