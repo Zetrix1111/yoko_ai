@@ -163,6 +163,28 @@ export default function ModulesSidebar({ show, onClose }) {
               />
             );
           }
+          // Módulo top-level con externalUrl → abre en nueva pestaña
+          if (m.externalUrl) {
+            return (
+              <a
+                key={m.id}
+                href={m.externalUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={handleNavClick}
+                className="module-card"
+              >
+                <div className={`module-icon-wrapper ${m.iconClass}`}>
+                  <m.Icon size={20} />
+                </div>
+                <div className="module-content">
+                  <h3 className="module-name">{m.name}</h3>
+                  {m.badge && <span className="module-badge">{m.badge}</span>}
+                </div>
+                <ExternalLink size={16} style={{ marginLeft: 'auto', flexShrink: 0, opacity: 0.5 }} />
+              </a>
+            );
+          }
           // Módulo sin submenús: NavLink directo (comportamiento clásico)
           return (
             <NavLink key={m.id} to={m.path} onClick={handleNavClick} className="module-card">

@@ -30,7 +30,6 @@ export const API = {
   CHAT: '/api/chat',
   UPLOAD: '/api/upload',
   ALERTA_SEGURA: '/api/alerta_segura',
-  CUENTA_BANCARIA: '/api/cuenta_bancaria',
   FACTURAS_PROCESAR: '/api/facturas_procesar',
   FACTURAS_CONCAR: '/api/facturas_concar',
 };

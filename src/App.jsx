@@ -10,7 +10,7 @@ import { MODULES } from './features/modules/modulesConfig';
 import { isModuleEnabled } from './tenants';
 
 import AlertaSeguraScreen from './features/modules/alerta-segura/AlertaSeguraScreen';
-import CuentaBancariaScreen from './features/modules/cuenta-bancaria/CuentaBancariaScreen';
+import ConfiguracionEmpresaScreen from './features/modules/configuracion-empresa/ConfiguracionEmpresaScreen';
 import FacturasInteligentesScreen from './features/modules/facturas-inteligentes/FacturasInteligentesScreen';
 import GestionCajaChicaScreen from './features/modules/gestion-caja-chica/GestionCajaChicaScreen';
 
@@ -18,7 +18,7 @@ import GestionCajaChicaScreen from './features/modules/gestion-caja-chica/Gestio
 // Para enchufar un módulo nuevo, solo agrega aquí su entrada.
 const MODULE_COMPONENTS = {
   'alerta-segura':          AlertaSeguraScreen,
-  'cuenta-bancaria':        CuentaBancariaScreen,
+  'configuracion-empresa':  ConfiguracionEmpresaScreen,
   'facturas-inteligentes':  FacturasInteligentesScreen,
   'gestion-caja':           GestionCajaChicaScreen,
 };

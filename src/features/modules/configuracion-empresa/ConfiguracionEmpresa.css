@@ -1,0 +1,141 @@
+/* ─────────────────────────────────────────────
+   Configuración de empresa — estilos del módulo
+   ───────────────────────────────────────────── */
+
+.ce-screen {
+  width: 100%;
+  max-width: 880px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  animation: ce-fade 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes ce-fade {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.ce-header h1 {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #0F172A;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.ce-header p {
+  color: #64748B;
+  font-size: 0.95rem;
+  margin: 0.35rem 0 0;
+}
+
+.ce-card {
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 16px;
+  padding: 1.5rem;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.ce-card-header h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #0F172A;
+  margin: 0;
+}
+
+.ce-card-header p {
+  color: #64748B;
+  font-size: 0.85rem;
+  margin: 0.3rem 0 0;
+  max-width: 520px;
+  line-height: 1.45;
+}
+
+/* ── Radio cards (sistema contable) ── */
+.ce-radio-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
+.ce-radio-option {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1.1rem;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+  background: #FFFFFF;
+  position: relative;
+}
+
+.ce-radio-option:hover {
+  border-color: #94A3B8;
+  background: #F8FAFC;
+}
+
+.ce-radio-option.selected {
+  border-color: #2563EB;
+  background: #EFF6FF;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08);
+}
+
+.ce-radio-option input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.ce-radio-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.ce-radio-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: #0F172A;
+  letter-spacing: 0.02em;
+}
+
+.ce-radio-desc {
+  font-size: 0.78rem;
+  color: #64748B;
+  margin-top: 2px;
+}
+
+.ce-radio-check {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #2563EB;
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.3);
+}
+
+/* ── Save indicator (sutil) ── */
+.ce-saved-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 1rem;
+  font-size: 0.8rem;
+  color: #059669;
+  font-weight: 500;
+}
+
+@media (max-width: 640px) {
+  .ce-radio-grid { grid-template-columns: 1fr; }
+  .ce-card { padding: 1.25rem; }
+  .ce-header h1 { font-size: 1.3rem; }
+}

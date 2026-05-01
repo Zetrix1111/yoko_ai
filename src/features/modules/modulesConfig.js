@@ -6,6 +6,9 @@
 // Submenús (opcional): si un módulo declara `submenus`, la sidebar
 // muestra un acordeón. Cada submenú navega a `${path}?section=<id>`.
 // La pantalla del módulo lee ?section= con useSearchParams.
+//
+// externalUrl (opcional): si un módulo o submenú lo declara, en vez
+// de navegar internamente, abre esa URL en nueva pestaña.
 import {
   ShieldAlert,
   FileText,
@@ -16,16 +19,10 @@ import {
   Receipt,
   BarChart3,
   Settings,
+  Building2,
 } from 'lucide-react';
 
 export const MODULES = [
-  {
-    id: 'alerta-segura',
-    path: '/modulos/alerta-segura',
-    name: 'Notificaciones y alertas',
-    Icon: ShieldAlert,
-    iconClass: 'alert',
-  },
   {
     id: 'gestion-caja',
     path: '/modulos/gestion-caja',
@@ -33,28 +30,38 @@ export const MODULES = [
     Icon: PiggyBank,
     iconClass: 'finance',
     submenus: [
-      { id: 'inicio',        label: 'Dashboard',     Icon: LayoutDashboard },
-      { id: 'solicitudes',   label: 'Solicitudes',   Icon: FileText        },
-      { id: 'aprobaciones',  label: 'Aprobaciones',  Icon: ShieldCheck,
-        externalUrl: 'https://aprobaciones.luna.com.pe/' },
-      { id: 'pagos',         label: 'Pagos',         Icon: CreditCard      },
-      { id: 'rendiciones',   label: 'Rendiciones',   Icon: Receipt         },
-      { id: 'reportes',      label: 'Reportes',      Icon: BarChart3       },
-      { id: 'configuracion', label: 'Configuración', Icon: Settings        },
+      { id: 'inicio', label: 'Dashboard', Icon: LayoutDashboard },
+      { id: 'solicitudes', label: 'Solicitudes', Icon: FileText },
+      {
+        id: 'aprobaciones', label: 'Aprobaciones', Icon: ShieldCheck,
+        externalUrl: 'https://aprobaciones.luna.com.pe/'
+      },
+      { id: 'pagos', label: 'Pagos', Icon: CreditCard },
+      { id: 'rendiciones', label: 'Rendiciones', Icon: Receipt },
+      { id: 'reportes', label: 'Reportes', Icon: BarChart3 },
+      { id: 'configuracion', label: 'Configuración', Icon: Settings },
     ],
   },
   {
     id: 'facturas-inteligentes',
     path: '/modulos/facturas-inteligentes',
-    name: 'Facturas Inteligentes',
+    name: 'Facturas Inteligentes (BETA)',
     Icon: FileText,
     iconClass: 'invoice',
   },
   {
-    id: 'cuenta-bancaria',
-    path: '/modulos/cuenta-bancaria',
-    name: 'Configuración Contable',
-    Icon: CreditCard,
+    id: 'configuracion-empresa',
+    path: '/modulos/configuracion-empresa',
+    name: 'Configuración',
+    Icon: Building2,
     iconClass: 'banking',
+  },
+  {
+    id: 'alerta-segura',
+    path: '/modulos/alerta-segura',
+    name: 'Notificaciones y alertas',
+    Icon: ShieldAlert,
+    iconClass: 'alert',
+    externalUrl: 'https://alertasegura.luna.com.pe/alerta_segura_cmejia.html',
   },
 ];
