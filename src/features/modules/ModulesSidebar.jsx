@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { NavLink, Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { X, ChevronRight } from 'lucide-react';
+import { X, ChevronRight, ExternalLink } from 'lucide-react';
 import { MODULES } from './modulesConfig';
 import { isModuleEnabled } from '../../tenants';
 import QuickLinksRail from '../quick-links/QuickLinksRail';
@@ -31,7 +31,24 @@ function ProcessItem({ module, isExpanded, isActive, onToggle, onClose }) {
   );
 }
 
-function SubmenuItem({ to, label, Icon, isActive, onClick }) {
+function SubmenuItem({ to, label, Icon, isActive, onClick, externalUrl }) {
+  // Si la subsección apunta a un sistema externo, abrimos en nueva
+  // pestaña para no perder la sesión del usuario en Yoko.
+  if (externalUrl) {
+    return (
+      <a
+        href={externalUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={onClick}
+        className="module-submenu-item"
+      >
+        <Icon size={14} />
+        <span style={{ flex: 1 }}>{label}</span>
+        <ExternalLink size={12} style={{ opacity: 0.6 }} />
+      </a>
+    );
+  }
   // Usamos <Link> (no NavLink) porque NavLink solo matchea por pathname
   // y nuestros submenús comparten pathname (varían por ?section=). El
   // estado activo lo calcula el padre y se pasa por prop.
@@ -56,7 +73,7 @@ function ProcessAccordion({ module, currentPath, currentSection, isExpanded, onT
       />
       <div className={`modules-submenu ${isExpanded ? 'open' : ''}`}>
         {module.submenus.map((sm) => {
-          const isActive = isCurrentModule && currentSection === sm.id;
+          const isActive = !sm.externalUrl && isCurrentModule && currentSection === sm.id;
           return (
             <SubmenuItem
               key={sm.id}
@@ -65,6 +82,7 @@ function ProcessAccordion({ module, currentPath, currentSection, isExpanded, onT
               Icon={sm.Icon}
               isActive={isActive}
               onClick={onClose}
+              externalUrl={sm.externalUrl}
             />
           );
         })}

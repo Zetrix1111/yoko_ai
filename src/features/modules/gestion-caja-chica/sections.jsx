@@ -342,65 +342,26 @@ export function SolicitudesSection() {
 }
 
 // ─────────────────────────────────────
-// 2 · APROBACIONES
+// 2 · APROBACIONES — externalizado
 // ─────────────────────────────────────
+// Las aprobaciones viven en https://aprobaciones.luna.com.pe/
+// El submenú abre ese sistema en nueva pestaña. Esta pantalla solo
+// se renderiza si alguien llega por deep-link a ?section=aprobaciones.
 export function AprobacionesSection() {
-  const [data, setData] = useState(APROBACIONES);
-
-  const decidir = (id, estado) => {
-    setData(data.map((a) => a.id === id ? { ...a, estado } : a));
-  };
-
   return (
-    <>
-      <SectionHeader
-        title="Aprobaciones"
-        subtitle="Revisa y autoriza las solicitudes pendientes."
-      />
-
-      <div className="gcc-table-wrap">
-        <div className="gcc-table-toolbar">
-          <h3>{data.filter((a) => a.estado === 'pendiente').length} pendientes</h3>
-        </div>
-        <table className="gcc-table">
-          <thead>
-            <tr>
-              <th>Solicitud</th>
-              <th>Solicitante</th>
-              <th>Área</th>
-              <th className="num">Monto</th>
-              <th>Estado</th>
-              <th style={{ width: 200 }}>Acción</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.map((a) => (
-              <tr key={a.id}>
-                <td style={{ fontFamily: 'monospace', fontSize: '0.78rem' }}>{a.solicitudId}</td>
-                <td style={{ fontWeight: 500 }}>{a.solicitante}</td>
-                <td>{a.area}</td>
-                <td className="num">{formatPEN(a.monto)}</td>
-                <td><Badge value={a.estado} /></td>
-                <td>
-                  {a.estado === 'pendiente' ? (
-                    <div style={{ display: 'flex', gap: '0.4rem' }}>
-                      <button className="gcc-btn gcc-btn-success" onClick={() => decidir(a.id, 'aprobada')}>
-                        <Check size={14} /> Aprobar
-                      </button>
-                      <button className="gcc-btn gcc-btn-danger" onClick={() => decidir(a.id, 'rechazada')}>
-                        <XCircle size={14} /> Rechazar
-                      </button>
-                    </div>
-                  ) : (
-                    <span style={{ fontSize: '0.8rem', color: 'var(--md-on-surface-variant)' }}>Decidido</span>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </>
+    <div className="gcc-card" style={{ textAlign: 'center', padding: '3rem 1.5rem' }}>
+      <p style={{ color: '#475569', marginBottom: '1rem' }}>
+        Las aprobaciones se gestionan en un sistema externo.
+      </p>
+      <a
+        className="gcc-btn gcc-btn-primary"
+        href="https://aprobaciones.luna.com.pe/"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        Abrir Aprobaciones ↗
+      </a>
+    </div>
   );
 }
 

@@ -33,9 +33,10 @@ export const MODULES = [
     Icon: PiggyBank,
     iconClass: 'finance',
     submenus: [
-      { id: 'inicio',        label: 'Inicio',        Icon: LayoutDashboard },
+      { id: 'inicio',        label: 'Dashboard',     Icon: LayoutDashboard },
       { id: 'solicitudes',   label: 'Solicitudes',   Icon: FileText        },
-      { id: 'aprobaciones',  label: 'Aprobaciones',  Icon: ShieldCheck     },
+      { id: 'aprobaciones',  label: 'Aprobaciones',  Icon: ShieldCheck,
+        externalUrl: 'https://aprobaciones.luna.com.pe/' },
       { id: 'pagos',         label: 'Pagos',         Icon: CreditCard      },
       { id: 'rendiciones',   label: 'Rendiciones',   Icon: Receipt         },
       { id: 'reportes',      label: 'Reportes',      Icon: BarChart3       },
