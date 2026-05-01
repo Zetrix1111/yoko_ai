@@ -1,8 +1,10 @@
 import { useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { postJson, postForm, API } from '../../shared/api';
 import { tenantConfig } from '../../tenants';
 
 export function useChat(user) {
+  const navigate = useNavigate();
   const agentName = tenantConfig.agent.name;
   const greeting = user?.nombre
     ? `¡Hola, ${user.nombre}! Soy tu asistente inteligente. Puedo ayudarte a ejecutar procesos como rendiciones, caja chica y pagos. ¿Qué deseas hacer hoy?`
@@ -90,21 +92,33 @@ export function useChat(user) {
     }]);
 
     try {
+      const apiMessages = [...messages, { id: 'temp', text, sender: 'user' }]
+        .filter(m => !m.isLoading)
+        .map(m => ({
+          role: m.sender === 'user' ? 'user' : 'assistant',
+          content: m.text
+        }));
+
       const payload = {
-        message: text,
-        has_attachment: batchId !== null,
-        session_id: user?.sessionId || '',
-        message_id: messageId,
+        user: user || {},
+        messages: apiMessages
       };
-      if (batchId) payload.batchId = batchId;
 
       const data = await postJson(API.CHAT, payload);
-      let yokoText = typeof data === 'string'
-        ? data
-        : (data.response || data.text || data.message || data.respuesta || JSON.stringify(data));
-
-      if (yokoText === 'Accepted') {
-        yokoText = 'He recibido tu mensaje (Make respondió "Accepted"). Recuerda configurar el módulo "Webhook Response".';
+      
+      let yokoText = '';
+      if (typeof data === 'string') {
+        yokoText = data;
+        if (yokoText === 'Accepted') {
+          yokoText = 'He recibido tu mensaje (Make respondió "Accepted"). Recuerda configurar el módulo "Webhook Response".';
+        }
+      } else {
+        yokoText = data.text || data.response || data.message || data.respuesta || JSON.stringify(data);
+        
+        // Handle navigation action from OpenAI backend
+        if (data.action?.type === 'navigate' && data.action.path) {
+          navigate(data.action.path);
+        }
       }
 
       setMessages((prev) => prev.map(msg =>

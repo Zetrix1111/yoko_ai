@@ -3,4 +3,6 @@ name = "yoko-chat"
 version = "0.1.0"
 description = "Yoko AI Chat Backend"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "openai>=1.51.0",
+]

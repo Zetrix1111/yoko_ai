@@ -1,13 +1,25 @@
 {
   "id": "demo",
-  "name": "Demo Corp",
-  "ruc": "",
-  "razonSocial": "",
+  "name": "Demo Grimentor",
+  "ruc": "20100090487",
+  "razonSocial": "GRIMENTOR CONSULTING SAC",
+  "sistemaContable": "concar",
   "seguimientoIA": false,
   "agent": {
     "name": "Aria"
   },
   "modules": [
     "gestion-caja"
-  ]
+  ],
+  "proceso": {
+    "caja_chica": {
+      "aplica_centro_costo": true,
+      "aplica_tipo_gasto": false,
+      "requiere_aprobacion": true,
+      "num_aprobadores": 1,
+      "monto_maximo_activo": false,
+      "monto_maximo": 0,
+      "aprobacion_rendicion": false
+    }
+  }
 }

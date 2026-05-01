@@ -1,0 +1,253 @@
+"""
+Loader de configuración multi-tenant en 2 capas:
+
+  • Estática  → src/tenants/<TENANT_ID>/config.json   (identidad, módulos, branding)
+  • Dinámica  → tablas Config_* en Airtable           (reglas de negocio editables)
+
+`load_full_config()` combina ambas en el dict final que consumirá el
+`prompt_builder` y demás módulos del backend.
+
+Cache: en memoria, TTL 300s. El cold start lo resetea (esperado en serverless).
+"""
+
+import json
+import os
+import sys
+import time
+
+from . import airtable_client
+from .airtable_client import AirtableError
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Resolución de rutas
+# ─────────────────────────────────────────────────────────────────────────
+_HERE = os.path.dirname(os.path.abspath(__file__))                # api/_lib
+_REPO_ROOT = os.path.abspath(os.path.join(_HERE, "..", ".."))     # repo root
+_TENANTS_DIR = os.path.join(_REPO_ROOT, "src", "tenants")
+
+_FALLBACK_TENANT = "cmejia"
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Cache de la config dinámica
+# ─────────────────────────────────────────────────────────────────────────
+_cache = {"data": None, "expires_at": 0.0}
+_CACHE_TTL_SECONDS = 300
+
+
+def _get_tenant_id() -> str:
+    """Lee TENANT_ID del entorno; si falta, usa el fallback con warning."""
+    tenant_id = os.environ.get("TENANT_ID")
+    if not tenant_id:
+        print(
+            f"[config_loader] TENANT_ID no seteado. Usando fallback '{_FALLBACK_TENANT}'.",
+            file=sys.stderr,
+        )
+        return _FALLBACK_TENANT
+    return tenant_id
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Capa 1-2: estática (identidad / capacidades)
+# ─────────────────────────────────────────────────────────────────────────
+def load_static_config() -> dict:
+    """
+    Lee y devuelve src/tenants/<TENANT_ID>/config.json.
+    Si el archivo del tenant no existe, cae al fallback.
+    """
+    tenant_id = _get_tenant_id()
+    path = os.path.join(_TENANTS_DIR, tenant_id, "config.json")
+
+    if not os.path.exists(path):
+        print(
+            f"[config_loader] No existe {path}. Usando fallback '{_FALLBACK_TENANT}'.",
+            file=sys.stderr,
+        )
+        path = os.path.join(_TENANTS_DIR, _FALLBACK_TENANT, "config.json")
+
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Capa 4: dinámica (reglas de negocio en Airtable)
+# ─────────────────────────────────────────────────────────────────────────
+def _cast(valor, tipo: str | None):
+    """
+    Castea el valor (que viene como string) según el `tipo` declarado en
+    Config_Procesos. Tipos soportados: int, float, bool, str (default).
+    Si el cast falla, devuelve el valor original como string.
+    """
+    if valor is None:
+        return None
+    tipo = (tipo or "str").strip().lower()
+    raw = str(valor).strip()
+    if tipo == "int":
+        try:
+            return int(raw)
+        except (ValueError, TypeError):
+            return None
+    if tipo == "float":
+        try:
+            return float(raw)
+        except (ValueError, TypeError):
+            return None
+    if tipo == "bool":
+        return raw.lower() in ("true", "1", "yes", "sí", "si", "on")
+    return raw
+
+
+def _safe_list(table: str, filter_formula: str) -> list[dict]:
+    """
+    Wrapper que intenta listar una tabla y, si falla (404 porque no existe
+    aún, o error de red), devuelve [] con un warning a stderr. El skeleton
+    debe poder correr aunque las tablas no estén creadas todavía.
+    """
+    try:
+        return airtable_client.list_records(table, filter_formula=filter_formula)
+    except AirtableError as e:
+        print(
+            f"[config_loader] No se pudo leer la tabla '{table}' "
+            f"(status={e.status}). Usando lista vacía. Detalle: {e}",
+            file=sys.stderr,
+        )
+        return []
+
+
+def load_dynamic_config() -> dict:
+    """
+    Lee las tablas Config_* desde Airtable filtradas por empresa_id == TENANT_ID.
+
+    Devuelve un dict por proceso con la forma:
+        {
+          "caja_chica": {
+            "<clave>": <valor casteado>,
+            ...
+            "aprobadores": [{...fields}],
+            "centros_costo": [{...fields}],
+            "tipos_gasto": [{...fields}],
+          }
+        }
+
+    Cache TTL 300s. Llamadas siguientes dentro del TTL no tocan Airtable.
+    """
+    now = time.time()
+    if _cache["data"] is not None and _cache["expires_at"] > now:
+        return _cache["data"]
+
+    tenant_id = _get_tenant_id()
+    formula = f"{{empresa_id}}='{tenant_id}'"
+
+    # 1) Config_Procesos: rows escalares (clave/valor/tipo) por proceso
+    config_rows = _safe_list("Config_Procesos", formula)
+
+    procesos: dict[str, dict] = {}
+    for row in config_rows:
+        f = row.get("fields", {})
+        proceso = f.get("proceso")
+        clave = f.get("clave")
+        if not proceso or not clave:
+            continue
+        valor_casteado = _cast(f.get("valor"), f.get("tipo"))
+        procesos.setdefault(proceso, {})[clave] = valor_casteado
+
+    # 2) Aprobadores: agrupados por proceso
+    aprobadores_rows = _safe_list("Aprobadores", formula)
+    for row in aprobadores_rows:
+        f = row.get("fields", {})
+        proceso = f.get("proceso")
+        if not proceso:
+            continue
+        procesos.setdefault(proceso, {}).setdefault("aprobadores", []).append(f)
+
+    # 3) Centros_Costo y Tipos_Gasto: empresa-wide. Por contrato del spec
+    #    los duplicamos en cada proceso para que el consumer los tenga
+    #    "a la mano" desde proceso.<nombre>.
+    centros_rows = [r.get("fields", {}) for r in _safe_list("Centros_Costo", formula)]
+    tipos_rows = [r.get("fields", {}) for r in _safe_list("Tipos_Gasto", formula)]
+
+    # Aseguramos que caja_chica exista aunque Config_Procesos esté vacío:
+    procesos.setdefault("caja_chica", {})
+
+    for proceso_dict in procesos.values():
+        proceso_dict.setdefault("aprobadores", [])
+        proceso_dict["centros_costo"] = centros_rows
+        proceso_dict["tipos_gasto"] = tipos_rows
+
+    _cache["data"] = procesos
+    _cache["expires_at"] = now + _CACHE_TTL_SECONDS
+    return procesos
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Combinada (estática + dinámica)
+# ─────────────────────────────────────────────────────────────────────────
+def _merge_proceso(static_proceso: dict, dynamic_proceso: dict) -> dict:
+    """
+    Combina los procesos del config estático (defaults por tenant) con
+    los del dinámico (Airtable). El dinámico sobreescribe clave a clave.
+
+    Cada `proceso` (ej. 'caja_chica') es un dict de claves individuales
+    (flags, números, listas). Hacemos shallow merge: las claves del
+    dinámico ganan sobre las del estático.
+    """
+    combined: dict[str, dict] = {}
+    # Defaults estáticos
+    for proc_name, proc_data in (static_proceso or {}).items():
+        combined[proc_name] = dict(proc_data) if isinstance(proc_data, dict) else {}
+    # Dinámico sobreescribe / agrega
+    for proc_name, proc_data in (dynamic_proceso or {}).items():
+        if proc_name in combined and isinstance(proc_data, dict):
+            combined[proc_name].update(proc_data)
+        else:
+            combined[proc_name] = proc_data
+    return combined
+
+
+def load_full_config() -> dict:
+    """
+    Devuelve la config completa con la forma:
+
+        {
+          "empresa": {
+            "id", "razon_social", "ruc", "sistema_contable",
+            "agent": {...}, "modules": [...]
+          },
+          "proceso": {
+            "caja_chica": {
+              "<clave>": <valor>, ...,
+              "aprobadores": [...],
+              "centros_costo": [...],
+              "tipos_gasto": [...]
+            }
+          }
+        }
+
+    `proceso` es un MERGE entre el config estático del tenant
+    (`tenants/<id>/config.json` → `proceso.<nombre>`) y el dinámico
+    (Airtable). Esto permite que el config estático provea defaults
+    razonables mientras `Config_Procesos` no exista en Airtable, y
+    cuando exista, sus valores ganan automáticamente.
+    """
+    static = load_static_config()
+    dynamic = load_dynamic_config()
+
+    empresa = {
+        "id": static.get("id"),
+        "razon_social": static.get("razonSocial", ""),
+        "ruc": static.get("ruc", ""),
+        "sistema_contable": static.get("sistemaContable", "concar"),
+        "agent": static.get("agent", {}),
+        "modules": static.get("modules", []),
+    }
+
+    proceso = _merge_proceso(
+        static.get("proceso", {}) or {},
+        dynamic or {},
+    )
+
+    return {
+        "empresa": empresa,
+        "proceso": proceso,
+    }

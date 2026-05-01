@@ -1,72 +1,121 @@
 """
-api/chat.py
-Serverless function (Python): proxy seguro hacia el webhook de Make (IA).
-El CHANNEL y la URL de Make nunca se exponen al browser.
+api/chat.py — handler conversacional con IA (function calling).
 
-A futuro (Fase 4): reemplazar la llamada a Make por:
-    import anthropic
-    client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
-    message = client.messages.create(...)
+Reemplaza el proxy a Make. Ahora arma el system prompt en 5 capas
+(identidad / capacidades / usuario / reglas / comportamiento), ejecuta
+el loop de tool calling con OpenAI, y devuelve `{text, action}` al
+frontend.
+
+Body esperado:
+    {
+      "user":     {"dni": "...", "nombre": "...", "cargo": "..."},
+      "messages": [{"role": "user"|"assistant", "content": "..."}, ...]
+    }
+
+Respuesta:
+    {"text": "...", "action": {...} | null}
+
+Errores (siempre en español, sin filtrar detalle interno):
+    400 → JSON inválido o datos del usuario inválidos
+    500 → configuración del servidor incompleta o error interno
+    502 → falla del servicio IA o de la base de datos (Airtable)
 """
 
-from http.server import BaseHTTPRequestHandler
 import json
 import os
-import urllib.request
-import urllib.error
+import sys
+from http.server import BaseHTTPRequestHandler
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Setup de imports: agregamos api/ al sys.path para poder hacer
+# `from _lib import ...` tanto en local como en Vercel.
+# ─────────────────────────────────────────────────────────────────────────
+_HERE = os.path.dirname(os.path.abspath(__file__))   # /.../api
+if _HERE not in sys.path:
+    sys.path.insert(0, _HERE)
+
+from _lib import config_loader, openai_client, prompt_builder, session  # noqa: E402
+from _lib.airtable_client import AirtableError                          # noqa: E402
+
+try:
+    from openai import APIError as OpenAIAPIError                       # noqa: E402
+except ImportError:
+    # Si por alguna razón el SDK no se carga, usamos Exception genérica
+    # como sentinel para que el handler no se rompa al cargar.
+    OpenAIAPIError = Exception  # type: ignore[assignment, misc]
+
+
+_REQUIRED_ENV = ("OPENAI_API_KEY", "AIRTABLE_TOKEN", "AIRTABLE_BASE_ID", "TENANT_ID")
 
 
 class handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         try:
+            # 1) Leer y parsear el body
             length = int(self.headers.get("Content-Length", 0))
-            body   = json.loads(self.rfile.read(length))
+            try:
+                raw = self.rfile.read(length)
+                body = json.loads(raw) if raw else {}
+            except json.JSONDecodeError:
+                return self._json(400, {"error": "JSON inválido en el cuerpo de la solicitud."})
 
-            webhook_url = os.environ.get("MAKE_WEBHOOK_AI")
-            channel     = os.environ.get("CHANNEL", "app")
-
-            if not webhook_url:
+            # 2) Verificar variables de entorno requeridas
+            missing = [k for k in _REQUIRED_ENV if not os.environ.get(k)]
+            if missing:
+                print(f"[chat] Faltan env vars: {missing}", file=sys.stderr)
                 return self._json(500, {"error": "Configuración del servidor incompleta."})
 
-            # El canal se inyecta aquí en el servidor, nunca viene del cliente
-            payload = {
-                "canal":          channel,
-                "message":        body.get("message", ""),
-                "has_attachment": bool(body.get("has_attachment", False)),
-                "session_id":     body.get("session_id", ""),
-                "message_id":     body.get("message_id", ""),
-            }
-            if body.get("batchId"):
-                payload["batchId"] = body["batchId"]
+            # 3) Extraer y validar al usuario
+            try:
+                user = session.extract_user(body)
+            except ValueError as e:
+                print(f"[chat] User inválido: {e}", file=sys.stderr)
+                return self._json(400, {"error": "Datos del usuario inválidos."})
 
-            data   = json.dumps(payload).encode("utf-8")
-            req    = urllib.request.Request(
-                webhook_url,
-                data=data,
-                headers={"Content-Type": "application/json"},
-                method="POST"
-            )
+            # 4) Cargar configuración (estática + dinámica)
+            try:
+                config = config_loader.load_full_config()
+            except AirtableError as e:
+                print(f"[chat] AirtableError al cargar config: {e}", file=sys.stderr)
+                return self._json(502, {"error": "Error al consultar la base de datos."})
 
-            with urllib.request.urlopen(req, timeout=28) as res:
-                content_type = res.headers.get("Content-Type", "")
-                raw = res.read()
+            # 5) Armar el system prompt y la lista de tools
+            try:
+                system = prompt_builder.build_system_prompt(config, user)
+                tools = prompt_builder.build_tools_list(config)
+            except Exception as e:
+                print(f"[chat] Error armando prompt/tools: {type(e).__name__}: {e}", file=sys.stderr)
+                return self._json(500, {"error": "Error interno del servidor."})
 
-            if "application/json" in content_type:
-                return self._json(200, json.loads(raw))
-            else:
-                # Make a veces responde texto plano
-                return self._json(200, {"response": raw.decode("utf-8")})
+            # 6) Loop de chat con OpenAI (puede llamar tools varias veces)
+            try:
+                result = openai_client.run_chat(
+                    system_prompt=system,
+                    messages=body.get("messages", []) or [],
+                    tools=tools,
+                    context={"user": user, "config": config},
+                )
+            except OpenAIAPIError as e:
+                print(f"[chat] OpenAI API error: {e}", file=sys.stderr)
+                return self._json(502, {"error": "Error del servicio IA."})
+            except AirtableError as e:
+                # Una tool puede haber tirado AirtableError adentro del loop;
+                # tool_registry lo captura y lo devuelve como {"error":"interno"},
+                # pero por si acaso lo manejamos aquí también.
+                print(f"[chat] AirtableError durante run_chat: {e}", file=sys.stderr)
+                return self._json(502, {"error": "Error al consultar la base de datos."})
 
-        except urllib.error.HTTPError as e:
-            print(f"[chat] Error Make HTTP {e.code}")
-            return self._json(502, {"error": f"Error del servicio IA: HTTP {e.code}."})
-
-        except json.JSONDecodeError:
-            return self._json(400, {"error": "JSON inválido en el cuerpo de la solicitud."})
+            # 7) Respuesta final
+            return self._json(200, {
+                "text":   result.get("text", ""),
+                "action": result.get("action"),
+            })
 
         except Exception as e:
-            print(f"[chat] Error inesperado: {e}")
+            # Cualquier cosa que se nos haya escapado.
+            print(f"[chat] Error inesperado: {type(e).__name__}: {e}", file=sys.stderr)
             return self._json(500, {"error": "Error interno del servidor."})
 
     # ──────────────────────────────────────────
