@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { NavLink, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { NavLink, Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { X, ChevronRight } from 'lucide-react';
 import { MODULES } from './modulesConfig';
 import { isModuleEnabled } from '../../tenants';
@@ -32,11 +32,14 @@ function ProcessItem({ module, isExpanded, isActive, onToggle, onClose }) {
 }
 
 function SubmenuItem({ to, label, Icon, isActive, onClick }) {
+  // Usamos <Link> (no NavLink) porque NavLink solo matchea por pathname
+  // y nuestros submenús comparten pathname (varían por ?section=). El
+  // estado activo lo calcula el padre y se pasa por prop.
   return (
-    <NavLink to={to} onClick={onClick} className={`module-submenu-item ${isActive ? 'active' : ''}`}>
+    <Link to={to} onClick={onClick} className={`module-submenu-item ${isActive ? 'active' : ''}`}>
       <Icon size={14} />
       <span>{label}</span>
-    </NavLink>
+    </Link>
   );
 }
 
