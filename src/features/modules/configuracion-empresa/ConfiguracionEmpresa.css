@@ -54,6 +54,76 @@
   line-height: 1.45;
 }
 
+.ce-card-title-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+}
+
+.ce-card-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: #DBEAFE;
+  color: #2563EB;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* ── Form fields (RUC + Razón social) ── */
+.ce-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 1rem;
+  margin-top: 1.25rem;
+}
+
+.ce-form-grid .full { grid-column: 1 / -1; }
+
+@media (max-width: 640px) {
+  .ce-form-grid { grid-template-columns: 1fr; }
+}
+
+.ce-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.ce-field label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.ce-field-hint {
+  font-size: 0.72rem;
+  color: #94A3B8;
+}
+
+.ce-input {
+  padding: 0.65rem 0.9rem;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 10px;
+  background: #FFFFFF;
+  color: #0F172A;
+  font-family: inherit;
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.ce-input:focus {
+  border-color: #2563EB;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.ce-input::placeholder {
+  color: #CBD5E1;
+}
+
 /* ── Radio cards (sistema contable) ── */
 .ce-radio-grid {
   display: grid;

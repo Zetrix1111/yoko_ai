@@ -653,6 +653,9 @@ export function ConfiguracionSection() {
   const [maxMontoEnabled, setMaxMontoEnabled] = useState(false);
   const [maxMonto, setMaxMonto] = useState(5000);
 
+  // ── Aprobación de rendición (default OFF) ──
+  const [aprobRendicionEnabled, setAprobRendicionEnabled] = useState(false);
+
   return (
     <>
       <SectionHeader
@@ -730,6 +733,14 @@ export function ConfiguracionSection() {
             />
           </div>
         </ConfigCard>
+
+        <ConfigCard
+          title="Aprobación de rendición"
+          description="Si está activo, las rendiciones deben pasar por aprobación antes de quedar registradas como válidas. Si está desactivado, se aceptan automáticamente al ser registradas."
+          summary={aprobRendicionEnabled ? 'Requiere aprobación' : 'Sin aprobación'}
+          enabled={aprobRendicionEnabled}
+          onToggle={setAprobRendicionEnabled}
+        />
       </div>
     </>
   );

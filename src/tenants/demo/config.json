@@ -1,6 +1,8 @@
 {
   "id": "demo",
   "name": "Demo Corp",
+  "ruc": "",
+  "razonSocial": "",
   "agent": {
     "name": "Aria"
   },
