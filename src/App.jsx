@@ -16,6 +16,7 @@ import CajaChicaScreen from './features/modules/caja-chica/CajaChicaScreen';
 import SolicitudCajaChicaScreen from './features/modules/solicitud-caja-chica/SolicitudCajaChicaScreen';
 import PagosInteligentesScreen from './features/modules/pagos-inteligentes/PagosInteligentesScreen';
 import FacturasInteligentesScreen from './features/modules/facturas-inteligentes/FacturasInteligentesScreen';
+import GestionCajaChicaScreen from './features/modules/gestion-caja-chica/GestionCajaChicaScreen';
 
 // Mapeo: id de módulo → componente que renderiza su pantalla.
 // Para enchufar un módulo nuevo, solo agrega aquí su entrada.
@@ -27,6 +28,7 @@ const MODULE_COMPONENTS = {
   'solicitud-caja-chica':   SolicitudCajaChicaScreen,
   'pagos-inteligentes':     PagosInteligentesScreen,
   'facturas-inteligentes':  FacturasInteligentesScreen,
+  'gestion-caja':           GestionCajaChicaScreen,
 };
 
 function AuthenticatedApp({ user, onLogout }) {

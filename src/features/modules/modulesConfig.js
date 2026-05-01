@@ -10,6 +10,7 @@ import {
   Banknote,
   FileText,
   CreditCard,
+  PiggyBank,
 } from 'lucide-react';
 
 export const MODULES = [
@@ -34,6 +35,13 @@ export const MODULES = [
     name: 'Caja Chica Inteligente',
     Icon: Wallet,
     iconClass: 'cash',
+  },
+  {
+    id: 'gestion-caja',
+    path: '/modulos/gestion-caja',
+    name: 'Gestión de Caja Chica',
+    Icon: PiggyBank,
+    iconClass: 'finance',
   },
   {
     id: 'solicitud-caja-chica',
