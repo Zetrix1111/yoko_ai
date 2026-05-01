@@ -5,8 +5,6 @@
     "name": "Aria"
   },
   "modules": [
-    "aprobaciones",
-    "solicitud-caja-chica",
-    "caja-chica"
+    "gestion-caja"
   ]
 }

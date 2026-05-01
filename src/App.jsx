@@ -9,24 +9,16 @@ import ModulesSidebar from './features/modules/ModulesSidebar';
 import { MODULES } from './features/modules/modulesConfig';
 import { isModuleEnabled } from './tenants';
 
-import AprobacionesScreen from './features/modules/aprobaciones/AprobacionesScreen';
 import AlertaSeguraScreen from './features/modules/alerta-segura/AlertaSeguraScreen';
 import CuentaBancariaScreen from './features/modules/cuenta-bancaria/CuentaBancariaScreen';
-import CajaChicaScreen from './features/modules/caja-chica/CajaChicaScreen';
-import SolicitudCajaChicaScreen from './features/modules/solicitud-caja-chica/SolicitudCajaChicaScreen';
-import PagosInteligentesScreen from './features/modules/pagos-inteligentes/PagosInteligentesScreen';
 import FacturasInteligentesScreen from './features/modules/facturas-inteligentes/FacturasInteligentesScreen';
 import GestionCajaChicaScreen from './features/modules/gestion-caja-chica/GestionCajaChicaScreen';
 
 // Mapeo: id de módulo → componente que renderiza su pantalla.
 // Para enchufar un módulo nuevo, solo agrega aquí su entrada.
 const MODULE_COMPONENTS = {
-  'aprobaciones':           AprobacionesScreen,
   'alerta-segura':          AlertaSeguraScreen,
   'cuenta-bancaria':        CuentaBancariaScreen,
-  'caja-chica':             CajaChicaScreen,
-  'solicitud-caja-chica':   SolicitudCajaChicaScreen,
-  'pagos-inteligentes':     PagosInteligentesScreen,
   'facturas-inteligentes':  FacturasInteligentesScreen,
   'gestion-caja':           GestionCajaChicaScreen,
 };

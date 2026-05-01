@@ -8,15 +8,12 @@
 // La pantalla del módulo lee ?section= con useSearchParams.
 import {
   ShieldAlert,
-  CheckSquare,
-  Wallet,
-  Receipt,
-  Banknote,
   FileText,
   CreditCard,
   PiggyBank,
   LayoutDashboard,
   ShieldCheck,
+  Receipt,
   BarChart3,
   Settings,
 } from 'lucide-react';
@@ -25,24 +22,9 @@ export const MODULES = [
   {
     id: 'alerta-segura',
     path: '/modulos/alerta-segura',
-    name: 'Solicitudes y alertas',
+    name: 'Notificaciones y alertas',
     Icon: ShieldAlert,
     iconClass: 'alert',
-  },
-  {
-    id: 'aprobaciones',
-    path: '/modulos/aprobaciones',
-    name: 'Gestión de Solicitudes',
-    Icon: CheckSquare,
-    iconClass: 'approvals',
-    badge: 'Nuevo',
-  },
-  {
-    id: 'caja-chica',
-    path: '/modulos/caja-chica',
-    name: 'Caja Chica Inteligente',
-    Icon: Wallet,
-    iconClass: 'cash',
   },
   {
     id: 'gestion-caja',
@@ -59,20 +41,6 @@ export const MODULES = [
       { id: 'reportes',      label: 'Reportes',      Icon: BarChart3       },
       { id: 'configuracion', label: 'Configuración', Icon: Settings        },
     ],
-  },
-  {
-    id: 'solicitud-caja-chica',
-    path: '/modulos/solicitud-caja-chica',
-    name: 'Rendición de Gastos Inteligente',
-    Icon: Receipt,
-    iconClass: 'request',
-  },
-  {
-    id: 'pagos-inteligentes',
-    path: '/modulos/pagos-inteligentes',
-    name: 'Pagos Inteligentes',
-    Icon: Banknote,
-    iconClass: 'payment',
   },
   {
     id: 'facturas-inteligentes',
