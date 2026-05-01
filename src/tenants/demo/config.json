@@ -3,6 +3,7 @@
   "name": "Demo Corp",
   "ruc": "",
   "razonSocial": "",
+  "seguimientoIA": false,
   "agent": {
     "name": "Aria"
   },

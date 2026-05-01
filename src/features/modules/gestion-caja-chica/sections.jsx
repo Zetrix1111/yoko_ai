@@ -10,6 +10,7 @@ import {
   REPORTE_AREAS, REPORTE_USUARIOS, TIPOS_GASTO, CENTROS_COSTO,
   AREAS, formatPEN, formatDate,
 } from './mockData';
+import { tenantConfig } from '../../../tenants';
 
 // ─────────────────────────────────────
 // Helpers UI
@@ -615,17 +616,20 @@ function Toggle({ checked, onChange, ariaLabel }) {
   );
 }
 
-function ConfigCard({ title, description, summary, enabled, onToggle, children }) {
+function ConfigCard({ title, titleBadge, description, summary, enabled, onToggle, children }) {
   return (
     <div className={`gcc-card gcc-config-card ${enabled ? 'is-on' : ''}`}>
       <div className="gcc-config-header">
         <div className="gcc-config-title-block">
-          <h3 className="gcc-card-title">{title}</h3>
+          <h3 className="gcc-card-title">
+            {title}
+            {titleBadge && <span className="gcc-title-badge">{titleBadge}</span>}
+          </h3>
           {description && <p className="gcc-config-description">{description}</p>}
         </div>
         <div className="gcc-config-controls">
           {summary && <span className="gcc-config-summary">{summary}</span>}
-          <Toggle checked={enabled} onChange={onToggle} ariaLabel={title} />
+          <Toggle checked={enabled} onChange={onToggle} ariaLabel={typeof title === 'string' ? title : ''} />
         </div>
       </div>
       {enabled && children && <div className="gcc-config-body">{children}</div>}
@@ -655,6 +659,9 @@ export function ConfiguracionSection() {
 
   // ── Aprobación de rendición (default OFF) ──
   const [aprobRendicionEnabled, setAprobRendicionEnabled] = useState(false);
+
+  // ── Seguimiento con IA (default por tenant: cmejia=true, demo=false) ──
+  const [seguimientoIA, setSeguimientoIA] = useState(tenantConfig.seguimientoIA ?? false);
 
   return (
     <>
@@ -740,6 +747,15 @@ export function ConfiguracionSection() {
           summary={aprobRendicionEnabled ? 'Requiere aprobación' : 'Sin aprobación'}
           enabled={aprobRendicionEnabled}
           onToggle={setAprobRendicionEnabled}
+        />
+
+        <ConfigCard
+          title="Seguimiento con IA"
+          titleBadge="Consume tokens"
+          description="Análisis automático de solicitudes y rendiciones con IA: detecta inconsistencias, recordatorios y sugerencias contables. El consumo de tokens se factura según el uso."
+          summary={seguimientoIA ? 'Activo' : 'Desactivado'}
+          enabled={seguimientoIA}
+          onToggle={setSeguimientoIA}
         />
       </div>
     </>

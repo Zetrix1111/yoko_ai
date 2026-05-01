@@ -701,6 +701,24 @@
   white-space: nowrap;
 }
 
+/* Badge inline al lado del título (ej. "Consume tokens") */
+.gcc-title-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-left: 0.5rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  background: #FEF3C7;
+  color: #92400E;
+  border-radius: 999px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
 .gcc-config-card.is-on .gcc-config-summary {
   background: #DBEAFE;
   color: #1D4ED8;
