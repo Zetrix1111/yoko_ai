@@ -6,9 +6,9 @@ import {
   Upload as UploadIcon,
 } from 'lucide-react';
 import {
-  STATS, SOLICITUDES, APROBACIONES, PAGOS, RENDICIONES,
+  STATS, SOLICITUDES, PAGOS, RENDICIONES,
   REPORTE_AREAS, REPORTE_USUARIOS, TIPOS_GASTO, CENTROS_COSTO,
-  USUARIOS, ROLES, AREAS, formatPEN, formatDate,
+  AREAS, formatPEN, formatDate,
 } from './mockData';
 
 // ─────────────────────────────────────
@@ -597,98 +597,139 @@ export function ReportesSection() {
 }
 
 // ─────────────────────────────────────
+// Helpers: Toggle + ConfigCard
+// ─────────────────────────────────────
+
+function Toggle({ checked, onChange, ariaLabel }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={ariaLabel}
+      className={`gcc-toggle ${checked ? 'on' : ''}`}
+      onClick={() => onChange(!checked)}
+    >
+      <span className="gcc-toggle-thumb" />
+    </button>
+  );
+}
+
+function ConfigCard({ title, description, summary, enabled, onToggle, children }) {
+  return (
+    <div className={`gcc-card gcc-config-card ${enabled ? 'is-on' : ''}`}>
+      <div className="gcc-config-header">
+        <div className="gcc-config-title-block">
+          <h3 className="gcc-card-title">{title}</h3>
+          {description && <p className="gcc-config-description">{description}</p>}
+        </div>
+        <div className="gcc-config-controls">
+          {summary && <span className="gcc-config-summary">{summary}</span>}
+          <Toggle checked={enabled} onChange={onToggle} ariaLabel={title} />
+        </div>
+      </div>
+      {enabled && children && <div className="gcc-config-body">{children}</div>}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────
 // 6 · CONFIGURACIÓN
 // ─────────────────────────────────────
 export function ConfiguracionSection() {
+  // ── Centros de costo ──
+  const [centrosEnabled, setCentrosEnabled] = useState(true);
+  const [centros, setCentros] = useState(CENTROS_COSTO);
+  const onCentroToggle = (id, value) => {
+    setCentros(centros.map((c) => (c.id === id ? { ...c, activo: value } : c)));
+  };
+  const centrosActivos = centros.filter((c) => c.activo).length;
+
+  // ── Número de aprobadores ──
+  const [aprobadoresEnabled, setAprobadoresEnabled] = useState(true);
+  const [aprobadores, setAprobadores] = useState(2);
+
+  // ── Monto máximo ──
+  const [maxMontoEnabled, setMaxMontoEnabled] = useState(false);
+  const [maxMonto, setMaxMonto] = useState(5000);
+
   return (
     <>
       <SectionHeader
         title="Configuración"
-        subtitle="Tipos de gasto, centros de costo, usuarios y roles."
+        subtitle="Activa o desactiva las reglas de negocio que aplican a los procesos."
       />
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1rem' }}>
-        <div className="gcc-card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-            <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600 }}>Tipos de gasto</h3>
-            <button className="gcc-btn gcc-btn-link"><Plus size={14} /> Agregar</button>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-            {TIPOS_GASTO.map((t) => (
-              <div key={t.id} style={{
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                padding: '0.5rem 0.75rem', background: 'var(--md-surface-variant)',
-                borderRadius: 8, fontSize: '0.85rem',
-              }}>
-                <span>{t.nombre}</span>
-                <Badge value={t.activo ? 'aprobada' : 'rechazada'} />
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="gcc-card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-            <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600 }}>Centros de costo</h3>
-            <button className="gcc-btn gcc-btn-link"><Plus size={14} /> Agregar</button>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-            {CENTROS_COSTO.map((c) => (
-              <div key={c.id} style={{
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                padding: '0.5rem 0.75rem', background: 'var(--md-surface-variant)',
-                borderRadius: 8, fontSize: '0.85rem',
-              }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <ConfigCard
+          title="Centros de costo"
+          description="Permite asignar cada solicitud a un centro de costo de la empresa."
+          summary={centrosEnabled ? `${centrosActivos} activo${centrosActivos === 1 ? '' : 's'}` : 'Desactivado'}
+          enabled={centrosEnabled}
+          onToggle={setCentrosEnabled}
+        >
+          <div className="gcc-list">
+            {centros.map((c) => (
+              <div key={c.id} className={`gcc-list-item ${c.activo ? '' : 'inactive'}`}>
                 <div>
-                  <span style={{ fontFamily: 'monospace', fontSize: '0.75rem', color: 'var(--md-on-surface-variant)' }}>{c.id}</span>
-                  {' · '}
-                  <span>{c.nombre}</span>
+                  <span className="gcc-list-id">{c.id}</span>
+                  <span className="gcc-list-name">{c.nombre}</span>
                 </div>
-                <Badge value={c.activo ? 'aprobada' : 'rechazada'} />
+                <Toggle
+                  checked={c.activo}
+                  onChange={(v) => onCentroToggle(c.id, v)}
+                  ariaLabel={`Activar centro ${c.id}`}
+                />
               </div>
             ))}
           </div>
-        </div>
+          <button type="button" className="gcc-list-add">
+            <Plus size={14} /> Agregar centro de costo
+          </button>
+        </ConfigCard>
 
-        <div className="gcc-card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-            <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600 }}>Usuarios</h3>
-            <button className="gcc-btn gcc-btn-link"><Plus size={14} /> Agregar</button>
+        <ConfigCard
+          title="Número de aprobadores"
+          description="Cantidad de aprobadores que debe pasar cada solicitud antes de ser autorizada. Si está desactivado, las solicitudes pasan directo a Pagos."
+          summary={
+            aprobadoresEnabled
+              ? `${aprobadores} ${aprobadores === 1 ? 'aprobador' : 'aprobadores'}`
+              : 'Sin aprobaciones'
+          }
+          enabled={aprobadoresEnabled}
+          onToggle={setAprobadoresEnabled}
+        >
+          <div className="gcc-number-input">
+            <input
+              type="number"
+              min="1"
+              max="10"
+              value={aprobadores}
+              onChange={(e) => setAprobadores(Math.max(1, Number(e.target.value) || 1))}
+            />
+            <span>aprobadores en cadena</span>
           </div>
-          <table className="gcc-table" style={{ borderTop: '1px solid var(--md-outline-variant)' }}>
-            <thead>
-              <tr>
-                <th>Nombre</th>
-                <th>Rol</th>
-                <th>Área</th>
-              </tr>
-            </thead>
-            <tbody>
-              {USUARIOS.map((u) => (
-                <tr key={u.id}>
-                  <td style={{ fontWeight: 500 }}>{u.nombre}</td>
-                  <td>{u.rol}</td>
-                  <td>{u.area}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        </ConfigCard>
 
-        <div className="gcc-card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-            <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600 }}>Roles</h3>
-            <button className="gcc-btn gcc-btn-link"><Plus size={14} /> Agregar</button>
+        <ConfigCard
+          title="Monto máximo por solicitud"
+          description="Si está activo, ninguna solicitud puede exceder el monto configurado. Si está desactivado, no hay límite."
+          summary={maxMontoEnabled ? formatPEN(maxMonto) : 'Sin límite'}
+          enabled={maxMontoEnabled}
+          onToggle={setMaxMontoEnabled}
+        >
+          <div className="gcc-number-input">
+            <span>S/</span>
+            <input
+              type="number"
+              min="0"
+              step="50"
+              value={maxMonto}
+              className="wide"
+              onChange={(e) => setMaxMonto(Math.max(0, Number(e.target.value) || 0))}
+            />
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            {ROLES.map((r) => (
-              <div key={r.id} style={{ padding: '0.6rem 0.75rem', background: 'var(--md-surface-variant)', borderRadius: 8 }}>
-                <div style={{ fontWeight: 600, fontSize: '0.88rem' }}>{r.nombre}</div>
-                <div style={{ fontSize: '0.78rem', color: 'var(--md-on-surface-variant)', marginTop: 2 }}>{r.permisos}</div>
-              </div>
-            ))}
-          </div>
-        </div>
+        </ConfigCard>
       </div>
     </>
   );

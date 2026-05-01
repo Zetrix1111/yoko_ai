@@ -606,6 +606,208 @@
   border-radius: 3px;
 }
 
+/* ─────────────────────────────────────
+   Toggle switch (SaaS style)
+   ───────────────────────────────────── */
+.gcc-toggle {
+  width: 38px;
+  height: 22px;
+  border-radius: 999px;
+  background: #CBD5E1;        /* slate-300 */
+  border: none;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.gcc-toggle:hover {
+  background: #94A3B8;        /* slate-400 */
+}
+
+.gcc-toggle.on {
+  background: #2563EB;        /* blue-600 */
+}
+
+.gcc-toggle.on:hover {
+  background: #1D4ED8;
+}
+
+.gcc-toggle:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25);
+}
+
+.gcc-toggle-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #FFFFFF;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.18);
+  transition: left 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.gcc-toggle.on .gcc-toggle-thumb {
+  left: 19px;
+}
+
+/* ─────────────────────────────────────
+   ConfigCard (toggleable setting block)
+   ───────────────────────────────────── */
+.gcc-config-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.gcc-config-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.gcc-config-title-block {
+  flex: 1;
+  min-width: 0;
+}
+
+.gcc-config-description {
+  color: #64748B;
+  font-size: 0.85rem;
+  margin: 0.3rem 0 0;
+  max-width: 460px;
+  line-height: 1.45;
+}
+
+.gcc-config-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+.gcc-config-summary {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #475569;
+  background: #F1F5F9;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.gcc-config-card.is-on .gcc-config-summary {
+  background: #DBEAFE;
+  color: #1D4ED8;
+}
+
+.gcc-config-body {
+  margin-top: 1.1rem;
+  padding-top: 1.1rem;
+  border-top: 1px solid #E2E8F0;
+  animation: gcc-fade 0.25s ease-out;
+}
+
+/* List of items with per-row toggle (centros de costo, etc.) */
+.gcc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.gcc-list-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 0.85rem;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  font-size: 0.875rem;
+  transition: background 0.15s, opacity 0.2s;
+}
+
+.gcc-list-item.inactive {
+  opacity: 0.55;
+}
+
+.gcc-list-id {
+  font-family: ui-monospace, 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  color: #64748B;
+  margin-right: 0.5rem;
+}
+
+.gcc-list-name {
+  color: #0F172A;
+  font-weight: 500;
+}
+
+.gcc-list-add {
+  margin-top: 0.6rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: transparent;
+  border: 1.5px dashed #CBD5E1;
+  color: #475569;
+  padding: 0.55rem 0.85rem;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  width: 100%;
+  justify-content: center;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.gcc-list-add:hover {
+  border-color: #2563EB;
+  color: #2563EB;
+  background: #EFF6FF;
+}
+
+/* Compact number input */
+.gcc-number-input {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: #334155;
+}
+
+.gcc-number-input input {
+  width: 100px;
+  padding: 0.55rem 0.75rem;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 10px;
+  background: #FFFFFF;
+  color: #0F172A;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.gcc-number-input input:focus {
+  border-color: #2563EB;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.gcc-number-input input.wide {
+  width: 160px;
+  text-align: right;
+}
+
 /* ── Mobile ── */
 @media (max-width: 900px) {
   .gcc-content-full { gap: 1rem; }
