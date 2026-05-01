@@ -1,7 +1,9 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Plus, X, Check, XCircle, CreditCard, Search,
-  TrendingUp, PiggyBank, Wallet, Clock, Upload as UploadIcon,
+  TrendingUp, Wallet, Clock, ShieldCheck, ArrowUpRight,
+  Upload as UploadIcon,
 } from 'lucide-react';
 import {
   STATS, SOLICITUDES, APROBACIONES, PAGOS, RENDICIONES,
@@ -53,60 +55,133 @@ function EmptyState({ message }) {
 // ─────────────────────────────────────
 // 0 · INICIO (welcome dashboard)
 // ─────────────────────────────────────
+
+const STAT_CARDS = [
+  {
+    key: 'solicitado',
+    label: 'Total solicitado',
+    Icon: TrendingUp,
+    variant: 'neutral',
+    trend: '+12% vs mes anterior',
+    trendVariant: 'success',
+  },
+  {
+    key: 'aprobado',
+    label: 'Total aprobado',
+    Icon: ShieldCheck,
+    variant: 'success',
+    trend: '74% de las solicitudes',
+    trendVariant: 'success',
+  },
+  {
+    key: 'pagado',
+    label: 'Total pagado',
+    Icon: Wallet,
+    variant: 'info',
+    trend: 'S/ 3,500 desembolsado hoy',
+    trendVariant: '',
+  },
+  {
+    key: 'pendiente',
+    label: 'Pendiente de rendir',
+    Icon: Clock,
+    variant: 'warning',
+    trend: '4 usuarios con rendiciones abiertas',
+    trendVariant: 'warning',
+  },
+];
+
+// Mapea estado de solicitud → ícono + color del activity row
+function activityIconFor(estado) {
+  switch (estado) {
+    case 'aprobada': return { Icon: ShieldCheck, variant: 'success' };
+    case 'pagada':   return { Icon: CreditCard,  variant: 'info'    };
+    case 'rechazada':return { Icon: XCircle,     variant: 'error'   };
+    case 'pendiente':
+    default:         return { Icon: Clock,       variant: 'warning' };
+  }
+}
+
 export function InicioSection() {
-  const cards = [
-    { label: 'Total solicitado',   value: STATS.totalSolicitado, Icon: TrendingUp,trend: '+12% vs mes anterior' },
-    { label: 'Total aprobado',     value: STATS.totalAprobado,   Icon: Check,     trend: '74% de las solicitudes' },
-    { label: 'Total pagado',       value: STATS.totalPagado,     Icon: Wallet,    trend: 'S/ 3,500 desembolsado hoy' },
-    { label: 'Pendiente de rendir',value: STATS.pendienteRendir, Icon: Clock,     trend: '4 usuarios con rendiciones abiertas' },
-  ];
+  const [, setSearchParams] = useSearchParams();
+
+  const statValueByKey = {
+    solicitado: STATS.totalSolicitado,
+    aprobado:   STATS.totalAprobado,
+    pagado:     STATS.totalPagado,
+    pendiente:  STATS.pendienteRendir,
+  };
+
+  const goToSolicitudes = (params = {}) => {
+    setSearchParams({ section: 'solicitudes', ...params });
+  };
 
   return (
     <>
       <SectionHeader
-        title="Gestión de Caja Chica y Rendición de Fondos"
-        subtitle="Controla solicitudes, aprobaciones, pagos y rendiciones en un solo lugar."
+        title="Dashboard"
+        subtitle="Control total del dinero de tu empresa, sin Excel ni desorden."
+        action={
+          <button className="gcc-btn gcc-btn-primary" onClick={() => goToSolicitudes({ new: '1' })}>
+            <Plus size={16} /> Nueva Solicitud
+          </button>
+        }
       />
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
-        {cards.map(({ label, value, Icon, trend }) => (
-          <div key={label} className="gcc-card gcc-stat-card">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '1rem' }}>
+        {STAT_CARDS.map(({ key, label, Icon, variant, trend, trendVariant }) => (
+          <div key={key} className="gcc-card gcc-stat-card">
+            <div className="gcc-stat-top">
               <span className="gcc-stat-label">{label}</span>
-              <div style={{
-                width: 32, height: 32, borderRadius: 10,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: 'color-mix(in srgb, var(--md-primary) 12%, transparent)',
-                color: 'var(--md-primary)',
-              }}>
-                <Icon size={16} />
+              <div className={`gcc-stat-icon-wrap ${variant}`}>
+                <Icon size={18} />
               </div>
             </div>
-            <div className="gcc-stat-value">{formatPEN(value)}</div>
-            <div className="gcc-stat-trend">{trend}</div>
+            <div className="gcc-stat-value">{formatPEN(statValueByKey[key])}</div>
+            <div className={`gcc-stat-trend ${trendVariant || ''}`}>
+              {trendVariant === 'success' && <ArrowUpRight size={12} />}
+              {trend}
+            </div>
           </div>
         ))}
       </div>
 
       <div className="gcc-card">
-        <h3 style={{ margin: '0 0 0.75rem', fontSize: '1rem', fontWeight: 600 }}>Actividad reciente</h3>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          {SOLICITUDES.slice(0, 4).map((s) => (
-            <div key={s.id} style={{
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              padding: '0.6rem 0.25rem', borderBottom: '1px solid var(--md-outline-variant)',
-              fontSize: '0.875rem',
-            }}>
-              <div>
-                <div style={{ fontWeight: 500 }}>{s.solicitante} — {s.motivo}</div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--md-on-surface-variant)' }}>{s.area} · {formatDate(s.fecha)}</div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <span style={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{formatPEN(s.monto)}</span>
-                <Badge value={s.estado} />
-              </div>
-            </div>
-          ))}
+        <div className="gcc-card-header">
+          <h3 className="gcc-card-title">Actividad reciente</h3>
+          <button className="gcc-link" onClick={() => goToSolicitudes()}>
+            Ver todo →
+          </button>
+        </div>
+
+        <div className="gcc-activity">
+          {SOLICITUDES.slice(0, 5).map((s) => {
+            const { Icon, variant } = activityIconFor(s.estado);
+            return (
+              <button
+                key={s.id}
+                type="button"
+                className="gcc-activity-row"
+                onClick={() => goToSolicitudes()}
+              >
+                <div className={`gcc-activity-icon ${variant}`}>
+                  <Icon size={16} />
+                </div>
+                <div className="gcc-activity-text">
+                  <div className="gcc-activity-title">
+                    {s.solicitante} — {s.motivo}
+                  </div>
+                  <div className="gcc-activity-meta">
+                    {s.area} · {formatDate(s.fecha)} · {s.tipo === 'caja-chica' ? 'Caja chica' : 'Entrega a rendir'}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', flexShrink: 0 }}>
+                  <span className="gcc-activity-amount">{formatPEN(s.monto)}</span>
+                  <Badge value={s.estado} />
+                </div>
+              </button>
+            );
+          })}
         </div>
       </div>
     </>
@@ -117,9 +192,20 @@ export function InicioSection() {
 // 1 · SOLICITUDES
 // ─────────────────────────────────────
 export function SolicitudesSection() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const autoOpen = searchParams.get('new') === '1';
+
   const [data, setData] = useState(SOLICITUDES);
-  const [showModal, setShowModal] = useState(false);
+  const [showModal, setShowModal] = useState(autoOpen);
   const [filter, setFilter] = useState('');
+
+  // Si llegamos con ?new=1, limpiamos ese flag de la URL después de abrir
+  // para que un refresh no vuelva a auto-abrir.
+  if (autoOpen) {
+    const next = new URLSearchParams(searchParams);
+    next.delete('new');
+    setSearchParams(next, { replace: true });
+  }
 
   const filtered = data.filter((s) =>
     !filter || s.solicitante.toLowerCase().includes(filter.toLowerCase()) ||

@@ -961,42 +961,49 @@ body {
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  padding: 0.5rem 0.75rem;
+  padding: 0.55rem 0.85rem;
+  padding-left: 0.95rem;
   border-radius: 10px;
   font-size: 0.82rem;
   color: var(--md-on-surface-variant);
   text-decoration: none;
   font-weight: 500;
-  transition: background 0.15s, color 0.15s, padding-left 0.15s;
+  transition: background 0.18s ease, color 0.18s ease;
   position: relative;
 }
 
+/* Indicador vertical en el borde izquierdo (estilo SaaS premium) */
 .module-submenu-item::before {
   content: '';
   position: absolute;
-  left: -0.6rem;
-  top: 50%;
-  width: 6px;
-  height: 1px;
-  background: var(--md-outline-variant);
-  transform: translateY(-50%);
+  left: 2px;
+  top: 28%;
+  bottom: 28%;
+  width: 3px;
+  border-radius: 2px;
+  background: transparent;
+  transition: background 0.2s ease, top 0.2s ease, bottom 0.2s ease;
 }
 
 .module-submenu-item:hover {
-  background: var(--md-state-hover);
-  color: var(--md-on-surface);
+  background: #F1F5F9;            /* slate-100 — neutro */
+  color: #334155;                 /* slate-700 */
 }
 
 .module-submenu-item.active {
-  background: color-mix(in srgb, var(--md-primary) 12%, transparent);
-  color: var(--md-primary);
+  background: #DBEAFE;            /* blue-100 — soft blue */
+  color: #1D4ED8;                 /* blue-700 */
   font-weight: 600;
 }
 
 .module-submenu-item.active::before {
-  background: var(--md-primary);
-  width: 8px;
-  height: 2px;
+  background: #2563EB;            /* blue-600 */
+  top: 18%;
+  bottom: 18%;
+}
+
+.module-submenu-item.active svg {
+  color: #2563EB;
 }
 
 .module-content {
