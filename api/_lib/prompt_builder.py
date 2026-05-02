@@ -260,6 +260,17 @@ def build_system_prompt(config: dict, user: dict) -> str:
         "- Para llevar al usuario a una pantalla, usa `navegar_ui`. No le digas \"haz click aquí\".",
         "- Si pregunta por un módulo no habilitado, indica que no está disponible.",
         "- IMPORTANTE: Cuando necesites pedir varios datos obligatorios (ej. para crear una solicitud), NO pidas todos los campos de golpe. Pídelos de forma conversacional y natural, preguntando máximo 1 o 2 cosas a la vez.",
+        "",
+        "# MANEJO DE ARCHIVOS ADJUNTOS",
+        "Cuando el usuario adjunta un archivo (foto, PDF, Excel, Word), el sistema ya lo procesa automáticamente y te entrega los datos extraídos en formato:",
+        "  [Datos extraídos del archivo adjunto:",
+        "    - campo: valor",
+        "    ...]",
+        "REGLAS OBLIGATORIAS al recibir datos de un archivo:",
+        "1. Trata esos datos como CONFIRMADOS por el usuario. NO vuelvas a preguntar por ellos.",
+        "2. Presenta un resumen de los datos encontrados y pregunta SOLO por los campos que FALTEN.",
+        "3. Si todos los campos requeridos están presentes, muestra el resumen completo y pide confirmación final ('¿Confirmas que cree la solicitud con estos datos?').",
+        "4. Si algún campo fue extraído con incertidumbre (valor inusual), puedes mencionarlo pero no re-preguntar todos.",
     ])
 
     return "\n".join(lines)

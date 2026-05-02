@@ -124,13 +124,15 @@ export function useChat(user) {
       let mensajeConContexto = text;
       if (camposExtraidos) {
         const camposStr = Object.entries(camposExtraidos)
-          .filter(([, v]) => v !== null && v !== undefined && v !== '')
+          .filter(([k, v]) => k !== 'confianza' && v !== null && v !== undefined && v !== '')
           .map(([k, v]) => `  - ${k}: ${v}`)
           .join('\n');
+
+        const instruccion = 'INSTRUCCIÓN SISTEMA: Los datos anteriores fueron extraídos automáticamente del archivo adjunto. Tratalos como CONFIRMADOS. NO vuelvas a preguntar por ellos. Identifica qué campos obligatorios faltan (plazo, motivo, moneda, obra, total_general, tipo_gasto, detalle_gasto, aprobador_id) y pregunta SOLO por los que no estén en la lista de arriba.';
         
         mensajeConContexto = text
-          ? `${text}\n\n[Datos extraídos del archivo adjunto:\n${camposStr}]`
-          : `[Datos extraídos del archivo adjunto:\n${camposStr}]\nPor favor revisa si estos datos son correctos y crea la solicitud de caja chica con ellos, confirmando conmigo cualquier dato que no esté claro.`;
+          ? `${text}\n\n[Datos extraídos del archivo adjunto:\n${camposStr}]\n\n${instruccion}`
+          : `[Datos extraídos del archivo adjunto:\n${camposStr}]\n\n${instruccion}`;
       }
 
       const apiMessages = [
