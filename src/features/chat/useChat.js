@@ -132,7 +132,7 @@ export function useChat(user) {
           : msg
       ));
     }
-  }, [user]);
+  }, [user, messages, navigate]);
 
   return { messages, sendMessage, isUploading };
 }
