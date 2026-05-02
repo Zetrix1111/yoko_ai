@@ -279,43 +279,79 @@
   transform: translateX(18px);
 }
 
-/* ── Lista de centros de costo ── */
+/* ── Lista de centros de costo (compacta, una línea por obra) ── */
 .ce-cc-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 0.6rem;
-}
-
-.ce-cc-item {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-  padding: 0.7rem 0.85rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
   border: 1px solid #E2E8F0;
   border-radius: 10px;
+  overflow: hidden;
+  background: #FFFFFF;
+}
+
+.ce-cc-row {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.5rem 0.85rem;
+  border-bottom: 1px solid #F1F5F9;
+  font-size: 0.86rem;
+}
+
+.ce-cc-row:last-child {
+  border-bottom: none;
+}
+
+.ce-cc-row:hover {
   background: #F8FAFC;
 }
 
 .ce-cc-id {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.72rem;
+  font-size: 0.74rem;
   color: #2563EB;
   font-weight: 600;
   letter-spacing: 0.02em;
+  min-width: 56px;
+  flex-shrink: 0;
 }
 
 .ce-cc-name {
-  font-size: 0.88rem;
-  font-weight: 600;
+  font-weight: 500;
   color: #0F172A;
-}
-
-.ce-cc-desc {
-  font-size: 0.74rem;
-  color: #64748B;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.ce-cc-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.65rem;
+  padding: 0.4rem 0.75rem;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  background: #FFFFFF;
+  color: #2563EB;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.ce-cc-toggle:hover {
+  background: #EFF6FF;
+  border-color: #BFDBFE;
+}
+
+.ce-cc-toggle svg {
+  transition: transform 0.2s ease;
+}
+
+.ce-cc-toggle.is-open svg {
+  transform: rotate(180deg);
 }
 
 /* ── Estados (loading / error / vacío) ── */

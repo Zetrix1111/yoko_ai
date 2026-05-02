@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Check, CheckCircle2, Building2, Briefcase, Loader2, AlertCircle } from 'lucide-react';
+import { Check, CheckCircle2, Building2, Briefcase, Loader2, AlertCircle, ChevronDown } from 'lucide-react';
 import ModuleLayout from '../ModuleLayout';
 import { tenantConfig } from '../../../tenants';
 import { API, getJson } from '../../../shared/api';
@@ -43,6 +43,7 @@ export default function ConfiguracionEmpresaScreen({ user, onOpenModules, onLogo
   const [centrosLoading, setCentrosLoading] = useState(false);
   const [centrosError, setCentrosError] = useState(null);
   const [centrosFetched, setCentrosFetched] = useState(false);
+  const [centrosExpanded, setCentrosExpanded] = useState(false);
 
   useEffect(() => {
     if (!centrosEnabled || centrosFetched) return;
@@ -250,15 +251,28 @@ export default function ConfiguracionEmpresaScreen({ user, onOpenModules, onLogo
               )}
 
               {!centrosLoading && !centrosError && centros.length > 0 && (
-                <div className="ce-cc-list">
-                  {centros.map((c) => (
-                    <div key={c.id} className="ce-cc-item">
-                      <span className="ce-cc-id">{c.id}</span>
-                      <span className="ce-cc-name">{c.obra}</span>
-                      {c.nombre && <span className="ce-cc-desc">{c.nombre}</span>}
-                    </div>
-                  ))}
-                </div>
+                <>
+                  <ul className="ce-cc-list">
+                    {(centrosExpanded ? centros : centros.slice(0, 7)).map((c) => (
+                      <li key={c.id} className="ce-cc-row">
+                        <span className="ce-cc-id">{c.id}</span>
+                        <span className="ce-cc-name">{c.obra}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  {centros.length > 7 && (
+                    <button
+                      type="button"
+                      className={`ce-cc-toggle ${centrosExpanded ? 'is-open' : ''}`}
+                      onClick={() => setCentrosExpanded((v) => !v)}
+                    >
+                      <ChevronDown size={16} />
+                      {centrosExpanded
+                        ? 'Ver menos'
+                        : `Ver todas las obras (${centros.length})`}
+                    </button>
+                  )}
+                </>
               )}
             </div>
           )}

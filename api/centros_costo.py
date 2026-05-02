@@ -23,7 +23,7 @@ class handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         try:
-            records = airtable_client.list_records("obras", max_records=7)
+            records = airtable_client.list_records("obras", max_records=100)
 
             centros = []
             for r in records:
