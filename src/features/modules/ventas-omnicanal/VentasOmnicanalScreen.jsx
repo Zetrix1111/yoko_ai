@@ -6,10 +6,10 @@ import {
 import './VentasOmnicanal.css';
 
 const SECTIONS = {
-  inicio:        InicioSection,
-  canales:       CanalesSection,
-  clientes:      ClientesSection,
-  catalogo:      CatalogoSection,
+  inicio: InicioSection,
+  canales: CanalesSection,
+  clientes: ClientesSection,
+  catalogo: CatalogoSection,
   configuracion: ConfiguracionSection,
 };
 
@@ -20,7 +20,7 @@ export default function VentasOmnicanalScreen({ user, onOpenModules, onLogout })
 
   return (
     <ModuleLayout
-      title="Ventas Omnicanal con IA"
+      title="Ventas Inteligentes"
       onOpenModules={onOpenModules}
       onLogout={onLogout}
     >

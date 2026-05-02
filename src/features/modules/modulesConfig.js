@@ -49,7 +49,7 @@ export const MODULES = [
   {
     id: 'ventas-omnicanal',
     path: '/modulos/ventas-omnicanal',
-    name: 'Ventas Omnicanal con IA',
+    name: 'Ventas Inteligentes',
     Icon: Sparkles,
     iconClass: 'sales',
     submenus: [

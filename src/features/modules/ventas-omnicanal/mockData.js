@@ -1,4 +1,4 @@
-// Datos de ejemplo para el módulo Ventas Omnicanal con IA.
+// Datos de ejemplo para el módulo Ventas Inteligentes.
 // Reemplazar por llamadas reales al backend cuando se integre con Make/Airtable.
 
 export const STATS = {
