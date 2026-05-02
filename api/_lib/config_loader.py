@@ -162,6 +162,32 @@ def load_dynamic_config() -> dict:
     # Aseguramos que caja_chica exista aunque Config_Procesos esté vacío:
     procesos.setdefault("caja_chica", {})
 
+    # 3) Empleados con rol de aprobador (leídos de la tabla Empleados)
+    # Filtramos donde APROBADORES no esté vacío
+    empleados_rows = _safe_list("Empleados", "NOT({APROBADORES} = '')")
+    aprobador_1 = []
+    aprobador_2 = []
+    for row in empleados_rows:
+        f = row.get("fields", {})
+        roles = f.get("APROBADORES")
+        if not roles:
+            continue
+        if isinstance(roles, str):
+            roles = [roles]
+        
+        info = {
+            "id": row.get("id"),
+            "nombre": f.get("NOMBRE CORTO", "Desconocido")
+        }
+        
+        if "APROBADOR_1" in roles:
+            aprobador_1.append(info)
+        if "APROBADOR_2" in roles:
+            aprobador_2.append(info)
+
+    procesos["caja_chica"]["lista_aprobador_1"] = aprobador_1
+    procesos["caja_chica"]["lista_aprobador_2"] = aprobador_2
+
     for proceso_dict in procesos.values():
         proceso_dict.setdefault("aprobadores", [])
 

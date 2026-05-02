@@ -13,21 +13,15 @@ headers = {
     'Content-Type': 'application/json'
 }
 
-fields = {
-    'NOMBRE': 'Test User',
-    'PLAZO': '10 dias',
-    'MOTIVO': 'Test motivo',
-    'MONEDA': 'PEN',
-    'OBRA': 'Test Obra',
-    'TOTAL_GENERAL': 100.0,
-    'TIPO_GASTO': 'CAJA CHICA',
-    'DETALLE_GASTO': 'Test detalle',
-    'ESTADO': 'PENDIENTE_APROBACION_RESIDENTE'
-}
-
-req = urllib.request.Request(url, data=json.dumps({'fields': fields}).encode('utf-8'), headers=headers, method='POST')
+# 1. Simulate login for a DNI (e.g. 41683585 or 72682425 as seen in screenshot)
+url_empleados = f"https://api.airtable.com/v0/{env['AIRTABLE_BASE_ID']}/Empleados?filterByFormula=NOT({{APROBADORES}}%3D'')"
+req_empleados = urllib.request.Request(url_empleados, headers=headers, method='GET')
 try:
-    with urllib.request.urlopen(req) as response:
-        print('SUCCESS:', response.read().decode())
-except urllib.error.HTTPError as e:
-    print('ERROR:', e.code, e.read().decode())
+    with urllib.request.urlopen(req_empleados) as res:
+        data = json.loads(res.read().decode())
+        print("Empleados con APROBADORES:")
+        for r in data.get('records', []):
+            f = r['fields']
+            print(r['id'], f.get('NOMBRE CORTO'), f.get('APROBADORES'))
+except Exception as e:
+    print('ERROR:', e)

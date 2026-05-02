@@ -200,14 +200,6 @@ def build_system_prompt(config: dict, user: dict) -> str:
                 f"{'aprobación' if int(num_aprob) == 1 else 'aprobaciones'} "
                 f"antes de pasar a Pagos."
             )
-        aprobadores = proceso.get("aprobadores") or []
-        if aprobadores:
-            lines.append(f"- Aprobadores:{_format_aprobadores(aprobadores)}")
-        else:
-            lines.append(
-                "- La lista de aprobadores específicos aún no está configurada "
-                "en el sistema (Airtable Aprobadores vacía)."
-            )
     else:
         lines.append(
             "- Las solicitudes no requieren aprobación — pasan directo al "
@@ -225,6 +217,36 @@ def build_system_prompt(config: dict, user: dict) -> str:
             "- Las rendiciones se aceptan automáticamente al ser registradas, "
             "sin pasar por aprobación."
         )
+
+    # ── Listas de Residentes (APROBADOR_1) y Aprobadores (APROBADOR_2) ──
+    lista_ap1 = proceso.get("lista_aprobador_1") or []
+    lista_ap2 = proceso.get("lista_aprobador_2") or []
+
+    lines.append("")
+    lines.append("# SELECCIÓN DE RESIDENTE Y APROBADOR AL CREAR SOLICITUD")
+    lines.append(
+        "Al crear una solicitud de caja chica, DEBES pedir al usuario que elija Residente y Aprobador:"
+    )
+    lines.append("")
+    lines.append("RESIDENTE (campo opcional — APROBADOR_1):")
+    lines.append("- Pregunta si la solicitud requiere la revisión de un Residente (en algunos casos no aplica).")
+    lines.append("- Si el usuario dice que sí, preséntale SOLO estos nombres y pídele que elija uno:")
+    if lista_ap1:
+        for a in lista_ap1:
+            lines.append(f"  • {a['nombre']} (id interno: {a['id']})")
+    else:
+        lines.append("  (No hay residentes configurados aún.)")
+    lines.append("- Usa el id interno del elegido como valor del parámetro `residente_id` en la tool.")
+    lines.append("- Si el usuario dice que no aplica, omite el parámetro `residente_id`.")
+    lines.append("")
+    lines.append("APROBADOR (campo obligatorio — APROBADOR_2):")
+    lines.append("- Siempre debes pedir que elija un Aprobador. Preséntale SOLO estos nombres:")
+    if lista_ap2:
+        for a in lista_ap2:
+            lines.append(f"  • {a['nombre']} (id interno: {a['id']})")
+    else:
+        lines.append("  (No hay aprobadores configurados aún.)")
+    lines.append("- Usa el id interno del elegido como valor del parámetro `aprobador_id` en la tool.")
 
 
     lines.extend([

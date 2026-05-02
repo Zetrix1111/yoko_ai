@@ -94,8 +94,10 @@ def _hoy_iso() -> str:
                 "description": "Clasificación del tipo de gasto."
             },
             "detalle_gasto": {"type": "string", "description": "Descripción detallada del gasto a realizar."},
+            "aprobador_id":  {"type": "string", "description": "Record ID del aprobador (APROBADOR_2) elegido por el usuario. SIEMPRE obligatorio."},
+            "residente_id":  {"type": "string", "description": "Record ID del residente (APROBADOR_1) elegido por el usuario. Omitir si el usuario indica que no aplica."},
         },
-        "required": ["plazo", "motivo", "moneda", "obra", "total_general", "tipo_gasto", "detalle_gasto"],
+        "required": ["plazo", "motivo", "moneda", "obra", "total_general", "tipo_gasto", "detalle_gasto", "aprobador_id"],
     },
     category="accion",
 )
@@ -107,6 +109,8 @@ def crear_solicitud(args: dict, context: dict) -> dict:
     total_general = args["total_general"]
     tipo_gasto = args["tipo_gasto"]
     detalle_gasto = args["detalle_gasto"]
+    aprobador_id = args["aprobador_id"]
+    residente_id = args.get("residente_id")  # opcional
 
     config = context.get("config") or {}
     dni = _user_dni(context)
@@ -128,10 +132,14 @@ def crear_solicitud(args: dict, context: dict) -> dict:
         "TOTAL_GENERAL": float(total_general),
         "TIPO_GASTO":    tipo_gasto,
         "DETALLE_GASTO": detalle_gasto,
+        "APROBADOR":     [aprobador_id],
     }
 
     if record_id:
         fields["SOLICITANTE"] = [record_id]
+
+    if residente_id:
+        fields["RESIDENTE"] = [residente_id]
 
     record = airtable_client.create_record(_TABLA_SOLICITUDES, fields)
     return {"id": record["id"], "fields": record["fields"]}
