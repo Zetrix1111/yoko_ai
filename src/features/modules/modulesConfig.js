@@ -22,13 +22,8 @@ import {
   Building2,
   Sparkles,
   Plug,
-  Bot,
   Package,
-  KanbanSquare,
-  Zap,
-  Brain,
   Users,
-  Bell,
 } from 'lucide-react';
 
 export const MODULES = [
@@ -58,16 +53,11 @@ export const MODULES = [
     Icon: Sparkles,
     iconClass: 'sales',
     submenus: [
-      { id: 'inicio',           label: 'Dashboard',         Icon: LayoutDashboard },
-      { id: 'canales',          label: 'Canales',           Icon: Plug },
-      { id: 'flujo',            label: 'Flujo de Ventas IA', Icon: Bot },
-      { id: 'catalogo',         label: 'Catálogo',          Icon: Package },
-      { id: 'pipeline',         label: 'Embudo',            Icon: KanbanSquare },
-      { id: 'automatizaciones', label: 'Automatizaciones',  Icon: Zap },
-      { id: 'training',         label: 'Respuestas IA',     Icon: Brain },
-      { id: 'crm',              label: 'Clientes (CRM)',    Icon: Users },
-      { id: 'notificaciones',   label: 'Notificaciones',    Icon: Bell },
-      { id: 'configuracion',    label: 'Configuración',     Icon: Settings },
+      { id: 'inicio',        label: 'Dashboard',     Icon: LayoutDashboard },
+      { id: 'canales',       label: 'Canales',       Icon: Plug },
+      { id: 'clientes',      label: 'Clientes',      Icon: Users },
+      { id: 'catalogo',      label: 'Catálogo',      Icon: Package },
+      { id: 'configuracion', label: 'Configuración', Icon: Settings },
     ],
   },
   {

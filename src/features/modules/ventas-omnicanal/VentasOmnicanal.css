@@ -121,6 +121,89 @@
 .vom-stat-trend.success { color: var(--md-success); }
 .vom-stat-trend.warning { color: var(--md-warning); }
 
+/* ── Dashboard: 2 columnas (funnel + actividad) en desktop ── */
+.vom-dashboard-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1rem;
+}
+
+@media (max-width: 900px) {
+  .vom-dashboard-row { grid-template-columns: 1fr; }
+}
+
+/* ── Mini embudo (Dashboard) ── */
+.vom-funnel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.vom-funnel-row {
+  display: grid;
+  grid-template-columns: 110px 1fr 110px;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.vom-funnel-label {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #1E293B;
+}
+
+.vom-funnel-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.vom-funnel-dot.info    { background: var(--md-info); }
+.vom-funnel-dot.warning { background: var(--md-warning); }
+.vom-funnel-dot.success { background: var(--md-success); }
+
+.vom-funnel-track {
+  height: 14px;
+  background: var(--md-surface-variant);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.vom-funnel-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.vom-funnel-fill.info    { background: linear-gradient(90deg, var(--md-info-container), var(--md-info)); }
+.vom-funnel-fill.warning { background: linear-gradient(90deg, var(--md-warning-container), var(--md-warning)); }
+.vom-funnel-fill.success { background: linear-gradient(90deg, var(--md-success-container), var(--md-success)); }
+
+.vom-funnel-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  text-align: right;
+}
+
+.vom-funnel-count {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: #0F172A;
+  font-variant-numeric: tabular-nums;
+}
+
+.vom-funnel-conv {
+  font-size: 0.7rem;
+  color: var(--md-on-surface-variant);
+  font-weight: 500;
+}
+
 /* ── Activity feed ── */
 .vom-activity {
   display: flex;
@@ -148,9 +231,9 @@
 .vom-activity-row:hover { background: #F8FAFC; }
 
 .vom-activity-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -167,7 +250,7 @@
 
 .vom-activity-title {
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: 0.88rem;
   color: #0F172A;
   margin: 0;
   white-space: nowrap;
@@ -176,9 +259,12 @@
 }
 
 .vom-activity-meta {
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   color: #64748B;
   margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .vom-link {
@@ -234,14 +320,6 @@
 
 .vom-btn-ghost:hover { background: var(--md-surface-container); }
 
-.vom-btn-danger {
-  background: var(--md-surface);
-  color: var(--md-error);
-  border: 1px solid var(--md-error-container);
-}
-
-.vom-btn-danger:not(:disabled):hover { background: var(--md-error-container); }
-
 /* CTA destacado: Activar IA de ventas */
 .vom-cta-banner {
   display: flex;
@@ -249,31 +327,40 @@
   gap: 1rem;
   padding: 1.25rem 1.5rem;
   border-radius: 16px;
-  background: linear-gradient(135deg, var(--md-primary-container), var(--md-tertiary-container));
-  border: 1px solid var(--md-primary-container);
+  background: linear-gradient(135deg, var(--md-surface-variant), var(--md-surface-container));
+  border: 1px solid var(--md-outline-variant);
+  transition: background 0.25s ease, border-color 0.25s ease;
 }
 
-.vom-cta-banner .vom-cta-icon {
+.vom-cta-banner.is-active {
+  background: linear-gradient(135deg, var(--md-primary-container), var(--md-tertiary-container));
+  border-color: var(--md-primary-container);
+}
+
+.vom-cta-icon {
   width: 44px;
   height: 44px;
   border-radius: 12px;
-  background: var(--md-primary);
-  color: var(--md-on-primary);
+  background: var(--md-on-surface-variant);
+  color: var(--md-surface);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  transition: background 0.25s ease;
 }
 
-.vom-cta-text {
-  flex: 1;
-  min-width: 0;
+.vom-cta-banner.is-active .vom-cta-icon {
+  background: var(--md-primary);
+  color: var(--md-on-primary);
 }
+
+.vom-cta-text { flex: 1; min-width: 0; }
 
 .vom-cta-text h3 {
   font-size: 1rem;
   font-weight: 700;
-  color: var(--md-on-primary-container);
+  color: #0F172A;
   margin: 0;
 }
 
@@ -307,7 +394,6 @@
 
 .vom-badge.nuevo       { background: var(--md-info-container);     color: var(--md-on-info-container); }
 .vom-badge.interesado  { background: var(--md-warning-container);  color: var(--md-on-warning-container); }
-.vom-badge.cotizacion  { background: var(--md-tertiary-container); color: var(--md-on-tertiary-container); }
 .vom-badge.negociacion { background: var(--md-tertiary-container); color: var(--md-on-tertiary-container); }
 .vom-badge.cerrado     { background: var(--md-success-container);  color: var(--md-on-success-container); }
 .vom-badge.frio        { background: var(--md-surface-variant);    color: var(--md-on-surface-variant); }
@@ -376,17 +462,21 @@
 .vom-table tbody tr:last-child td { border-bottom: none; }
 .vom-table tbody tr:hover { background: #F8FAFC; }
 
-.vom-table .num {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
-}
-
 .vom-table-empty {
   padding: 2.5rem 1rem;
   text-align: center;
   color: var(--md-on-surface-variant);
   font-size: 0.9rem;
+}
+
+/* Celda de "último mensaje": truncate con max-width */
+.vom-msg-cell {
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--md-on-surface-variant);
+  font-size: 0.85rem;
 }
 
 /* ── Channel list ── */
@@ -462,7 +552,7 @@
   color: var(--md-on-surface-variant);
 }
 
-/* ── Toggle switch (igual al de GCC pero con prefijo vom-) ── */
+/* ── Toggle switch ── */
 .vom-toggle {
   width: 38px;
   height: 22px;
@@ -494,90 +584,6 @@
 
 .vom-toggle.on .vom-toggle-thumb { left: 19px; }
 
-/* ── Pipeline (Kanban) ── */
-.vom-pipeline {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(180px, 1fr));
-  gap: 0.85rem;
-  overflow-x: auto;
-  padding-bottom: 0.5rem;
-}
-
-@media (max-width: 1100px) {
-  .vom-pipeline { grid-template-columns: repeat(5, 220px); }
-}
-
-.vom-pipeline-col {
-  background: var(--md-surface-variant);
-  border-radius: 14px;
-  padding: 0.85rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-  min-height: 320px;
-}
-
-.vom-pipeline-col-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 0.25rem;
-}
-
-.vom-pipeline-col-title {
-  font-size: 0.78rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: #475569;
-}
-
-.vom-pipeline-col-count {
-  background: var(--md-surface);
-  color: var(--md-on-surface-variant);
-  border-radius: 999px;
-  padding: 1px 8px;
-  font-size: 0.7rem;
-  font-weight: 700;
-}
-
-.vom-pipeline-card {
-  background: var(--md-surface);
-  border: 1px solid var(--md-outline-variant);
-  border-radius: 10px;
-  padding: 0.7rem 0.85rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-  cursor: grab;
-  transition: box-shadow 0.15s, transform 0.12s;
-}
-
-.vom-pipeline-card:hover {
-  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
-  transform: translateY(-1px);
-}
-
-.vom-pipeline-card-name {
-  font-weight: 600;
-  font-size: 0.86rem;
-  color: #0F172A;
-}
-
-.vom-pipeline-card-meta {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 0.76rem;
-  color: var(--md-on-surface-variant);
-}
-
-.vom-pipeline-card-monto {
-  font-weight: 700;
-  color: var(--md-primary);
-  font-variant-numeric: tabular-nums;
-}
-
 /* ── Catálogo: cards de producto ── */
 .vom-product-grid {
   display: grid;
@@ -608,9 +614,9 @@
 }
 
 .vom-product-desc {
-  font-size: 0.8rem;
+  font-size: 0.82rem;
   color: var(--md-on-surface-variant);
-  line-height: 1.4;
+  line-height: 1.45;
   flex: 1;
 }
 
@@ -618,7 +624,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding-top: 0.5rem;
+  padding-top: 0.6rem;
   border-top: 1px solid var(--md-outline-variant);
 }
 
@@ -626,11 +632,7 @@
   font-weight: 700;
   color: var(--md-primary);
   font-variant-numeric: tabular-nums;
-}
-
-.vom-product-stock {
-  font-size: 0.74rem;
-  color: var(--md-on-surface-variant);
+  font-size: 1rem;
 }
 
 .vom-product-actions {
@@ -661,51 +663,6 @@
   background: var(--md-error-container);
   color: var(--md-error);
   border-color: var(--md-error-container);
-}
-
-/* ── Flujo IA: lista de pasos ── */
-.vom-flow-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.vom-flow-step {
-  display: flex;
-  align-items: center;
-  gap: 0.85rem;
-  padding: 0.85rem 1rem;
-  background: var(--md-surface);
-  border: 1px solid var(--md-outline-variant);
-  border-radius: 12px;
-}
-
-.vom-flow-num {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: var(--md-primary-container);
-  color: var(--md-on-primary-container);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  font-size: 0.8rem;
-  flex-shrink: 0;
-}
-
-.vom-flow-info { flex: 1; min-width: 0; }
-
-.vom-flow-title {
-  font-weight: 600;
-  font-size: 0.92rem;
-  color: #0F172A;
-}
-
-.vom-flow-desc {
-  font-size: 0.78rem;
-  color: var(--md-on-surface-variant);
-  margin-top: 2px;
 }
 
 /* ── ConfigCard reutilizable ── */
@@ -760,54 +717,15 @@
   animation: vom-fade 0.25s ease-out;
 }
 
-/* ── Notification list ── */
-.vom-notif-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.vom-notif-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.75rem;
-  padding: 0.85rem 1rem;
-  background: var(--md-surface);
-  border: 1px solid var(--md-outline-variant);
-  border-radius: 12px;
-}
-
-.vom-notif-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.vom-notif-icon.lead     { background: var(--md-info-container);     color: var(--md-info); }
-.vom-notif-icon.caliente { background: var(--md-warning-container);  color: var(--md-warning); }
-.vom-notif-icon.venta    { background: var(--md-success-container);  color: var(--md-success); }
-
-.vom-notif-msg {
-  font-size: 0.88rem;
-  color: #1E293B;
-  margin: 0;
-}
-
-.vom-notif-fecha {
-  font-size: 0.74rem;
-  color: var(--md-on-surface-variant);
-  margin-top: 2px;
-}
-
 /* ── Mobile ── */
 @media (max-width: 900px) {
   .vom-content-full { gap: 1rem; }
   .vom-section-title { font-size: 1.3rem; }
   .vom-card { padding: 1rem; border-radius: 14px; }
   .vom-stat-value { font-size: 1.5rem; }
-  .vom-pipeline { grid-auto-flow: column; grid-template-columns: none; }
+  .vom-funnel-row {
+    grid-template-columns: 90px 1fr 80px;
+    gap: 0.5rem;
+  }
+  .vom-msg-cell { max-width: 160px; }
 }

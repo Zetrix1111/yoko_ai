@@ -2,13 +2,11 @@ import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Plus, Sparkles, Users, MessageCircle, ShoppingBag, ArrowUpRight,
-  Zap, BellRing, Pencil, Trash2, Check,
-  TrendingUp, Activity, Search, Brain,
+  Pencil, Trash2, Check, TrendingUp, Activity, Search,
 } from 'lucide-react';
 import {
-  STATS, ACTIVIDAD, CANALES, FLUJO_IA, PRODUCTOS,
-  PIPELINE_ETAPAS, PIPELINE_CLIENTES, AUTOMATIZACIONES, TRAINING,
-  CLIENTES, NOTIFICACIONES, CANAL_LABELS, ESTADO_LABELS,
+  STATS, FUNNEL, ACTIVIDAD, CANALES, PRODUCTOS, CLIENTES,
+  CANAL_LABELS, ESTADO_LABELS,
   formatPEN, formatNum, formatDate,
 } from './mockData';
 
@@ -62,15 +60,49 @@ function activityIconFor(estado) {
 }
 
 // ─────────────────────────────────────
-// 0 · DASHBOARD
+// 1 · DASHBOARD
 // ─────────────────────────────────────
 
 const STAT_CARDS = [
-  { key: 'totalLeads',           label: 'Total leads',          Icon: Users,          variant: 'primary',  trend: '+18% vs mes anterior',  trendVariant: 'success', format: 'num' },
-  { key: 'conversacionesActivas',label: 'Conversaciones activas', Icon: MessageCircle,variant: 'tertiary', trend: '45 en tiempo real',     trendVariant: '',        format: 'num' },
-  { key: 'ventasCerradas',       label: 'Ventas cerradas',      Icon: ShoppingBag,    variant: 'success',  trend: 'S/ 5,200 hoy',          trendVariant: 'success', format: 'pen' },
-  { key: 'clientesCalientes',    label: 'Clientes calientes',   Icon: Sparkles,       variant: 'warning',  trend: 'Listos para comprar',    trendVariant: 'warning', format: 'num' },
+  { key: 'totalLeads',           label: 'Total leads',          Icon: Users,         variant: 'primary',  trend: '+18% vs mes anterior',  trendVariant: 'success', format: 'num' },
+  { key: 'conversacionesActivas',label: 'Conversaciones activas', Icon: MessageCircle,variant: 'tertiary', trend: '45 en tiempo real',    trendVariant: '',        format: 'num' },
+  { key: 'ventasCerradas',       label: 'Ventas cerradas',      Icon: ShoppingBag,   variant: 'success',  trend: 'S/ 5,200 hoy',          trendVariant: 'success', format: 'pen' },
+  { key: 'clientesCalientes',    label: 'Clientes calientes',   Icon: Sparkles,      variant: 'warning',  trend: 'Listos para comprar',    trendVariant: 'warning', format: 'num' },
 ];
+
+function MiniFunnel({ stages }) {
+  const max = Math.max(...stages.map((s) => s.count));
+  return (
+    <div className="vom-funnel">
+      {stages.map((s, idx) => {
+        const pct = max > 0 ? Math.round((s.count / max) * 100) : 0;
+        const conversion = idx === 0
+          ? null
+          : Math.round((s.count / stages[idx - 1].count) * 100);
+        return (
+          <div key={s.id} className="vom-funnel-row">
+            <div className="vom-funnel-label">
+              <span className={`vom-funnel-dot ${s.variant}`} />
+              {s.label}
+            </div>
+            <div className="vom-funnel-track">
+              <div
+                className={`vom-funnel-fill ${s.variant}`}
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+            <div className="vom-funnel-meta">
+              <span className="vom-funnel-count">{formatNum(s.count)}</span>
+              {conversion !== null && (
+                <span className="vom-funnel-conv">{conversion}% conv.</span>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 export function InicioSection() {
   const [, setSearchParams] = useSearchParams();
@@ -82,25 +114,25 @@ export function InicioSection() {
     <>
       <SectionHeader
         title="Dashboard"
-        subtitle="Controla, automatiza y aumenta tus ventas desde todos tus canales digitales."
+        subtitle="Controla, automatiza y aumenta tus ventas desde todos tus canales."
         action={
-          <button className="vom-btn vom-btn-primary" onClick={() => goTo('crm', { new: '1' })}>
+          <button className="vom-btn vom-btn-primary" onClick={() => goTo('clientes', { new: '1' })}>
             <Plus size={16} /> Nuevo lead
           </button>
         }
       />
 
-      {/* CTA destacado: Activar IA de ventas */}
-      <div className="vom-cta-banner">
+      {/* Bloque destacado: IA de ventas activa */}
+      <div className={`vom-cta-banner ${iaActiva ? 'is-active' : ''}`}>
         <div className="vom-cta-icon">
           <Sparkles size={22} />
         </div>
         <div className="vom-cta-text">
-          <h3>{iaActiva ? 'IA de ventas activa' : 'Activar IA de ventas'}</h3>
+          <h3>{iaActiva ? 'IA de ventas activa' : 'IA de ventas pausada'}</h3>
           <p>
             {iaActiva
-              ? 'Tu IA está respondiendo automáticamente en todos los canales conectados.'
-              : 'Deja que la IA califique leads, responda dudas y cierre ventas mientras tu equipo se enfoca en lo importante.'}
+              ? 'Tu IA está respondiendo automáticamente y calificando leads en todos los canales.'
+              : 'Activa la IA y deja que responda, califique y cierre ventas mientras trabajas en lo importante.'}
           </p>
         </div>
         <button
@@ -111,6 +143,7 @@ export function InicioSection() {
         </button>
       </div>
 
+      {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '1rem' }}>
         {STAT_CARDS.map(({ key, label, Icon, variant, trend, trendVariant, format }) => {
           const raw = STATS[key];
@@ -133,31 +166,42 @@ export function InicioSection() {
         })}
       </div>
 
-      <div className="vom-card">
-        <div className="vom-card-header">
-          <h3 className="vom-card-title">Actividad reciente</h3>
-          <button className="vom-link" onClick={() => goTo('crm')}>Ver todo →</button>
+      {/* Mini embudo + Actividad reciente lado a lado en desktop */}
+      <div className="vom-dashboard-row">
+        <div className="vom-card">
+          <div className="vom-card-header">
+            <h3 className="vom-card-title">Embudo de ventas</h3>
+            <span style={{ fontSize: '0.78rem', color: 'var(--md-on-surface-variant)' }}>
+              Mes actual
+            </span>
+          </div>
+          <MiniFunnel stages={FUNNEL} />
         </div>
-        <div className="vom-activity">
-          {ACTIVIDAD.slice(0, 6).map((a) => {
-            const { Icon, variant } = activityIconFor(a.estado);
-            return (
-              <button key={a.id} type="button" className="vom-activity-row" onClick={() => goTo('crm')}>
-                <div className={`vom-activity-icon ${variant}`}>
-                  <Icon size={16} />
-                </div>
-                <div className="vom-activity-text">
-                  <div className="vom-activity-title">{a.cliente} — {a.asunto}</div>
-                  <div className="vom-activity-meta">
-                    {CANAL_LABELS[a.canal]} · {formatDate(a.fecha)}
+
+        <div className="vom-card">
+          <div className="vom-card-header">
+            <h3 className="vom-card-title">Actividad reciente</h3>
+            <button className="vom-link" onClick={() => goTo('clientes')}>Ver todo →</button>
+          </div>
+          <div className="vom-activity">
+            {ACTIVIDAD.slice(0, 5).map((a) => {
+              const { Icon, variant } = activityIconFor(a.estado);
+              return (
+                <button key={a.id} type="button" className="vom-activity-row" onClick={() => goTo('clientes')}>
+                  <div className={`vom-activity-icon ${variant}`}>
+                    <Icon size={16} />
                   </div>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexShrink: 0 }}>
+                  <div className="vom-activity-text">
+                    <div className="vom-activity-title">{a.cliente}</div>
+                    <div className="vom-activity-meta">
+                      {a.asunto} · {CANAL_LABELS[a.canal]}
+                    </div>
+                  </div>
                   <Badge value={a.estado} />
-                </div>
-              </button>
-            );
-          })}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
     </>
@@ -165,7 +209,7 @@ export function InicioSection() {
 }
 
 // ─────────────────────────────────────
-// 1 · CANALES
+// 2 · CANALES
 // ─────────────────────────────────────
 
 export function CanalesSection() {
@@ -178,7 +222,7 @@ export function CanalesSection() {
   return (
     <>
       <SectionHeader
-        title="Canales integrados"
+        title="Canales"
         subtitle={`${conectados} de ${canales.length} canales activos · todos los mensajes en una sola bandeja`}
         action={
           <button className="vom-btn vom-btn-primary">
@@ -201,7 +245,7 @@ export function CanalesSection() {
                 </div>
               </div>
               <span className={`vom-channel-status ${c.conectado ? 'connected' : 'disconnected'}`}>
-                {c.conectado ? 'Conectado' : 'Desconectado'}
+                {c.conectado ? 'Conectado' : 'No conectado'}
               </span>
               <Toggle
                 checked={c.conectado}
@@ -217,228 +261,22 @@ export function CanalesSection() {
 }
 
 // ─────────────────────────────────────
-// 2 · FLUJO DE VENTAS (IA)
+// 3 · CLIENTES
 // ─────────────────────────────────────
 
-export function FlujoSection() {
-  const [pasos, setPasos] = useState(FLUJO_IA);
-  const togglePaso = (id) => {
-    setPasos(pasos.map((p) => p.id === id ? { ...p, activo: !p.activo } : p));
-  };
-  const activos = pasos.filter((p) => p.activo).length;
-
-  return (
-    <>
-      <SectionHeader
-        title="Flujo de ventas con IA"
-        subtitle={`${activos} de ${pasos.length} pasos activos en el flujo automático`}
-        action={
-          <button className="vom-btn vom-btn-ghost">
-            <Pencil size={14} /> Editar flujo
-          </button>
-        }
-      />
-
-      <div className="vom-card">
-        <div className="vom-flow-list">
-          {pasos.map((p, idx) => (
-            <div key={p.id} className="vom-flow-step">
-              <div className="vom-flow-num">{idx + 1}</div>
-              <div className="vom-flow-info">
-                <div className="vom-flow-title">{p.titulo}</div>
-                <div className="vom-flow-desc">{p.descripcion}</div>
-              </div>
-              <Toggle checked={p.activo} onChange={() => togglePaso(p.id)} ariaLabel={p.titulo} />
-            </div>
-          ))}
-        </div>
-      </div>
-    </>
-  );
-}
-
-// ─────────────────────────────────────
-// 3 · CATÁLOGO
-// ─────────────────────────────────────
-
-export function CatalogoSection() {
-  const [productos] = useState(PRODUCTOS);
-
-  return (
-    <>
-      <SectionHeader
-        title="Catálogo de productos"
-        subtitle={`${productos.length} productos disponibles para venta automática vía IA`}
-        action={
-          <button className="vom-btn vom-btn-primary">
-            <Plus size={16} /> Agregar producto
-          </button>
-        }
-      />
-
-      <div className="vom-product-grid">
-        {productos.map((p) => (
-          <div key={p.id} className="vom-product-card">
-            <div className="vom-product-name">{p.nombre}</div>
-            <div className="vom-product-desc">{p.descripcion}</div>
-            <div className="vom-product-row">
-              <div>
-                <div className="vom-product-price">{formatPEN(p.precio)}</div>
-                <div className="vom-product-stock">
-                  {p.stock === null ? 'Servicio' : `Stock: ${p.stock}`}
-                </div>
-              </div>
-              <div className="vom-product-actions">
-                <button className="vom-icon-btn" title="Editar">
-                  <Pencil size={14} />
-                </button>
-                <button className="vom-icon-btn danger" title="Eliminar">
-                  <Trash2 size={14} />
-                </button>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </>
-  );
-}
-
-// ─────────────────────────────────────
-// 4 · EMBUDO (PIPELINE)
-// ─────────────────────────────────────
-
-export function PipelineSection() {
-  const [clientes] = useState(PIPELINE_CLIENTES);
-
-  return (
-    <>
-      <SectionHeader
-        title="Embudo de ventas"
-        subtitle="Mueve los leads entre etapas según avancen en el proceso de venta."
-      />
-
-      <div className="vom-pipeline">
-        {PIPELINE_ETAPAS.map((etapa) => {
-          const items = clientes.filter((c) => c.etapa === etapa.id);
-          const total = items.reduce((sum, c) => sum + c.monto, 0);
-          return (
-            <div key={etapa.id} className="vom-pipeline-col">
-              <div className="vom-pipeline-col-header">
-                <span className="vom-pipeline-col-title">{etapa.label}</span>
-                <span className="vom-pipeline-col-count">{items.length}</span>
-              </div>
-              <div style={{ fontSize: '0.74rem', color: 'var(--md-on-surface-variant)', marginBottom: '0.25rem' }}>
-                {formatPEN(total)}
-              </div>
-              {items.map((c) => (
-                <div key={c.id} className="vom-pipeline-card">
-                  <div className="vom-pipeline-card-name">{c.nombre}</div>
-                  <div className="vom-pipeline-card-meta">
-                    <ChannelBadge value={c.canal} />
-                    <span className="vom-pipeline-card-monto">{formatPEN(c.monto)}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          );
-        })}
-      </div>
-    </>
-  );
-}
-
-// ─────────────────────────────────────
-// 5 · AUTOMATIZACIONES
-// ─────────────────────────────────────
-
-export function AutomatizacionesSection() {
-  const [autos, setAutos] = useState(AUTOMATIZACIONES);
-  const toggle = (id) => setAutos(autos.map((a) => a.id === id ? { ...a, activa: !a.activa } : a));
-  const activas = autos.filter((a) => a.activa).length;
-
-  return (
-    <>
-      <SectionHeader
-        title="Automatizaciones"
-        subtitle={`${activas} de ${autos.length} reglas activas. La IA ejecuta estas acciones sin intervención humana.`}
-        action={
-          <button className="vom-btn vom-btn-primary">
-            <Plus size={16} /> Nueva automatización
-          </button>
-        }
-      />
-
-      <div className="vom-card">
-        <div className="vom-flow-list">
-          {autos.map((a) => (
-            <div key={a.id} className="vom-flow-step">
-              <div className="vom-flow-num"><Zap size={14} /></div>
-              <div className="vom-flow-info">
-                <div className="vom-flow-title">{a.nombre}</div>
-                <div className="vom-flow-desc">{a.descripcion}</div>
-              </div>
-              <Toggle checked={a.activa} onChange={() => toggle(a.id)} ariaLabel={a.nombre} />
-            </div>
-          ))}
-        </div>
-      </div>
-    </>
-  );
-}
-
-// ─────────────────────────────────────
-// 6 · RESPUESTAS INTELIGENTES (Training)
-// ─────────────────────────────────────
-
-export function TrainingSection() {
-  return (
-    <>
-      <SectionHeader
-        title="Respuestas inteligentes"
-        subtitle="Entrena a la IA con tu conocimiento de negocio: FAQs, objeciones, scripts y tono."
-        action={
-          <button className="vom-btn vom-btn-ghost">
-            <Brain size={14} /> Editar conocimiento
-          </button>
-        }
-      />
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.85rem' }}>
-        {TRAINING.map((t) => (
-          <div key={t.id} className="vom-card">
-            <div className="vom-stat-top">
-              <span className="vom-stat-label">{t.titulo}</span>
-              <div className="vom-stat-icon-wrap primary">
-                <Brain size={16} />
-              </div>
-            </div>
-            <div className="vom-stat-value" style={{ fontSize: '1.5rem' }}>{t.items}</div>
-            <div className="vom-stat-trend">Última edición: {formatDate(t.ultimaEdicion)}</div>
-          </div>
-        ))}
-      </div>
-    </>
-  );
-}
-
-// ─────────────────────────────────────
-// 7 · CRM (Clientes)
-// ─────────────────────────────────────
-
-export function CrmSection() {
+export function ClientesSection() {
   const [clientes] = useState(CLIENTES);
   const [filter, setFilter] = useState('');
 
   const filtered = clientes.filter((c) =>
     !filter || c.nombre.toLowerCase().includes(filter.toLowerCase()) ||
-    c.email.toLowerCase().includes(filter.toLowerCase())
+    (c.ultimoMensaje || '').toLowerCase().includes(filter.toLowerCase())
   );
 
   return (
     <>
       <SectionHeader
-        title="Clientes (CRM)"
+        title="Clientes"
         subtitle="Todos los contactos capturados en cualquier canal, con su estado actual."
         action={
           <button className="vom-btn vom-btn-primary">
@@ -468,25 +306,25 @@ export function CrmSection() {
         <table className="vom-table">
           <thead>
             <tr>
-              <th>ID</th>
-              <th>Cliente</th>
-              <th>Email</th>
+              <th>Nombre</th>
               <th>Canal</th>
               <th>Estado</th>
-              <th>Última interacción</th>
+              <th>Último mensaje</th>
+              <th>Fecha</th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
-              <tr><td colSpan="6"><div className="vom-table-empty">Sin resultados</div></td></tr>
+              <tr><td colSpan="5"><div className="vom-table-empty">Sin resultados</div></td></tr>
             ) : filtered.map((c) => (
               <tr key={c.id}>
-                <td style={{ fontFamily: 'monospace', fontSize: '0.78rem', color: 'var(--md-on-surface-variant)' }}>{c.id}</td>
                 <td style={{ fontWeight: 500 }}>{c.nombre}</td>
-                <td style={{ fontSize: '0.82rem', color: 'var(--md-on-surface-variant)' }}>{c.email}</td>
                 <td><ChannelBadge value={c.canal} /></td>
                 <td><Badge value={c.estado} /></td>
-                <td>{formatDate(c.ultimaInteraccion)}</td>
+                <td className="vom-msg-cell">{c.ultimoMensaje}</td>
+                <td style={{ color: 'var(--md-on-surface-variant)', fontSize: '0.82rem' }}>
+                  {formatDate(c.fecha)}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -497,47 +335,49 @@ export function CrmSection() {
 }
 
 // ─────────────────────────────────────
-// 8 · NOTIFICACIONES
+// 4 · CATÁLOGO
 // ─────────────────────────────────────
 
-const NOTIF_ICONS = {
-  lead:     { Icon: BellRing,   variant: 'lead' },
-  caliente: { Icon: Sparkles,   variant: 'caliente' },
-  venta:    { Icon: ShoppingBag,variant: 'venta' },
-};
+export function CatalogoSection() {
+  const [productos] = useState(PRODUCTOS);
 
-export function NotificacionesSection() {
   return (
     <>
       <SectionHeader
-        title="Notificaciones"
-        subtitle="Avisos en tiempo real de los eventos importantes en tus canales."
+        title="Catálogo"
+        subtitle={`${productos.length} productos y servicios disponibles para venta automática`}
+        action={
+          <button className="vom-btn vom-btn-primary">
+            <Plus size={16} /> Agregar producto
+          </button>
+        }
       />
 
-      <div className="vom-card">
-        <div className="vom-notif-list">
-          {NOTIFICACIONES.map((n) => {
-            const { Icon, variant } = NOTIF_ICONS[n.tipo] || NOTIF_ICONS.lead;
-            return (
-              <div key={n.id} className="vom-notif-row">
-                <div className={`vom-notif-icon ${variant}`}>
-                  <Icon size={16} />
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p className="vom-notif-msg">{n.mensaje}</p>
-                  <div className="vom-notif-fecha">{n.fecha}</div>
-                </div>
+      <div className="vom-product-grid">
+        {productos.map((p) => (
+          <div key={p.id} className="vom-product-card">
+            <div className="vom-product-name">{p.nombre}</div>
+            <div className="vom-product-desc">{p.descripcion}</div>
+            <div className="vom-product-row">
+              <div className="vom-product-price">{formatPEN(p.precio)}</div>
+              <div className="vom-product-actions">
+                <button className="vom-icon-btn" title="Editar">
+                  <Pencil size={14} />
+                </button>
+                <button className="vom-icon-btn danger" title="Eliminar">
+                  <Trash2 size={14} />
+                </button>
               </div>
-            );
-          })}
-        </div>
+            </div>
+          </div>
+        ))}
       </div>
     </>
   );
 }
 
 // ─────────────────────────────────────
-// 9 · CONFIGURACIÓN
+// 5 · CONFIGURACIÓN
 // ─────────────────────────────────────
 
 function ConfigCard({ title, description, summary, enabled, onToggle, children }) {
@@ -561,61 +401,49 @@ function ConfigCard({ title, description, summary, enabled, onToggle, children }
 export function ConfiguracionSection() {
   const [integraciones, setIntegraciones] = useState(true);
   const [webhooks, setWebhooks] = useState(true);
-  const [personalizacion, setPersonalizacion] = useState(false);
+  const [ajustes, setAjustes] = useState(false);
 
   return (
     <>
       <SectionHeader
         title="Configuración"
-        subtitle="Integraciones, claves de API y personalización del comportamiento de la IA."
+        subtitle="Conecta tus canales, dispara automatizaciones externas y personaliza el comportamiento."
       />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         <ConfigCard
-          title="Integraciones de mensajería"
-          description="Conecta WhatsApp, Messenger, Instagram y otros canales a través de Meta Business y API oficiales."
+          title="Integraciones"
+          description="Conecta WhatsApp, Facebook, Instagram y LinkedIn a través de las API oficiales de Meta."
           summary={integraciones ? 'Conectado' : 'Sin conectar'}
           enabled={integraciones}
           onToggle={setIntegraciones}
         >
           <div style={{ fontSize: '0.85rem', color: 'var(--md-on-surface-variant)' }}>
-            Última sincronización: hace 5 minutos · 4 canales activos
+            Última sincronización: hace 5 minutos · 3 de 4 canales activos
           </div>
         </ConfigCard>
 
         <ConfigCard
-          title="Webhooks (Make / n8n)"
-          description="Dispara automatizaciones externas cuando ocurre un evento en el módulo (lead nuevo, venta cerrada, etc.)."
+          title="Webhooks"
+          description="Dispara automatizaciones externas (Make, n8n, Zapier) cuando ocurre un evento: lead nuevo, venta cerrada, mensaje escalado."
           summary={webhooks ? '3 endpoints activos' : 'Sin endpoints'}
           enabled={webhooks}
           onToggle={setWebhooks}
         >
           <div style={{ fontSize: '0.85rem', color: 'var(--md-on-surface-variant)' }}>
-            Endpoints: lead.created · sale.closed · message.escalated
+            lead.created · sale.closed · message.escalated
           </div>
         </ConfigCard>
 
         <ConfigCard
-          title="Personalización de la IA"
-          description="Define el tono, vocabulario y reglas de negocio que tu IA usará al responder a los clientes."
-          summary={personalizacion ? 'Personalizada' : 'Default'}
-          enabled={personalizacion}
-          onToggle={setPersonalizacion}
+          title="Ajustes generales"
+          description="Tono, idioma y reglas de negocio que aplica la IA al responder a tus clientes."
+          summary={ajustes ? 'Personalizado' : 'Default'}
+          enabled={ajustes}
+          onToggle={setAjustes}
         >
           <div style={{ fontSize: '0.85rem', color: 'var(--md-on-surface-variant)' }}>
-            Tono actual: profesional cálido · Idioma: español peruano
-          </div>
-        </ConfigCard>
-
-        <ConfigCard
-          title="API keys"
-          description="Genera o revoca claves para integrar terceros con el módulo de Ventas Omnicanal."
-          summary="2 keys activas"
-          enabled={true}
-          onToggle={() => {}}
-        >
-          <div style={{ fontSize: '0.85rem', color: 'var(--md-on-surface-variant)' }}>
-            sk_live_••••••3F4A · sk_test_••••••B921
+            Tono: profesional cálido · Idioma: español peruano
           </div>
         </ConfigCard>
       </div>
