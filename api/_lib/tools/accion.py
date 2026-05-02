@@ -86,7 +86,7 @@ def _hoy_iso() -> str:
                 "enum": ["PEN", "USD", "EUR", "CNY"], 
                 "description": "Moneda de la solicitud."
             },
-            "obra":          {"type": "string", "description": "Nombre de la obra a la que pertenece el gasto."},
+            "obra":          {"type": "string", "description": "Nombre de la obra o area que pertenece el gasto."},
             "total_general": {"type": "number", "description": "Monto total a solicitar (numérico)."},
             "tipo_gasto":    {
                 "type": "string", 
@@ -119,18 +119,14 @@ def crear_solicitud(args: dict, context: dict) -> dict:
 
     # ── Escritura ──
     fields = {
-        "empresa_id":    _tenant_id(context),
-        "DNI":           dni,
         "NOMBRE":        nombre,
         "PLAZO":         plazo,
         "MOTIVO":        motivo,
         "MONEDA":        moneda,
         "OBRA":          obra,
         "TOTAL_GENERAL": float(total_general),
-        "TIPO GASTO":    tipo_gasto,
-        "DETALLE GASTO": detalle_gasto,
-        "ESTADO":        "PENDIENTE",
-        "fecha":         _hoy_iso(),
+        "TIPO_GASTO":    tipo_gasto,
+        "DETALLE_GASTO": detalle_gasto,
     }
 
     record = airtable_client.create_record(_TABLA_SOLICITUDES, fields)
