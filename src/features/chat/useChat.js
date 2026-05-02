@@ -163,7 +163,11 @@ export function useChat(user) {
         
         // Handle navigation action from OpenAI backend
         if (data.action?.type === 'navigate' && data.action.path) {
-          navigate(data.action.path);
+          const params = data.action.params;
+          const queryString = params && Object.keys(params).length > 0
+            ? '?' + new URLSearchParams(params).toString()
+            : '';
+          navigate(data.action.path + queryString);
         }
       }
 
