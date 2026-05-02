@@ -125,8 +125,6 @@ def load_dynamic_config() -> dict:
             "<clave>": <valor casteado>,
             ...
             "aprobadores": [{...fields}],
-            "centros_costo": [{...fields}],
-            "tipos_gasto": [{...fields}],
           }
         }
 
@@ -161,19 +159,11 @@ def load_dynamic_config() -> dict:
             continue
         procesos.setdefault(proceso, {}).setdefault("aprobadores", []).append(f)
 
-    # 3) Centros_Costo y Tipos_Gasto: empresa-wide. Por contrato del spec
-    #    los duplicamos en cada proceso para que el consumer los tenga
-    #    "a la mano" desde proceso.<nombre>.
-    centros_rows = [r.get("fields", {}) for r in _safe_list("Centros_Costo", formula)]
-    tipos_rows = [r.get("fields", {}) for r in _safe_list("Tipos_Gasto", formula)]
-
     # Aseguramos que caja_chica exista aunque Config_Procesos esté vacío:
     procesos.setdefault("caja_chica", {})
 
     for proceso_dict in procesos.values():
         proceso_dict.setdefault("aprobadores", [])
-        proceso_dict["centros_costo"] = centros_rows
-        proceso_dict["tipos_gasto"] = tipos_rows
 
     _cache["data"] = procesos
     _cache["expires_at"] = now + _CACHE_TTL_SECONDS
@@ -217,9 +207,7 @@ def load_full_config() -> dict:
           "proceso": {
             "caja_chica": {
               "<clave>": <valor>, ...,
-              "aprobadores": [...],
-              "centros_costo": [...],
-              "tipos_gasto": [...]
+              "aprobadores": [...]
             }
           }
         }

@@ -78,37 +78,7 @@ def validar_monto_contra_tope(
         )
 
 
-def validar_centro_costo(codigo: str, config: dict) -> None:
-    """
-    Verifica que `codigo` corresponda a un centro de costo activo del tenant.
 
-    Lanza ValidationError con la lista de códigos válidos en el detalle
-    para que el LLM pueda sugerirle al usuario un centro válido.
-    """
-    if not codigo or not str(codigo).strip():
-        raise ValidationError("Falta el código del centro de costo.")
-
-    codigo = str(codigo).strip()
-    proceso = _proceso_caja_chica(config)
-    centros = proceso.get("centros_costo", []) or []
-
-    activos = [c for c in centros if c.get("activo")]
-    valid = next((c for c in activos if c.get("codigo") == codigo), None)
-
-    if valid:
-        return
-
-    codigos_validos = [c.get("codigo", "?") for c in activos]
-    if not codigos_validos:
-        raise ValidationError(
-            f"Centro de costo '{codigo}' no existe. No hay centros activos "
-            f"configurados para esta empresa."
-        )
-
-    raise ValidationError(
-        f"Centro de costo '{codigo}' no está activo o no existe. "
-        f"Códigos válidos: {', '.join(codigos_validos)}."
-    )
 
 
 def validar_plazo_rendicion(id_solicitud: str, config: dict) -> None:

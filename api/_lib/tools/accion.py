@@ -28,13 +28,12 @@ from .. import airtable_client
 from ..tool_registry import register
 from ..validators import (
     ValidationError,
-    validar_centro_costo,
     validar_monto_contra_tope,
     validar_plazo_rendicion,
 )
 
 
-_TABLA_SOLICITUDES   = "Solicitudes"
+_TABLA_SOLICITUDES   = "solicitudes_caja"
 _TABLA_RENDICIONES   = "Rendiciones"
 _TABLA_ITEMS_RENDIC  = "ItemsRendicion"
 
@@ -59,11 +58,7 @@ def _user_dni(context: dict) -> str:
     return str(dni)
 
 
-def _aplica_centro_costo(config: dict) -> bool:
-    proceso = (config or {}).get("proceso", {}).get("caja_chica", {})
-    # Default True si no está configurado: comportamiento conservador
-    # (mejor exigir un campo y errar a estricto que olvidar registrar uno).
-    return bool(proceso.get("aplica_centro_costo", True))
+
 
 
 def _hoy_iso() -> str:
@@ -77,80 +72,66 @@ def _hoy_iso() -> str:
 @register(
     name="crear_solicitud",
     description=(
-        "Crea una nueva solicitud de fondos (caja chica o entrega a rendir). "
-        "Valida tope semanal y centro de costo antes de escribir. Si falla "
-        "una validación, NO se crea el registro y se le explica al usuario."
+        "Crea una nueva solicitud de caja chica. "
+        "Valida el tope de monto antes de escribir. Si falla la validación, "
+        "NO se crea el registro y se le explica al usuario."
     ),
     parameters={
         "type": "object",
         "properties": {
-            "monto":         {"type": "number", "description": "Monto en soles."},
-            "tipo":          {
-                "type": "string",
-                "enum": ["caja-chica", "rendir"],
-                "description": "Tipo de fondo solicitado.",
+            "plazo":         {"type": "string", "description": "Plazo para la caja chica (ej. cantidad de días, o fecha desde/hasta)."},
+            "motivo":        {"type": "string", "description": "Motivo general de la solicitud (ej. Compra de utiles)."},
+            "moneda":        {
+                "type": "string", 
+                "enum": ["PEN", "USD", "EUR", "CNY"], 
+                "description": "Moneda de la solicitud."
             },
-            "origen":        {
-                "type": "string",
-                "enum": ["sede", "obra"],
-                "description": "Origen del fondo.",
+            "obra":          {"type": "string", "description": "Sede u Obra a la que pertenece."},
+            "total_general": {"type": "number", "description": "Monto total a solicitar (numérico)."},
+            "tipo_gasto":    {
+                "type": "string", 
+                "enum": ["CAJA CHICA", "PASAJES AEREOS", "CAJA EXTRAORDINARIA"], 
+                "description": "Clasificación del tipo de gasto."
             },
-            "justificacion": {"type": "string", "description": "Motivo o sustento."},
-            "destino":       {
-                "type": "string",
-                "description": "A quién o a qué se destina el fondo (proveedor, obra, etc.).",
-            },
-            "centro_costo":  {
-                "type": "string",
-                "description": "Código del centro de costo. Obligatorio si aplica_centro_costo=True.",
-            },
-            "numero_cuenta": {
-                "type": "string",
-                "description": "Cuenta bancaria de depósito.",
-            },
+            "detalle_gasto": {"type": "string", "description": "Descripción detallada del gasto a realizar."},
         },
-        "required": ["monto", "tipo", "origen", "justificacion", "destino", "numero_cuenta"],
+        "required": ["plazo", "motivo", "moneda", "obra", "total_general", "tipo_gasto", "detalle_gasto"],
     },
     category="accion",
 )
 def crear_solicitud(args: dict, context: dict) -> dict:
-    monto = args["monto"]
-    tipo = args["tipo"]
-    origen = args["origen"]
-    justificacion = args["justificacion"]
-    destino = args["destino"]
-    centro_costo = args.get("centro_costo")
-    numero_cuenta = args["numero_cuenta"]
+    plazo = args["plazo"]
+    motivo = args["motivo"]
+    moneda = args["moneda"]
+    obra = args["obra"]
+    total_general = args["total_general"]
+    tipo_gasto = args["tipo_gasto"]
+    detalle_gasto = args["detalle_gasto"]
 
     config = context.get("config") or {}
     dni = _user_dni(context)
+    user = context.get("user") or {}
+    nombre = user.get("nombre") or ""
 
     # ── Validaciones ANTES de tocar Airtable ──
-    validar_monto_contra_tope(monto, dni, origen, config)
-
-    if _aplica_centro_costo(config):
-        if not centro_costo:
-            raise ValidationError(
-                "Esta empresa exige asignar un centro de costo a cada solicitud. "
-                "Indica el código (consulta los activos con `consultar_centros_costo`)."
-            )
-        validar_centro_costo(centro_costo, config)
+    # Usamos total_general como monto y obra como origen para la validación heredada.
+    validar_monto_contra_tope(total_general, dni, obra, config)
 
     # ── Escritura ──
     fields = {
         "empresa_id":    _tenant_id(context),
-        "dni":           dni,
-        "monto":         float(monto),
-        "tipo":          tipo,
-        "origen":        origen,
-        "justificacion": justificacion,
-        "destino":       destino,
-        "numero_cuenta": numero_cuenta,
-        "estado":        "pendiente",
+        "DNI":           dni,
+        "NOMBRE":        nombre,
+        "PLAZO":         plazo,
+        "MOTIVO":        motivo,
+        "MONEDA":        moneda,
+        "OBRA":          obra,
+        "TOTAL_GENERAL": float(total_general),
+        "TIPO GASTO":    tipo_gasto,
+        "DETALLE GASTO": detalle_gasto,
+        "ESTADO":        "PENDIENTE",
         "fecha":         _hoy_iso(),
     }
-    if centro_costo:
-        fields["centro_costo"] = centro_costo
 
     record = airtable_client.create_record(_TABLA_SOLICITUDES, fields)
     return {"id": record["id"], "fields": record["fields"]}
@@ -233,10 +214,7 @@ def iniciar_rendicion(args: dict, context: dict) -> dict:
             "monto":               {"type": "number", "description": "Total del comprobante incluyendo IGV."},
             "igv":                 {"type": "number", "description": "Monto del IGV (puede ser 0)."},
             "concepto":            {"type": "string", "description": "Descripción del gasto."},
-            "centro_costo":        {
-                "type": "string",
-                "description": "Código del centro de costo. Obligatorio si aplica_centro_costo=True.",
-            },
+
         },
         "required": [
             "id_rendicion", "tipo_comprobante", "ruc_emisor",
@@ -248,17 +226,7 @@ def iniciar_rendicion(args: dict, context: dict) -> dict:
 )
 def agregar_item_rendicion(args: dict, context: dict) -> dict:
     id_rendicion = args["id_rendicion"]
-    centro_costo = args.get("centro_costo")
     config = context.get("config") or {}
-
-    # ── Validaciones ──
-    if _aplica_centro_costo(config):
-        if not centro_costo:
-            raise ValidationError(
-                "Esta empresa exige asignar un centro de costo a cada item "
-                "de rendición. Indica el código."
-            )
-        validar_centro_costo(centro_costo, config)
 
     # ── Escritura ──
     fields = {
@@ -273,8 +241,7 @@ def agregar_item_rendicion(args: dict, context: dict) -> dict:
         "igv":                 float(args["igv"]),
         "concepto":            args["concepto"],
     }
-    if centro_costo:
-        fields["centro_costo"] = centro_costo
+
 
     record = airtable_client.create_record(_TABLA_ITEMS_RENDIC, fields)
     return {"id": record["id"], "fields": record["fields"]}

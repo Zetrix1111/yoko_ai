@@ -110,25 +110,6 @@ def _format_aprobadores(aprobadores: list) -> str:
     return "\n" + "\n".join(items)
 
 
-def _format_centros(centros: list) -> str:
-    """Lista compacta de centros de costo activos."""
-    activos = [c for c in centros if c.get("activo")]
-    if not activos:
-        return "ninguno configurado todavía."
-    return ", ".join(
-        f"{c.get('codigo','?')} {c.get('nombre','?')}" for c in activos
-    )
-
-
-def _format_tipos(tipos: list) -> str:
-    """Lista compacta de tipos de gasto activos."""
-    activos = [t for t in tipos if t.get("activo")]
-    if not activos:
-        return "ninguno configurado todavía."
-    return ", ".join(
-        f"{t.get('codigo','?')} {t.get('nombre','?')}" for t in activos
-    )
-
 
 # ─────────────────────────────────────────────────────────────────────────
 # API pública
@@ -164,8 +145,7 @@ def build_system_prompt(config: dict, user: dict) -> str:
     requiere_aprob = bool(proceso.get("requiere_aprobacion", True))
     num_aprob = proceso.get("num_aprobadores")
     aprob_rendicion = bool(proceso.get("aprobacion_rendicion", False))
-    aplica_cc = bool(proceso.get("aplica_centro_costo", True))
-    aplica_tg = bool(proceso.get("aplica_tipo_gasto", False))
+
 
     # Línea de identidad: incluye RUC si está disponible
     identidad = f"Eres {agent_name}, asistente virtual de {razon_social}"
@@ -186,7 +166,18 @@ def build_system_prompt(config: dict, user: dict) -> str:
         f"- Cargo: {user.get('cargo') or '—'}",
         f"- DNI: {user.get('dni') or '—'}",
         "",
-        "# REGLAS DEL PROCESO DE CAJA CHICA",
+        "# SECUENCIA OPERATIVA DE CAJA CHICA",
+        "El ciclo de vida de caja chica sigue estrictamente estos pasos:",
+        "1. El usuario inicia creando una **Solicitud** de caja chica.",
+        "2. La solicitud pasa a revisión de los **Aprobadores** (según la cantidad de niveles requeridos). Al ser aprobada, se notifica por correo.",
+        "3. El tesorero procede a realizar el **Pago** de la solicitud aprobada.",
+        "4. El usuario realiza la **Rendición** de los gastos efectuados con el dinero recibido.",
+        "",
+        "RESTRICCIÓN IMPORTANTE DE GESTIÓN POR CHAT:",
+        "Como asistente IA en este chat, tu capacidad de gestión directa está limitada ÚNICAMENTE a **'Solicitudes'** y **'Rendiciones'**.",
+        "Para todo lo demás (Dashboard, Aprobaciones, Pagos, Reportes o Configuración), NO intentes gestionarlo por el chat. Debes explicarle al usuario que esa acción se realiza desde el módulo visual correspondiente y usar tus herramientas (tools) para redirigirlo a esa pantalla.",
+        "",
+        "# REGLAS Y LÍMITES DEL PROCESO",
     ]
 
     # ── Monto máximo por solicitud ──
@@ -235,15 +226,6 @@ def build_system_prompt(config: dict, user: dict) -> str:
             "sin pasar por aprobación."
         )
 
-    # ── Catálogos condicionales ──
-    if aplica_cc:
-        lines.append(
-            f"- Centros de costo activos: {_format_centros(proceso.get('centros_costo', []))}"
-        )
-    if aplica_tg:
-        lines.append(
-            f"- Tipos de gasto válidos: {_format_tipos(proceso.get('tipos_gasto', []))}"
-        )
 
     lines.extend([
         "",
@@ -255,6 +237,7 @@ def build_system_prompt(config: dict, user: dict) -> str:
         "- Si el usuario excede un tope o plazo, NO rechaces. Explica el límite y sugiere alternativas concretas.",
         "- Para llevar al usuario a una pantalla, usa `navegar_ui`. No le digas \"haz click aquí\".",
         "- Si pregunta por un módulo no habilitado, indica que no está disponible.",
+        "- IMPORTANTE: Cuando necesites pedir varios datos obligatorios (ej. para crear una solicitud), NO pidas todos los campos de golpe. Pídelos de forma conversacional y natural, preguntando máximo 1 o 2 cosas a la vez.",
     ])
 
     return "\n".join(lines)
