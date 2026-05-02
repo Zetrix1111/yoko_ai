@@ -112,6 +112,7 @@ def crear_solicitud(args: dict, context: dict) -> dict:
     dni = _user_dni(context)
     user = context.get("user") or {}
     nombre = user.get("nombre") or ""
+    record_id = user.get("record_id")
 
     # ── Validaciones ANTES de tocar Airtable ──
     # Usamos total_general como monto. Ya no existe origen (sede/obra).
@@ -128,6 +129,9 @@ def crear_solicitud(args: dict, context: dict) -> dict:
         "TIPO_GASTO":    tipo_gasto,
         "DETALLE_GASTO": detalle_gasto,
     }
+
+    if record_id:
+        fields["SOLICITANTE"] = [record_id]
 
     record = airtable_client.create_record(_TABLA_SOLICITUDES, fields)
     return {"id": record["id"], "fields": record["fields"]}

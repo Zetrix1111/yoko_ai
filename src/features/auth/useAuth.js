@@ -71,6 +71,7 @@ export function useAuth() {
           dni,
           nombre: data.nombre || '',
           cargo: data.cargo || '',
+          record_id: data.record_id || '',
           sessionId: `${dni}-${now()}`,
         });
         setUser(fresh);

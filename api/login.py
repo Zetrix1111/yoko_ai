@@ -63,6 +63,7 @@ class handler(BaseHTTPRequestHandler):
                 "nombre": fields.get("NOMBRE CORTO", ""),
                 "cargo":  fields.get("PUESTO", ""),
                 "dni":    dni,
+                "record_id": records[0].get("id", ""),
             })
 
         except urllib.error.HTTPError as e:
