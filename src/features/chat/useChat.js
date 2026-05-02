@@ -39,41 +39,69 @@ export function useChat(user) {
     const messageId = crypto.randomUUID();
     let batchId = null;
 
-    // Fase 1: subida de archivos
+    // Fase 1: procesar archivos (extraer campos + subir si aplica)
+    let camposExtraidos = null;
+
     if (files.length > 0) {
-      batchId = messageId;
       setIsUploading(true);
 
       const uploadMsgId = crypto.randomUUID();
       setMessages((prev) => [...prev, {
         id: uploadMsgId,
-        text: 'Preparando subida...',
+        text: `Analizando ${files.length > 1 ? files.length + ' archivos' : files[0].name}...`,
         sender: 'yoko',
         isLoading: true,
       }]);
 
       try {
+        // Procesar cada archivo: primero parse_file para extraer campos
+        const todosLosCampos = [];
         for (let i = 0; i < files.length; i++) {
           const file = files[i];
-          const formData = new FormData();
-          formData.append('file', file);
-          formData.append('batchId', batchId);
-          formData.append('fileName', file.name);
 
+          // Actualizar estado visual
           setMessages((prev) => prev.map(msg =>
             msg.id === uploadMsgId
-              ? { ...msg, text: `Subiendo archivo ${i + 1} de ${files.length}...` }
+              ? { ...msg, text: `Leyendo archivo ${i + 1} de ${files.length}: ${file.name}...` }
               : msg
           ));
 
-          await postForm(API.UPLOAD, formData);
+          // Llamar a parse_file para extraer campos con IA
+          const formData = new FormData();
+          formData.append('file', file);
+          formData.append('fileName', file.name);
+
+          try {
+            const res = await fetch(API.PARSE_FILE, { method: 'POST', body: formData });
+            if (res.ok) {
+              const parsed = await res.json();
+              if (parsed.campos) {
+                todosLosCampos.push(parsed.campos);
+              }
+            }
+          } catch (parseErr) {
+            console.warn('parse_file falló para', file.name, parseErr);
+          }
         }
+
+        // Consolidar campos extraídos (usar el primero con valor no-null)
+        if (todosLosCampos.length > 0) {
+          camposExtraidos = todosLosCampos.reduce((acc, cur) => {
+            Object.keys(cur).forEach(k => {
+              if (!acc[k] && cur[k] !== null && cur[k] !== undefined) {
+                acc[k] = cur[k];
+              }
+            });
+            return acc;
+          }, {});
+        }
+
         setMessages((prev) => prev.filter(msg => msg.id !== uploadMsgId));
       } catch (err) {
-        console.error('Error subiendo archivos:', err);
+        console.error('Error procesando archivos:', err);
         setMessages((prev) => prev.map(msg =>
           msg.id === uploadMsgId
-            ? { ...msg, text: 'Hubo un error al subir los archivos.', isLoading: false }
+            ? { ...msg, text: 'Hubo un error al analizar el archivo.', isLoading: false }
             : msg
         ));
         setIsUploading(false);
@@ -82,7 +110,7 @@ export function useChat(user) {
       setIsUploading(false);
     }
 
-    // Fase 2: IA
+    // Fase 2: enviar a la IA con los campos extraídos como contexto adicional
     const loadingId = crypto.randomUUID();
     setMessages((prev) => [...prev, {
       id: loadingId,
@@ -92,7 +120,23 @@ export function useChat(user) {
     }]);
 
     try {
-      const apiMessages = [...messages, { id: 'temp', text, sender: 'user' }]
+      // Si se extrajeron campos del archivo, los incluimos en el mensaje del usuario
+      let mensajeConContexto = text;
+      if (camposExtraidos) {
+        const camposStr = Object.entries(camposExtraidos)
+          .filter(([, v]) => v !== null && v !== undefined && v !== '')
+          .map(([k, v]) => `  - ${k}: ${v}`)
+          .join('\n');
+        
+        mensajeConContexto = text
+          ? `${text}\n\n[Datos extraídos del archivo adjunto:\n${camposStr}]`
+          : `[Datos extraídos del archivo adjunto:\n${camposStr}]\nPor favor revisa si estos datos son correctos y crea la solicitud de caja chica con ellos, confirmando conmigo cualquier dato que no esté claro.`;
+      }
+
+      const apiMessages = [
+        ...messages,
+        { id: 'temp', text: mensajeConContexto, sender: 'user' }
+      ]
         .filter(m => !m.isLoading)
         .map(m => ({
           role: m.sender === 'user' ? 'user' : 'assistant',

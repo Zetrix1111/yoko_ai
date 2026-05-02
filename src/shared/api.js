@@ -29,6 +29,7 @@ export const API = {
   LOGIN: '/api/login',
   CHAT: '/api/chat',
   UPLOAD: '/api/upload',
+  PARSE_FILE: '/api/parse_file',
   ALERTA_SEGURA: '/api/alerta_segura',
   FACTURAS_PROCESAR: '/api/facturas_procesar',
   FACTURAS_CONCAR: '/api/facturas_concar',
