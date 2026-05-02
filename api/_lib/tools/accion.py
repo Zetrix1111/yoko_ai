@@ -86,7 +86,7 @@ def _hoy_iso() -> str:
                 "enum": ["PEN", "USD", "EUR", "CNY"], 
                 "description": "Moneda de la solicitud."
             },
-            "obra":          {"type": "string", "description": "Sede u Obra a la que pertenece."},
+            "obra":          {"type": "string", "description": "Nombre de la obra a la que pertenece el gasto."},
             "total_general": {"type": "number", "description": "Monto total a solicitar (numérico)."},
             "tipo_gasto":    {
                 "type": "string", 
