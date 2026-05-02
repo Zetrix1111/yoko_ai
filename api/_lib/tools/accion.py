@@ -122,6 +122,9 @@ def crear_solicitud(args: dict, context: dict) -> dict:
     # Usamos total_general como monto. Ya no existe origen (sede/obra).
     validar_monto_contra_tope(total_general, config)
 
+    # ── Estado inicial según presencia de Residente ──
+    estado = "PENDIENTE_APROBACION_RESIDENTE" if residente_id else "PENDIENTE_APROBACION_JEFATURA_SEDE"
+
     # ── Escritura ──
     fields = {
         "NOMBRE":        nombre,
@@ -133,6 +136,7 @@ def crear_solicitud(args: dict, context: dict) -> dict:
         "TIPO_GASTO":    tipo_gasto,
         "DETALLE_GASTO": detalle_gasto,
         "APROBADOR":     [aprobador_id],
+        "ESTADO":        estado,
     }
 
     if record_id:
