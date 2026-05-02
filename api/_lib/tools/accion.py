@@ -114,8 +114,8 @@ def crear_solicitud(args: dict, context: dict) -> dict:
     nombre = user.get("nombre") or ""
 
     # ── Validaciones ANTES de tocar Airtable ──
-    # Usamos total_general como monto y obra como origen para la validación heredada.
-    validar_monto_contra_tope(total_general, dni, obra, config)
+    # Usamos total_general como monto. Ya no existe origen (sede/obra).
+    validar_monto_contra_tope(total_general, config)
 
     # ── Escritura ──
     fields = {

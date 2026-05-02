@@ -22,23 +22,9 @@ def _proceso_caja_chica(config: dict) -> dict:
     return ((config or {}).get("proceso", {}) or {}).get("caja_chica", {}) or {}
 
 
-def validar_monto_contra_tope(
-    monto: float,
-    dni: str,
-    origen: str,
-    config: dict,
-) -> None:
+def validar_monto_contra_tope(monto: float, config: dict) -> None:
     """
-    Verifica que `monto` no exceda el tope semanal según `origen` (sede/obra).
-
-    No considera el "ya consumido" en la semana — para eso se usa la tool
-    `consultar_tope_disponible`. Esta validación es solo contra el tope
-    nominal (límite duro por transacción individual).
-
-    Lanza ValidationError si:
-      - monto no es numérico
-      - origen no es 'sede' u 'obra'
-      - monto > tope configurado
+    Verifica que `monto` no exceda el tope máximo por solicitud.
     """
     if monto is None:
         raise ValidationError("Falta el monto de la solicitud.")
@@ -50,18 +36,11 @@ def validar_monto_contra_tope(
     if monto_f <= 0:
         raise ValidationError("El monto debe ser mayor a cero.")
 
-    if origen not in ("sede", "obra"):
-        raise ValidationError(
-            f"Origen inválido: {origen!r}. Debe ser 'sede' u 'obra'."
-        )
-
     proceso = _proceso_caja_chica(config)
-    clave_tope = f"tope_semanal_{origen}"
-    tope = proceso.get(clave_tope)
+    activo = bool(proceso.get("monto_maximo_activo", False))
+    tope = proceso.get("monto_maximo")
 
-    if tope is None:
-        # Si no está configurado, no podemos validar — lo dejamos pasar
-        # para no bloquear el flujo. El LLM verá el resultado y advertirá.
+    if not activo or tope is None:
         return
 
     try:
@@ -70,11 +49,9 @@ def validar_monto_contra_tope(
         return
 
     if monto_f > tope_f:
-        # Incluimos el DNI en el mensaje para que el LLM tenga contexto del
-        # usuario afectado y pueda mencionarlo si la conversación lo amerita.
         raise ValidationError(
-            f"El monto S/{monto_f:,.2f} excede el tope semanal de "
-            f"S/{tope_f:,.2f} para origen '{origen}' (DNI {dni})."
+            f"El monto S/{monto_f:,.2f} excede el tope máximo por solicitud de "
+            f"S/{tope_f:,.2f}."
         )
 
 
