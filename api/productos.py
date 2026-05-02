@@ -86,16 +86,18 @@ def _to_airtable_fields(payload: dict) -> dict:
     if "categoria" in payload:     fields["categoria"]    = payload["categoria"]
     if "activo" in payload:        fields["activo"]       = bool(payload["activo"])
     if "keywords" in payload:      fields["keywords"]     = payload["keywords"]
-    # Foto: aceptamos URL string. Para Airtable Attachment se envía como
-    # lista [{"url": "..."}]. Si el cliente manda null/empty lo dejamos vacío.
+    # Foto: aceptamos URL string. La mandamos como string plano, que es
+    # compatible con campos Airtable de tipo URL o "Single line text".
+    # Si en el futuro la tabla migra a Attachment, hay que envolverlo en
+    # [{"url": foto}]. Por ahora mantener URL string (más portable).
+    # Si es un blob:// (preview local del modal), lo ignoramos: no se puede
+    # subir a Airtable directamente sin pasar por un CDN.
     if "foto" in payload:
         foto = payload["foto"]
         if foto and isinstance(foto, str) and foto.startswith(("http://", "https://")):
-            fields["foto"] = [{"url": foto}]
+            fields["foto"] = foto
         elif not foto:
-            fields["foto"] = []
-        # Si es un blob:// (preview local del modal), lo ignoramos: no se puede
-        # subir a Airtable directamente. Frontend deberá usar upload aparte.
+            fields["foto"] = ""
     return fields
 
 
