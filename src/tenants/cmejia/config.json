@@ -11,6 +11,7 @@
   "modules": [
     "alerta-segura",
     "gestion-caja",
+    "ventas-omnicanal",
     "facturas-inteligentes",
     "configuracion-empresa"
   ],

@@ -20,6 +20,15 @@ import {
   BarChart3,
   Settings,
   Building2,
+  Sparkles,
+  Plug,
+  Bot,
+  Package,
+  KanbanSquare,
+  Zap,
+  Brain,
+  Users,
+  Bell,
 } from 'lucide-react';
 
 export const MODULES = [
@@ -40,6 +49,25 @@ export const MODULES = [
       { id: 'rendiciones', label: 'Rendiciones', Icon: Receipt },
       { id: 'reportes', label: 'Reportes', Icon: BarChart3 },
       { id: 'configuracion', label: 'Configuración', Icon: Settings },
+    ],
+  },
+  {
+    id: 'ventas-omnicanal',
+    path: '/modulos/ventas-omnicanal',
+    name: 'Ventas Omnicanal con IA',
+    Icon: Sparkles,
+    iconClass: 'sales',
+    submenus: [
+      { id: 'inicio',           label: 'Dashboard',         Icon: LayoutDashboard },
+      { id: 'canales',          label: 'Canales',           Icon: Plug },
+      { id: 'flujo',            label: 'Flujo de Ventas IA', Icon: Bot },
+      { id: 'catalogo',         label: 'Catálogo',          Icon: Package },
+      { id: 'pipeline',         label: 'Embudo',            Icon: KanbanSquare },
+      { id: 'automatizaciones', label: 'Automatizaciones',  Icon: Zap },
+      { id: 'training',         label: 'Respuestas IA',     Icon: Brain },
+      { id: 'crm',              label: 'Clientes (CRM)',    Icon: Users },
+      { id: 'notificaciones',   label: 'Notificaciones',    Icon: Bell },
+      { id: 'configuracion',    label: 'Configuración',     Icon: Settings },
     ],
   },
   {

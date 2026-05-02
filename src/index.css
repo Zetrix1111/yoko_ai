@@ -926,6 +926,7 @@ body {
 .module-icon-wrapper.payment   { background: linear-gradient(135deg, #FFE082, #F57F17); }
 .module-icon-wrapper.invoice   { background: linear-gradient(135deg, #80DEEA, #00838F); }
 .module-icon-wrapper.finance   { background: linear-gradient(135deg, #BCD2C0, #4E7A5E); }
+.module-icon-wrapper.sales     { background: linear-gradient(135deg, #B89455, #876B30); }
 
 /* ─────────────────────────────────────────────
    Accordion (módulos con submenús)

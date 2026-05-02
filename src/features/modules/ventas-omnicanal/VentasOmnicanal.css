@@ -1,0 +1,813 @@
+/* ─────────────────────────────────────────────
+   Ventas Omnicanal con IA — usa tokens globales (Sage)
+   Mismo lenguaje visual que Gestión de Caja Chica.
+   ───────────────────────────────────────────── */
+
+.vom-content-full {
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  animation: vom-fade 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes vom-fade {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Section header ── */
+.vom-section-title {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #0F172A;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.vom-section-subtitle {
+  color: #64748B;
+  font-size: 0.95rem;
+  margin: 0.35rem 0 0;
+}
+
+/* ── Cards ── */
+.vom-card {
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 16px;
+  padding: 1.25rem;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.vom-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.85rem;
+}
+
+.vom-card-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #0F172A;
+  margin: 0;
+}
+
+/* ── Stat cards ── */
+.vom-stat-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  cursor: default;
+}
+
+.vom-stat-card:hover {
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+  transform: translateY(-2px);
+}
+
+.vom-stat-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.vom-stat-label {
+  color: #64748B;
+  font-size: 0.78rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.vom-stat-icon-wrap {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--md-info-container);
+  color: var(--md-info);
+}
+
+.vom-stat-icon-wrap.success { background: var(--md-success-container);  color: var(--md-success); }
+.vom-stat-icon-wrap.warning { background: var(--md-warning-container);  color: var(--md-warning); }
+.vom-stat-icon-wrap.primary { background: var(--md-primary-container);  color: var(--md-primary); }
+.vom-stat-icon-wrap.tertiary{ background: var(--md-tertiary-container); color: var(--md-tertiary); }
+
+.vom-stat-value {
+  font-size: 1.85rem;
+  font-weight: 700;
+  color: #0F172A;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+}
+
+.vom-stat-trend {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  color: #64748B;
+  font-weight: 500;
+}
+
+.vom-stat-trend.success { color: var(--md-success); }
+.vom-stat-trend.warning { color: var(--md-warning); }
+
+/* ── Activity feed ── */
+.vom-activity {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.vom-activity-row {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.7rem 0.65rem;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  text-decoration: none;
+  color: inherit;
+  background: transparent;
+  border: none;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+}
+
+.vom-activity-row:hover { background: #F8FAFC; }
+
+.vom-activity-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.vom-activity-icon.nuevo       { background: var(--md-info-container);     color: var(--md-info); }
+.vom-activity-icon.interesado  { background: var(--md-warning-container);  color: var(--md-warning); }
+.vom-activity-icon.negociacion { background: var(--md-tertiary-container); color: var(--md-tertiary); }
+.vom-activity-icon.cerrado     { background: var(--md-success-container);  color: var(--md-success); }
+.vom-activity-icon.frio        { background: var(--md-surface-variant);    color: var(--md-on-surface-variant); }
+
+.vom-activity-text { flex: 1; min-width: 0; }
+
+.vom-activity-title {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #0F172A;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vom-activity-meta {
+  font-size: 0.78rem;
+  color: #64748B;
+  margin-top: 2px;
+}
+
+.vom-link {
+  background: transparent;
+  border: none;
+  color: var(--md-primary);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-family: inherit;
+  transition: background 0.15s ease;
+}
+
+.vom-link:hover { background: var(--md-primary-container); }
+
+/* ── Buttons ── */
+.vom-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  padding: 0.6rem 1.05rem;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 0.875rem;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s, color 0.15s, transform 0.12s, box-shadow 0.18s;
+  white-space: nowrap;
+}
+
+.vom-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.vom-btn-primary {
+  background: var(--md-primary);
+  color: var(--md-on-primary);
+  box-shadow: 0 1px 2px rgba(78, 122, 94, 0.18), 0 4px 10px rgba(78, 122, 94, 0.22);
+}
+
+.vom-btn-primary:not(:disabled):hover {
+  background: var(--md-primary-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(78, 122, 94, 0.20), 0 6px 14px rgba(78, 122, 94, 0.28);
+}
+
+.vom-btn-ghost {
+  background: var(--md-surface-variant);
+  color: var(--md-on-surface);
+}
+
+.vom-btn-ghost:hover { background: var(--md-surface-container); }
+
+.vom-btn-danger {
+  background: var(--md-surface);
+  color: var(--md-error);
+  border: 1px solid var(--md-error-container);
+}
+
+.vom-btn-danger:not(:disabled):hover { background: var(--md-error-container); }
+
+/* CTA destacado: Activar IA de ventas */
+.vom-cta-banner {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+  border-radius: 16px;
+  background: linear-gradient(135deg, var(--md-primary-container), var(--md-tertiary-container));
+  border: 1px solid var(--md-primary-container);
+}
+
+.vom-cta-banner .vom-cta-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--md-primary);
+  color: var(--md-on-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.vom-cta-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.vom-cta-text h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--md-on-primary-container);
+  margin: 0;
+}
+
+.vom-cta-text p {
+  font-size: 0.85rem;
+  color: var(--md-on-surface-variant);
+  margin: 0.2rem 0 0;
+}
+
+/* ── Badges ── */
+.vom-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.vom-badge::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.vom-badge.nuevo       { background: var(--md-info-container);     color: var(--md-on-info-container); }
+.vom-badge.interesado  { background: var(--md-warning-container);  color: var(--md-on-warning-container); }
+.vom-badge.cotizacion  { background: var(--md-tertiary-container); color: var(--md-on-tertiary-container); }
+.vom-badge.negociacion { background: var(--md-tertiary-container); color: var(--md-on-tertiary-container); }
+.vom-badge.cerrado     { background: var(--md-success-container);  color: var(--md-on-success-container); }
+.vom-badge.frio        { background: var(--md-surface-variant);    color: var(--md-on-surface-variant); }
+
+.vom-channel-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  background: var(--md-surface-variant);
+  color: var(--md-on-surface-variant);
+  white-space: nowrap;
+}
+
+/* ── Tables ── */
+.vom-table-wrap {
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.vom-table-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid #E2E8F0;
+}
+
+.vom-table-toolbar h3 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #0F172A;
+  margin: 0;
+}
+
+.vom-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.vom-table thead th {
+  padding: 0.7rem 1rem;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.72rem;
+  color: #64748B;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: #F8FAFC;
+  border-bottom: 1px solid #E2E8F0;
+}
+
+.vom-table tbody td {
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid #F1F5F9;
+  color: #1E293B;
+}
+
+.vom-table tbody tr:last-child td { border-bottom: none; }
+.vom-table tbody tr:hover { background: #F8FAFC; }
+
+.vom-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.vom-table-empty {
+  padding: 2.5rem 1rem;
+  text-align: center;
+  color: var(--md-on-surface-variant);
+  font-size: 0.9rem;
+}
+
+/* ── Channel list ── */
+.vom-channel-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.vom-channel-row {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.85rem 1rem;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  transition: background 0.15s, opacity 0.2s;
+}
+
+.vom-channel-row.disconnected { opacity: 0.6; }
+
+.vom-channel-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: var(--md-surface);
+  border: 1px solid var(--md-outline-variant);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--md-on-surface-variant);
+}
+
+.vom-channel-row.connected .vom-channel-icon {
+  background: var(--md-primary-container);
+  color: var(--md-primary);
+  border-color: var(--md-primary-container);
+}
+
+.vom-channel-info { flex: 1; min-width: 0; }
+
+.vom-channel-name {
+  font-weight: 600;
+  font-size: 0.92rem;
+  color: #0F172A;
+}
+
+.vom-channel-meta {
+  font-size: 0.78rem;
+  color: #64748B;
+  margin-top: 2px;
+}
+
+.vom-channel-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+
+.vom-channel-status.connected {
+  background: var(--md-success-container);
+  color: var(--md-on-success-container);
+}
+
+.vom-channel-status.disconnected {
+  background: var(--md-surface-variant);
+  color: var(--md-on-surface-variant);
+}
+
+/* ── Toggle switch (igual al de GCC pero con prefijo vom-) ── */
+.vom-toggle {
+  width: 38px;
+  height: 22px;
+  border-radius: 999px;
+  background: #CBD5E1;
+  border: none;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.vom-toggle:hover { background: #94A3B8; }
+.vom-toggle.on { background: var(--md-primary); }
+.vom-toggle.on:hover { background: var(--md-primary-hover); }
+
+.vom-toggle-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #FFFFFF;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.18);
+  transition: left 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.vom-toggle.on .vom-toggle-thumb { left: 19px; }
+
+/* ── Pipeline (Kanban) ── */
+.vom-pipeline {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(180px, 1fr));
+  gap: 0.85rem;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+}
+
+@media (max-width: 1100px) {
+  .vom-pipeline { grid-template-columns: repeat(5, 220px); }
+}
+
+.vom-pipeline-col {
+  background: var(--md-surface-variant);
+  border-radius: 14px;
+  padding: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  min-height: 320px;
+}
+
+.vom-pipeline-col-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.25rem;
+}
+
+.vom-pipeline-col-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #475569;
+}
+
+.vom-pipeline-col-count {
+  background: var(--md-surface);
+  color: var(--md-on-surface-variant);
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.vom-pipeline-card {
+  background: var(--md-surface);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 10px;
+  padding: 0.7rem 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  cursor: grab;
+  transition: box-shadow 0.15s, transform 0.12s;
+}
+
+.vom-pipeline-card:hover {
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+  transform: translateY(-1px);
+}
+
+.vom-pipeline-card-name {
+  font-weight: 600;
+  font-size: 0.86rem;
+  color: #0F172A;
+}
+
+.vom-pipeline-card-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.76rem;
+  color: var(--md-on-surface-variant);
+}
+
+.vom-pipeline-card-monto {
+  font-weight: 700;
+  color: var(--md-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Catálogo: cards de producto ── */
+.vom-product-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 0.85rem;
+}
+
+.vom-product-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem;
+  background: var(--md-surface);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 12px;
+  transition: box-shadow 0.18s, transform 0.15s;
+}
+
+.vom-product-card:hover {
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+  transform: translateY(-2px);
+}
+
+.vom-product-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: #0F172A;
+}
+
+.vom-product-desc {
+  font-size: 0.8rem;
+  color: var(--md-on-surface-variant);
+  line-height: 1.4;
+  flex: 1;
+}
+
+.vom-product-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--md-outline-variant);
+}
+
+.vom-product-price {
+  font-weight: 700;
+  color: var(--md-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.vom-product-stock {
+  font-size: 0.74rem;
+  color: var(--md-on-surface-variant);
+}
+
+.vom-product-actions {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.vom-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: transparent;
+  border: 1px solid var(--md-outline-variant);
+  color: var(--md-on-surface-variant);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.vom-icon-btn:hover {
+  background: var(--md-surface-variant);
+  color: var(--md-on-surface);
+}
+
+.vom-icon-btn.danger:hover {
+  background: var(--md-error-container);
+  color: var(--md-error);
+  border-color: var(--md-error-container);
+}
+
+/* ── Flujo IA: lista de pasos ── */
+.vom-flow-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.vom-flow-step {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.85rem 1rem;
+  background: var(--md-surface);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 12px;
+}
+
+.vom-flow-num {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--md-primary-container);
+  color: var(--md-on-primary-container);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.8rem;
+  flex-shrink: 0;
+}
+
+.vom-flow-info { flex: 1; min-width: 0; }
+
+.vom-flow-title {
+  font-weight: 600;
+  font-size: 0.92rem;
+  color: #0F172A;
+}
+
+.vom-flow-desc {
+  font-size: 0.78rem;
+  color: var(--md-on-surface-variant);
+  margin-top: 2px;
+}
+
+/* ── ConfigCard reutilizable ── */
+.vom-config-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.vom-config-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.vom-config-title-block { flex: 1; min-width: 0; }
+
+.vom-config-description {
+  color: #64748B;
+  font-size: 0.85rem;
+  margin: 0.3rem 0 0;
+  max-width: 460px;
+  line-height: 1.45;
+}
+
+.vom-config-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+.vom-config-summary {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #475569;
+  background: #F1F5F9;
+  padding: 4px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.vom-config-card.is-on .vom-config-summary {
+  background: var(--md-primary-container);
+  color: var(--md-on-primary-container);
+}
+
+.vom-config-body {
+  margin-top: 1.1rem;
+  padding-top: 1.1rem;
+  border-top: 1px solid #E2E8F0;
+  animation: vom-fade 0.25s ease-out;
+}
+
+/* ── Notification list ── */
+.vom-notif-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.vom-notif-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  background: var(--md-surface);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 12px;
+}
+
+.vom-notif-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.vom-notif-icon.lead     { background: var(--md-info-container);     color: var(--md-info); }
+.vom-notif-icon.caliente { background: var(--md-warning-container);  color: var(--md-warning); }
+.vom-notif-icon.venta    { background: var(--md-success-container);  color: var(--md-success); }
+
+.vom-notif-msg {
+  font-size: 0.88rem;
+  color: #1E293B;
+  margin: 0;
+}
+
+.vom-notif-fecha {
+  font-size: 0.74rem;
+  color: var(--md-on-surface-variant);
+  margin-top: 2px;
+}
+
+/* ── Mobile ── */
+@media (max-width: 900px) {
+  .vom-content-full { gap: 1rem; }
+  .vom-section-title { font-size: 1.3rem; }
+  .vom-card { padding: 1rem; border-radius: 14px; }
+  .vom-stat-value { font-size: 1.5rem; }
+  .vom-pipeline { grid-auto-flow: column; grid-template-columns: none; }
+}
