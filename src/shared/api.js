@@ -33,4 +33,17 @@ export const API = {
   ALERTA_SEGURA: '/api/alerta_segura',
   FACTURAS_PROCESAR: '/api/facturas_procesar',
   FACTURAS_CONCAR: '/api/facturas_concar',
+  CENTROS_COSTO: '/api/centros_costo',
 };
+
+export async function getJson(url) {
+  const res = await fetch(url, { method: 'GET' });
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`);
+  }
+  const contentType = res.headers.get('content-type') || '';
+  if (contentType.includes('application/json')) {
+    return res.json();
+  }
+  return res.text();
+}

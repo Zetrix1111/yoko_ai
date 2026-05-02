@@ -1,7 +1,8 @@
-import { useState } from 'react';
-import { Check, CheckCircle2, Building2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Check, CheckCircle2, Building2, Briefcase, Loader2, AlertCircle } from 'lucide-react';
 import ModuleLayout from '../ModuleLayout';
 import { tenantConfig } from '../../../tenants';
+import { API, getJson } from '../../../shared/api';
 import './ConfiguracionEmpresa.css';
 
 const SISTEMAS_CONTABLES = [
@@ -10,6 +11,21 @@ const SISTEMAS_CONTABLES = [
   { id: 'starsoft', name: 'STARSOFT', description: 'ERP integral con módulo contable.' },
   { id: 'siigo',    name: 'SIIGO',    description: 'Software contable cloud para Latinoamérica.' },
 ];
+
+function Toggle({ checked, onChange, ariaLabel }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={ariaLabel}
+      className={`ce-toggle ${checked ? 'on' : ''}`}
+      onClick={() => onChange(!checked)}
+    >
+      <span className="ce-toggle-thumb" />
+    </button>
+  );
+}
 
 export default function ConfiguracionEmpresaScreen({ user, onOpenModules, onLogout }) {
   // Datos de la empresa (default desde el tenant config)
@@ -20,6 +36,44 @@ export default function ConfiguracionEmpresaScreen({ user, onOpenModules, onLogo
   const [sistemaContable, setSistemaContable] = useState('concar');
 
   const [savedHint, setSavedHint] = useState(false);
+
+  // ── Centros de costo ──
+  const [centrosEnabled, setCentrosEnabled] = useState(true);
+  const [centros, setCentros] = useState([]);
+  const [centrosLoading, setCentrosLoading] = useState(false);
+  const [centrosError, setCentrosError] = useState(null);
+  const [centrosFetched, setCentrosFetched] = useState(false);
+
+  useEffect(() => {
+    if (!centrosEnabled || centrosFetched) return;
+
+    let cancelled = false;
+    setCentrosLoading(true);
+    setCentrosError(null);
+
+    getJson(API.CENTROS_COSTO)
+      .then((data) => {
+        if (cancelled) return;
+        setCentros(Array.isArray(data?.centros) ? data.centros : []);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.error('[centros_costo]', err);
+        setCentrosError('No se pudieron cargar los centros de costo.');
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setCentrosLoading(false);
+        setCentrosFetched(true);
+      });
+
+    return () => { cancelled = true; };
+  }, [centrosEnabled, centrosFetched]);
+
+  const reintentarCentros = () => {
+    setCentrosFetched(false);
+    setCentrosError(null);
+  };
 
   const flashSaved = () => {
     setSavedHint(true);
@@ -134,6 +188,78 @@ export default function ConfiguracionEmpresaScreen({ user, onOpenModules, onLogo
             <div className="ce-saved-hint">
               <CheckCircle2 size={14} />
               Cambios guardados
+            </div>
+          )}
+        </div>
+
+        {/* ── Centros de costo ── */}
+        <div className={`ce-card ce-config-card ${centrosEnabled ? 'is-on' : ''}`}>
+          <div className="ce-config-header">
+            <div className="ce-card-title-row">
+              <div className="ce-card-icon">
+                <Briefcase size={18} />
+              </div>
+              <div>
+                <h3>Centros de costo</h3>
+                <p>
+                  Activa los centros de costo para asignarlos en solicitudes,
+                  facturas, rendiciones y demás procesos. La lista se sincroniza
+                  desde la tabla <strong>obras</strong> de Airtable.
+                </p>
+              </div>
+            </div>
+            <div className="ce-config-controls">
+              <span className="ce-config-summary">
+                {centrosEnabled
+                  ? (centrosLoading
+                      ? 'Cargando…'
+                      : `${centros.length} centro${centros.length === 1 ? '' : 's'}`)
+                  : 'Desactivado'}
+              </span>
+              <Toggle
+                checked={centrosEnabled}
+                onChange={setCentrosEnabled}
+                ariaLabel="Activar centros de costo"
+              />
+            </div>
+          </div>
+
+          {centrosEnabled && (
+            <div className="ce-config-body">
+              {centrosLoading && (
+                <div className="ce-list-status">
+                  <Loader2 size={16} className="ce-spin" />
+                  Cargando centros de costo desde Airtable…
+                </div>
+              )}
+
+              {centrosError && !centrosLoading && (
+                <div className="ce-list-status error">
+                  <AlertCircle size={16} />
+                  <span>{centrosError}</span>
+                  <button type="button" className="ce-link-btn" onClick={reintentarCentros}>
+                    Reintentar
+                  </button>
+                </div>
+              )}
+
+              {!centrosLoading && !centrosError && centros.length === 0 && (
+                <div className="ce-list-status">
+                  No hay centros de costo registrados en la tabla <strong>obras</strong>.
+                </div>
+              )}
+
+              {!centrosLoading && !centrosError && centros.length > 0 && (
+                <div className="ce-cc-list">
+                  {centros.map((c) => (
+                    <div key={c.id} className="ce-cc-item">
+                      <span className="ce-cc-id">{c.id}</span>
+                      <span className="ce-cc-name">{c.obra}</span>
+                      {c.nombre && <span className="ce-cc-desc">{c.nombre}</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>

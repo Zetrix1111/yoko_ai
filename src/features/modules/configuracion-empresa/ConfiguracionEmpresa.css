@@ -209,3 +209,152 @@
   .ce-card { padding: 1.25rem; }
   .ce-header h1 { font-size: 1.3rem; }
 }
+
+/* ─────────────────────────────────────────────
+   Centros de costo (toggle + lista desde Airtable)
+   ───────────────────────────────────────────── */
+
+.ce-config-card.is-on {
+  border-color: #BFDBFE;
+}
+
+.ce-config-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.ce-config-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  flex-shrink: 0;
+}
+
+.ce-config-summary {
+  font-size: 0.78rem;
+  color: #64748B;
+  font-weight: 500;
+}
+
+.ce-config-body {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid #E2E8F0;
+}
+
+/* ── Toggle switch ── */
+.ce-toggle {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  border-radius: 999px;
+  background: #CBD5E1;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.2s ease;
+  flex-shrink: 0;
+}
+
+.ce-toggle.on {
+  background: #2563EB;
+}
+
+.ce-toggle-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #FFFFFF;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.2);
+  transition: transform 0.2s ease;
+}
+
+.ce-toggle.on .ce-toggle-thumb {
+  transform: translateX(18px);
+}
+
+/* ── Lista de centros de costo ── */
+.ce-cc-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.6rem;
+}
+
+.ce-cc-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  background: #F8FAFC;
+}
+
+.ce-cc-id {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.72rem;
+  color: #2563EB;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.ce-cc-name {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #0F172A;
+}
+
+.ce-cc-desc {
+  font-size: 0.74rem;
+  color: #64748B;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Estados (loading / error / vacío) ── */
+.ce-list-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.85rem 1rem;
+  border-radius: 10px;
+  background: #F1F5F9;
+  color: #475569;
+  font-size: 0.85rem;
+}
+
+.ce-list-status.error {
+  background: #FEF2F2;
+  color: #B91C1C;
+}
+
+.ce-link-btn {
+  background: none;
+  border: none;
+  color: #2563EB;
+  font-weight: 600;
+  font-size: 0.82rem;
+  cursor: pointer;
+  padding: 0;
+  margin-left: auto;
+  text-decoration: underline;
+}
+
+.ce-link-btn:hover {
+  color: #1D4ED8;
+}
+
+.ce-spin {
+  animation: ce-spin 1s linear infinite;
+}
+
+@keyframes ce-spin {
+  to { transform: rotate(360deg); }
+}

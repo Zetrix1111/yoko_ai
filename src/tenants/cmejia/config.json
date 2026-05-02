@@ -4,7 +4,7 @@
   "ruc": "20392546899",
   "razonSocial": "C.MEJIA CONTRATISTAS GENERALES SAC",
   "sistemaContable": "concar",
-  "seguimientoIA": true,
+  "seguimientoIA": false,
   "agent": {
     "name": "Yoko"
   },

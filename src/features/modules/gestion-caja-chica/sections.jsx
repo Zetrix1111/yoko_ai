@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import {
   STATS, SOLICITUDES, PAGOS, RENDICIONES,
-  REPORTE_AREAS, REPORTE_USUARIOS, TIPOS_GASTO, CENTROS_COSTO,
+  REPORTE_AREAS, REPORTE_USUARIOS, TIPOS_GASTO,
   AREAS, formatPEN, formatDate,
 } from './mockData';
 import { tenantConfig } from '../../../tenants';
@@ -641,14 +641,6 @@ function ConfigCard({ title, titleBadge, description, summary, enabled, onToggle
 // 6 · CONFIGURACIÓN
 // ─────────────────────────────────────
 export function ConfiguracionSection() {
-  // ── Centros de costo ──
-  const [centrosEnabled, setCentrosEnabled] = useState(true);
-  const [centros, setCentros] = useState(CENTROS_COSTO);
-  const onCentroToggle = (id, value) => {
-    setCentros(centros.map((c) => (c.id === id ? { ...c, activo: value } : c)));
-  };
-  const centrosActivos = centros.filter((c) => c.activo).length;
-
   // ── Número de aprobadores ──
   const [aprobadoresEnabled, setAprobadoresEnabled] = useState(true);
   const [aprobadores, setAprobadores] = useState(2);
@@ -671,33 +663,6 @@ export function ConfiguracionSection() {
       />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        <ConfigCard
-          title="Centros de costo"
-          description="Permite asignar cada solicitud a un centro de costo de la empresa."
-          summary={centrosEnabled ? `${centrosActivos} activo${centrosActivos === 1 ? '' : 's'}` : 'Desactivado'}
-          enabled={centrosEnabled}
-          onToggle={setCentrosEnabled}
-        >
-          <div className="gcc-list">
-            {centros.map((c) => (
-              <div key={c.id} className={`gcc-list-item ${c.activo ? '' : 'inactive'}`}>
-                <div>
-                  <span className="gcc-list-id">{c.id}</span>
-                  <span className="gcc-list-name">{c.nombre}</span>
-                </div>
-                <Toggle
-                  checked={c.activo}
-                  onChange={(v) => onCentroToggle(c.id, v)}
-                  ariaLabel={`Activar centro ${c.id}`}
-                />
-              </div>
-            ))}
-          </div>
-          <button type="button" className="gcc-list-add">
-            <Plus size={14} /> Agregar centro de costo
-          </button>
-        </ConfigCard>
-
         <ConfigCard
           title="Número de aprobadores"
           description="Cantidad de aprobadores que debe pasar cada solicitud antes de ser autorizada. Si está desactivado, las solicitudes pasan directo a Pagos."
