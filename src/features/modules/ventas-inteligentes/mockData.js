@@ -30,14 +30,33 @@ export const CANALES = [
   { id: 'linkedin',  nombre: 'LinkedIn',           conectado: false, numero: '—',                mensajesHoy: 0   },
 ];
 
+// Productos: stock=null indica servicio (no aplica inventario).
+// foto: URL o null (en local mostramos un placeholder con gradiente).
+// TODO: cuando se integre con Airtable, foto sera un Attachment field.
 export const PRODUCTOS = [
-  { id: 1, nombre: 'Banco de condensadores 24kV', precio: 12500, descripcion: 'Para subestaciones de media tensión' },
-  { id: 2, nombre: 'Transformador 100 kVA',       precio: 18900, descripcion: 'Trifásico, refrigerado en aceite' },
-  { id: 3, nombre: 'Cable XLPE 500m',             precio: 4250,  descripcion: 'Aislamiento polietileno reticulado' },
-  { id: 4, nombre: 'Servicio mantenimiento',      precio: 3500,  descripcion: 'Inspección anual de subestaciones' },
-  { id: 5, nombre: 'Tablero de distribución',     precio: 6800,  descripcion: 'Capacidad 200A con interruptores' },
-  { id: 6, nombre: 'Asesoría técnica',            precio: 1200,  descripcion: 'Consultoría especializada por hora' },
+  { id: 1, nombre: 'Banco de condensadores 24kV', precio: 12500, descripcion: 'Para subestaciones de media tensión',     foto: null, stock: 8,    stockMinimo: 3 },
+  { id: 2, nombre: 'Transformador 100 kVA',       precio: 18900, descripcion: 'Trifásico, refrigerado en aceite',         foto: null, stock: 3,    stockMinimo: 5 },
+  { id: 3, nombre: 'Cable XLPE 500m',             precio: 4250,  descripcion: 'Aislamiento polietileno reticulado',       foto: null, stock: 24,   stockMinimo: 10 },
+  { id: 4, nombre: 'Servicio mantenimiento',      precio: 3500,  descripcion: 'Inspección anual de subestaciones',        foto: null, stock: null, stockMinimo: null },
+  { id: 5, nombre: 'Tablero de distribución',     precio: 6800,  descripcion: 'Capacidad 200A con interruptores',         foto: null, stock: 0,    stockMinimo: 2 },
+  { id: 6, nombre: 'Asesoría técnica',            precio: 1200,  descripcion: 'Consultoría especializada por hora',       foto: null, stock: null, stockMinimo: null },
 ];
+
+// Calcula el estado del stock segun las reglas de negocio.
+// Retorna: 'servicio' | 'sin-stock' | 'bajo-stock' | 'disponible'.
+export function getStockStatus(producto) {
+  if (producto.stock === null || producto.stock === undefined) return 'servicio';
+  if (producto.stock === 0) return 'sin-stock';
+  if (producto.stockMinimo !== null && producto.stock <= producto.stockMinimo) return 'bajo-stock';
+  return 'disponible';
+}
+
+export const STOCK_LABELS = {
+  'disponible':  'Disponible',
+  'bajo-stock':  'Bajo stock',
+  'sin-stock':   'Sin stock',
+  'servicio':    'Servicio',
+};
 
 export const CLIENTES = [
   { id: 'CL-1024', nombre: 'Juan Pérez',     canal: 'whatsapp',  estado: 'interesado',   ultimoMensaje: 'Me interesan más detalles del producto…',   fecha: '2026-05-02' },

@@ -1,15 +1,14 @@
 import { useSearchParams } from 'react-router-dom';
 import ModuleLayout from '../ModuleLayout';
 import {
-  InicioSection, CanalesSection, ClientesSection, CatalogoSection, ConfiguracionSection,
+  InicioSection, ClientesSection, ProductosSection, ConfiguracionSection,
 } from './sections';
 import './VentasInteligentes.css';
 
 const SECTIONS = {
-  inicio: InicioSection,
-  canales: CanalesSection,
-  clientes: ClientesSection,
-  catalogo: CatalogoSection,
+  inicio:        InicioSection,
+  clientes:      ClientesSection,
+  productos:     ProductosSection,
   configuracion: ConfiguracionSection,
 };
 

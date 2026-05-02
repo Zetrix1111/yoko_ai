@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  Plus, Sparkles, Users, MessageCircle, ShoppingBag, ArrowUpRight,
-  Pencil, Trash2, Check, TrendingUp, Activity, Search,
+  Plus, X, Sparkles, Users, MessageCircle, ShoppingBag, ArrowUpRight,
+  Pencil, Trash2, Check, TrendingUp, Activity, Search, Package,
+  Upload as UploadIcon, Image as ImageIcon,
 } from 'lucide-react';
 import {
   STATS, FUNNEL, ACTIVIDAD, CANALES, PRODUCTOS, CLIENTES,
-  CANAL_LABELS, ESTADO_LABELS,
+  CANAL_LABELS, ESTADO_LABELS, STOCK_LABELS, getStockStatus,
   formatPEN, formatNum, formatDate,
 } from './mockData';
 
@@ -49,6 +50,22 @@ function Toggle({ checked, onChange, ariaLabel }) {
   );
 }
 
+function Modal({ title, onClose, children }) {
+  return (
+    <div className="vom-modal-overlay" onClick={onClose}>
+      <div className="vom-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="vom-modal-header">
+          <h2 className="vom-modal-title">{title}</h2>
+          <button className="vom-modal-close" onClick={onClose} aria-label="Cerrar">
+            <X size={18} />
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 function activityIconFor(estado) {
   switch (estado) {
     case 'cerrado':     return { Icon: Check, variant: 'cerrado' };
@@ -76,9 +93,7 @@ function MiniFunnel({ stages }) {
     <div className="vom-funnel">
       {stages.map((s, idx) => {
         const pct = max > 0 ? Math.round((s.count / max) * 100) : 0;
-        const conversion = idx === 0
-          ? null
-          : Math.round((s.count / stages[idx - 1].count) * 100);
+        const conversion = idx === 0 ? null : Math.round((s.count / stages[idx - 1].count) * 100);
         return (
           <div key={s.id} className="vom-funnel-row">
             <div className="vom-funnel-label">
@@ -86,16 +101,11 @@ function MiniFunnel({ stages }) {
               {s.label}
             </div>
             <div className="vom-funnel-track">
-              <div
-                className={`vom-funnel-fill ${s.variant}`}
-                style={{ width: `${pct}%` }}
-              />
+              <div className={`vom-funnel-fill ${s.variant}`} style={{ width: `${pct}%` }} />
             </div>
             <div className="vom-funnel-meta">
               <span className="vom-funnel-count">{formatNum(s.count)}</span>
-              {conversion !== null && (
-                <span className="vom-funnel-conv">{conversion}% conv.</span>
-              )}
+              {conversion !== null && <span className="vom-funnel-conv">{conversion}% conv.</span>}
             </div>
           </div>
         );
@@ -114,7 +124,7 @@ export function InicioSection() {
     <>
       <SectionHeader
         title="Dashboard"
-        subtitle="Controla, automatiza y aumenta tus ventas desde todos tus canales."
+        subtitle="Controla y aumenta tus ventas desde todos tus canales en un solo lugar."
         action={
           <button className="vom-btn vom-btn-primary" onClick={() => goTo('clientes', { new: '1' })}>
             <Plus size={16} /> Nuevo lead
@@ -131,8 +141,8 @@ export function InicioSection() {
           <h3>{iaActiva ? 'IA de ventas activa' : 'IA de ventas pausada'}</h3>
           <p>
             {iaActiva
-              ? 'Tu IA está respondiendo automáticamente y calificando leads en todos los canales.'
-              : 'Activa la IA y deja que responda, califique y cierre ventas mientras trabajas en lo importante.'}
+              ? 'Tu IA está respondiendo automáticamente y generando oportunidades de venta.'
+              : 'Activa la IA y deja que responda, califique leads y cierre ventas mientras trabajas en lo importante.'}
           </p>
         </div>
         <button
@@ -166,14 +176,12 @@ export function InicioSection() {
         })}
       </div>
 
-      {/* Mini embudo + Actividad reciente lado a lado en desktop */}
+      {/* Mini embudo + Actividad reciente */}
       <div className="vom-dashboard-row">
         <div className="vom-card">
           <div className="vom-card-header">
             <h3 className="vom-card-title">Embudo de ventas</h3>
-            <span style={{ fontSize: '0.78rem', color: 'var(--md-on-surface-variant)' }}>
-              Mes actual
-            </span>
+            <span style={{ fontSize: '0.78rem', color: 'var(--md-on-surface-variant)' }}>Mes actual</span>
           </div>
           <MiniFunnel stages={FUNNEL} />
         </div>
@@ -193,9 +201,7 @@ export function InicioSection() {
                   </div>
                   <div className="vom-activity-text">
                     <div className="vom-activity-title">{a.cliente}</div>
-                    <div className="vom-activity-meta">
-                      {a.asunto} · {CANAL_LABELS[a.canal]}
-                    </div>
+                    <div className="vom-activity-meta">{a.asunto} · {CANAL_LABELS[a.canal]}</div>
                   </div>
                   <Badge value={a.estado} />
                 </button>
@@ -209,59 +215,7 @@ export function InicioSection() {
 }
 
 // ─────────────────────────────────────
-// 2 · CANALES
-// ─────────────────────────────────────
-
-export function CanalesSection() {
-  const [canales, setCanales] = useState(CANALES);
-  const toggleCanal = (id) => {
-    setCanales(canales.map((c) => c.id === id ? { ...c, conectado: !c.conectado } : c));
-  };
-  const conectados = canales.filter((c) => c.conectado).length;
-
-  return (
-    <>
-      <SectionHeader
-        title="Canales"
-        subtitle={`${conectados} de ${canales.length} canales activos · todos los mensajes en una sola bandeja`}
-        action={
-          <button className="vom-btn vom-btn-primary">
-            <Plus size={16} /> Conectar canal
-          </button>
-        }
-      />
-
-      <div className="vom-card">
-        <div className="vom-channel-list">
-          {canales.map((c) => (
-            <div key={c.id} className={`vom-channel-row ${c.conectado ? 'connected' : 'disconnected'}`}>
-              <div className="vom-channel-icon">
-                <MessageCircle size={18} />
-              </div>
-              <div className="vom-channel-info">
-                <div className="vom-channel-name">{c.nombre}</div>
-                <div className="vom-channel-meta">
-                  {c.numero} {c.conectado && `· ${c.mensajesHoy} mensajes hoy`}
-                </div>
-              </div>
-              <span className={`vom-channel-status ${c.conectado ? 'connected' : 'disconnected'}`}>
-                {c.conectado ? 'Conectado' : 'No conectado'}
-              </span>
-              <Toggle
-                checked={c.conectado}
-                onChange={() => toggleCanal(c.id)}
-                ariaLabel={`Conectar ${c.nombre}`}
-              />
-            </div>
-          ))}
-        </div>
-      </div>
-    </>
-  );
-}
-
-// ─────────────────────────────────────
-// 3 · CLIENTES
+// 2 · CLIENTES
 // ─────────────────────────────────────
 
 export function ClientesSection() {
@@ -335,19 +289,194 @@ export function ClientesSection() {
 }
 
 // ─────────────────────────────────────
-// 4 · CATÁLOGO
+// 3 · PRODUCTOS
 // ─────────────────────────────────────
 
-export function CatalogoSection() {
-  const [productos] = useState(PRODUCTOS);
+function ProductoCard({ producto, onEdit, onDelete }) {
+  const status = getStockStatus(producto);
+  return (
+    <div className="vom-product-card">
+      <div className="vom-product-photo">
+        {producto.foto ? (
+          <img src={producto.foto} alt={producto.nombre} />
+        ) : (
+          <div className="vom-product-photo-placeholder">
+            <Package size={28} />
+          </div>
+        )}
+        <span className={`vom-stock-badge ${status} vom-stock-badge--floating`}>
+          {STOCK_LABELS[status]}
+        </span>
+      </div>
+      <div className="vom-product-body">
+        <div className="vom-product-name">{producto.nombre}</div>
+        <div className="vom-product-desc">{producto.descripcion}</div>
+        <div className="vom-product-row">
+          <div>
+            <div className="vom-product-price">{formatPEN(producto.precio)}</div>
+            {producto.stock !== null && producto.stock !== undefined && (
+              <div className="vom-product-stock-num">
+                Stock: <strong>{producto.stock}</strong>
+                {producto.stockMinimo !== null && producto.stockMinimo !== undefined && (
+                  <span style={{ color: 'var(--md-on-surface-variant)' }}>
+                    {' '}· mín {producto.stockMinimo}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+          <div className="vom-product-actions">
+            <button className="vom-icon-btn" title="Editar" onClick={() => onEdit(producto)}>
+              <Pencil size={14} />
+            </button>
+            <button className="vom-icon-btn danger" title="Eliminar" onClick={() => onDelete(producto.id)}>
+              <Trash2 size={14} />
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProductoForm({ producto, onSubmit, onCancel }) {
+  const editing = Boolean(producto?.id);
+  const [foto, setFoto] = useState(producto?.foto || null);
+
+  const handleFile = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // Mock: preview local. Cuando se integre con backend, subir y guardar URL.
+    const url = URL.createObjectURL(file);
+    setFoto(url);
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const f = new FormData(e.currentTarget);
+    const stockStr = f.get('stock');
+    const stock = stockStr === '' || stockStr === null ? null : Number(stockStr);
+    const stockMinStr = f.get('stockMinimo');
+    const stockMinimo = stockMinStr === '' || stockMinStr === null ? null : Number(stockMinStr);
+    const stockIniStr = f.get('stockInicial');
+    const stockInicial = stockIniStr === '' || stockIniStr === null ? null : Number(stockIniStr);
+    onSubmit({
+      id:           producto?.id,
+      nombre:       f.get('nombre'),
+      precio:       Number(f.get('precio')),
+      descripcion:  f.get('descripcion'),
+      foto,
+      stockInicial,
+      stock,
+      stockMinimo,
+    });
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="vom-form">
+      {/* Foto */}
+      <label className="vom-photo-uploader">
+        <input type="file" accept="image/*" onChange={handleFile} hidden />
+        {foto ? (
+          <img src={foto} alt="Preview" />
+        ) : (
+          <div className="vom-photo-uploader-empty">
+            <ImageIcon size={28} />
+            <span>Click para subir foto del producto</span>
+          </div>
+        )}
+        <div className="vom-photo-uploader-overlay">
+          <UploadIcon size={14} /> {foto ? 'Cambiar foto' : 'Subir foto'}
+        </div>
+      </label>
+
+      <div className="vom-form-grid">
+        <div className="vom-field full">
+          <label htmlFor="p-nombre">Nombre del producto</label>
+          <input
+            id="p-nombre" name="nombre" required
+            defaultValue={producto?.nombre || ''}
+            className="vom-input"
+          />
+        </div>
+        <div className="vom-field">
+          <label htmlFor="p-precio">Precio (S/)</label>
+          <input
+            id="p-precio" name="precio" type="number" min="0" step="0.01" required
+            defaultValue={producto?.precio || ''}
+            className="vom-input"
+          />
+        </div>
+        <div className="vom-field">
+          <label htmlFor="p-stock">Stock actual</label>
+          <input
+            id="p-stock" name="stock" type="number" min="0"
+            defaultValue={producto?.stock ?? ''}
+            placeholder="Vacío = servicio"
+            className="vom-input"
+          />
+        </div>
+        <div className="vom-field">
+          <label htmlFor="p-stockInicial">Stock inicial</label>
+          <input
+            id="p-stockInicial" name="stockInicial" type="number" min="0"
+            defaultValue={producto?.stockInicial ?? producto?.stock ?? ''}
+            className="vom-input"
+          />
+        </div>
+        <div className="vom-field">
+          <label htmlFor="p-stockMinimo">Stock mínimo (alerta)</label>
+          <input
+            id="p-stockMinimo" name="stockMinimo" type="number" min="0"
+            defaultValue={producto?.stockMinimo ?? ''}
+            className="vom-input"
+          />
+        </div>
+        <div className="vom-field full">
+          <label htmlFor="p-desc">Descripción</label>
+          <textarea
+            id="p-desc" name="descripcion" required rows="3"
+            defaultValue={producto?.descripcion || ''}
+            className="vom-textarea"
+          />
+        </div>
+      </div>
+
+      <div className="vom-modal-actions">
+        <button type="button" className="vom-btn vom-btn-ghost" onClick={onCancel}>Cancelar</button>
+        <button type="submit" className="vom-btn vom-btn-primary">
+          {editing ? <><Check size={16} /> Guardar cambios</> : <><Plus size={16} /> Crear producto</>}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+export function ProductosSection() {
+  const [productos, setProductos] = useState(PRODUCTOS);
+  const [editing, setEditing] = useState(null); // null | {} (nuevo) | producto (editar)
+
+  const handleSave = (data) => {
+    if (data.id) {
+      setProductos(productos.map((p) => p.id === data.id ? { ...p, ...data } : p));
+    } else {
+      const nextId = Math.max(0, ...productos.map((p) => p.id)) + 1;
+      setProductos([{ ...data, id: nextId }, ...productos]);
+    }
+    setEditing(null);
+  };
+
+  const handleDelete = (id) => {
+    setProductos(productos.filter((p) => p.id !== id));
+  };
 
   return (
     <>
       <SectionHeader
-        title="Catálogo"
+        title="Productos"
         subtitle={`${productos.length} productos y servicios disponibles para venta automática`}
         action={
-          <button className="vom-btn vom-btn-primary">
+          <button className="vom-btn vom-btn-primary" onClick={() => setEditing({})}>
             <Plus size={16} /> Agregar producto
           </button>
         }
@@ -355,29 +484,24 @@ export function CatalogoSection() {
 
       <div className="vom-product-grid">
         {productos.map((p) => (
-          <div key={p.id} className="vom-product-card">
-            <div className="vom-product-name">{p.nombre}</div>
-            <div className="vom-product-desc">{p.descripcion}</div>
-            <div className="vom-product-row">
-              <div className="vom-product-price">{formatPEN(p.precio)}</div>
-              <div className="vom-product-actions">
-                <button className="vom-icon-btn" title="Editar">
-                  <Pencil size={14} />
-                </button>
-                <button className="vom-icon-btn danger" title="Eliminar">
-                  <Trash2 size={14} />
-                </button>
-              </div>
-            </div>
-          </div>
+          <ProductoCard key={p.id} producto={p} onEdit={setEditing} onDelete={handleDelete} />
         ))}
       </div>
+
+      {editing && (
+        <Modal
+          title={editing.id ? 'Editar producto' : 'Nuevo producto'}
+          onClose={() => setEditing(null)}
+        >
+          <ProductoForm producto={editing} onSubmit={handleSave} onCancel={() => setEditing(null)} />
+        </Modal>
+      )}
     </>
   );
 }
 
 // ─────────────────────────────────────
-// 5 · CONFIGURACIÓN
+// 4 · CONFIGURACIÓN (incluye Canales)
 // ─────────────────────────────────────
 
 function ConfigCard({ title, description, summary, enabled, onToggle, children }) {
@@ -398,40 +522,99 @@ function ConfigCard({ title, description, summary, enabled, onToggle, children }
   );
 }
 
+function CanalesBlock() {
+  const [canales, setCanales] = useState(CANALES);
+  const toggleCanal = (id) => {
+    setCanales(canales.map((c) => c.id === id ? { ...c, conectado: !c.conectado } : c));
+  };
+  const conectados = canales.filter((c) => c.conectado).length;
+
+  return (
+    <div className="vom-card">
+      <div className="vom-config-header">
+        <div className="vom-config-title-block">
+          <h3 className="vom-card-title">Canales</h3>
+          <p className="vom-config-description">
+            Conecta tus canales de mensajería para que la IA reciba y responda
+            mensajes en una sola bandeja unificada.
+          </p>
+        </div>
+        <div className="vom-config-controls">
+          <span className="vom-config-summary">
+            {conectados} de {canales.length} conectados
+          </span>
+          <button className="vom-btn vom-btn-ghost" style={{ padding: '0.45rem 0.85rem', fontSize: '0.82rem' }}>
+            <Plus size={14} /> Conectar canal
+          </button>
+        </div>
+      </div>
+
+      <div className="vom-config-body" style={{ marginTop: '1.1rem', paddingTop: '1.1rem', borderTop: '1px solid #E2E8F0' }}>
+        <div className="vom-channel-list">
+          {canales.map((c) => (
+            <div key={c.id} className={`vom-channel-row ${c.conectado ? 'connected' : 'disconnected'}`}>
+              <div className="vom-channel-icon">
+                <MessageCircle size={18} />
+              </div>
+              <div className="vom-channel-info">
+                <div className="vom-channel-name">{c.nombre}</div>
+                <div className="vom-channel-meta">
+                  {c.numero} {c.conectado && `· ${c.mensajesHoy} mensajes hoy`}
+                </div>
+              </div>
+              <span className={`vom-channel-status ${c.conectado ? 'connected' : 'disconnected'}`}>
+                {c.conectado ? 'Conectado' : 'No conectado'}
+              </span>
+              <Toggle
+                checked={c.conectado}
+                onChange={() => toggleCanal(c.id)}
+                ariaLabel={`Conectar ${c.nombre}`}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function ConfiguracionSection() {
-  const [integraciones, setIntegraciones] = useState(true);
   const [webhooks, setWebhooks] = useState(true);
+  const [integraciones, setIntegraciones] = useState(true);
   const [ajustes, setAjustes] = useState(false);
 
   return (
     <>
       <SectionHeader
         title="Configuración"
-        subtitle="Conecta tus canales, dispara automatizaciones externas y personaliza el comportamiento."
+        subtitle="Conecta canales, dispara automatizaciones externas y personaliza el comportamiento de la IA."
       />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        <ConfigCard
-          title="Integraciones"
-          description="Conecta WhatsApp, Facebook, Instagram y LinkedIn a través de las API oficiales de Meta."
-          summary={integraciones ? 'Conectado' : 'Sin conectar'}
-          enabled={integraciones}
-          onToggle={setIntegraciones}
-        >
-          <div style={{ fontSize: '0.85rem', color: 'var(--md-on-surface-variant)' }}>
-            Última sincronización: hace 5 minutos · 3 de 4 canales activos
-          </div>
-        </ConfigCard>
+        {/* Canales como bloque destacado dentro de Configuración */}
+        <CanalesBlock />
 
         <ConfigCard
           title="Webhooks"
-          description="Dispara automatizaciones externas (Make, n8n, Zapier) cuando ocurre un evento: lead nuevo, venta cerrada, mensaje escalado."
+          description="Dispara eventos hacia URLs externas: lead nuevo, venta cerrada, mensaje escalado a humano."
           summary={webhooks ? '3 endpoints activos' : 'Sin endpoints'}
           enabled={webhooks}
           onToggle={setWebhooks}
         >
           <div style={{ fontSize: '0.85rem', color: 'var(--md-on-surface-variant)' }}>
             lead.created · sale.closed · message.escalated
+          </div>
+        </ConfigCard>
+
+        <ConfigCard
+          title="Integraciones (Make)"
+          description="Automatiza con Make, n8n o Zapier. Genera cotizaciones, registra ventas en CONCAR, notifica vendedores."
+          summary={integraciones ? '2 escenarios activos' : 'Sin escenarios'}
+          enabled={integraciones}
+          onToggle={setIntegraciones}
+        >
+          <div style={{ fontSize: '0.85rem', color: 'var(--md-on-surface-variant)' }}>
+            Cotización automática · Registro contable
           </div>
         </ConfigCard>
 

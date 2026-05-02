@@ -21,7 +21,6 @@ import {
   Settings,
   Building2,
   Sparkles,
-  Plug,
   Package,
   Users,
 } from 'lucide-react';
@@ -54,9 +53,8 @@ export const MODULES = [
     iconClass: 'sales',
     submenus: [
       { id: 'inicio',        label: 'Dashboard',     Icon: LayoutDashboard },
-      { id: 'canales',       label: 'Canales',       Icon: Plug },
       { id: 'clientes',      label: 'Clientes',      Icon: Users },
-      { id: 'catalogo',      label: 'Catálogo',      Icon: Package },
+      { id: 'productos',     label: 'Productos',     Icon: Package },
       { id: 'configuracion', label: 'Configuración', Icon: Settings },
     ],
   },
