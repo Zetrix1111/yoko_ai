@@ -1,17 +1,6 @@
 /* ─────────────────────────────────────────────
-   Gestión de Caja Chica — finance SaaS theme
-   Scope blue como primary dentro del módulo (override de --md-primary).
-   El resto de la app sigue en rosa.
+   Gestión de Caja Chica — usa tokens globales (paleta Sage)
    ───────────────────────────────────────────── */
-
-.gcc-content,
-.gcc-content-full {
-  /* Primary azul scoped solo al módulo */
-  --md-primary:           #2563EB;   /* blue-600 */
-  --md-primary-hover:     #1D4ED8;   /* blue-700 */
-  --md-primary-container: #DBEAFE;   /* blue-100 */
-  --md-on-primary-container: #1E3A8A;
-}
 
 .gcc-content-full {
   width: 100%;
@@ -87,15 +76,15 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  /* default = info / blue */
-  background: #DBEAFE;
-  color: #2563EB;
+  /* default = info */
+  background: var(--md-info-container);
+  color: var(--md-info);
 }
 
-.gcc-stat-icon-wrap.success { background: #D1FAE5; color: #059669; }
-.gcc-stat-icon-wrap.warning { background: #FEF3C7; color: #B45309; }
-.gcc-stat-icon-wrap.error   { background: #FEE2E2; color: #B91C1C; }
-.gcc-stat-icon-wrap.neutral { background: #F1F5F9; color: #475569; }
+.gcc-stat-icon-wrap.success { background: var(--md-success-container); color: var(--md-success); }
+.gcc-stat-icon-wrap.warning { background: var(--md-warning-container); color: var(--md-warning); }
+.gcc-stat-icon-wrap.error   { background: var(--md-error-container);   color: var(--md-error); }
+.gcc-stat-icon-wrap.neutral { background: var(--md-surface-variant);    color: var(--md-on-surface-variant); }
 
 .gcc-stat-value {
   font-size: 1.85rem;
@@ -115,9 +104,9 @@
   font-weight: 500;
 }
 
-.gcc-stat-trend.success { color: #059669; }
-.gcc-stat-trend.warning { color: #B45309; }
-.gcc-stat-trend.error   { color: #B91C1C; }
+.gcc-stat-trend.success { color: var(--md-success); }
+.gcc-stat-trend.warning { color: var(--md-warning); }
+.gcc-stat-trend.error   { color: var(--md-error); }
 
 /* ── Activity feed ── */
 .gcc-activity {
@@ -152,10 +141,10 @@
   flex-shrink: 0;
 }
 
-.gcc-activity-icon.success { background: #D1FAE5; color: #059669; }
-.gcc-activity-icon.warning { background: #FEF3C7; color: #B45309; }
-.gcc-activity-icon.error   { background: #FEE2E2; color: #B91C1C; }
-.gcc-activity-icon.info    { background: #DBEAFE; color: #2563EB; }
+.gcc-activity-icon.success { background: var(--md-success-container); color: var(--md-success); }
+.gcc-activity-icon.warning { background: var(--md-warning-container); color: var(--md-warning); }
+.gcc-activity-icon.error   { background: var(--md-error-container);   color: var(--md-error); }
+.gcc-activity-icon.info    { background: var(--md-info-container);    color: var(--md-info); }
 
 .gcc-activity-text {
   flex: 1;
@@ -204,7 +193,7 @@
 .gcc-link {
   background: transparent;
   border: none;
-  color: #2563EB;
+  color: var(--md-primary);
   font-size: 0.85rem;
   font-weight: 500;
   cursor: pointer;
@@ -215,7 +204,7 @@
 }
 
 .gcc-link:hover {
-  background: #DBEAFE;
+  background: var(--md-primary-container);
 }
 
 /* ── Table ── */
@@ -310,13 +299,13 @@
   background: currentColor;
 }
 
-.gcc-badge.pendiente { background: #FEF3C7; color: #92400E; }
+.gcc-badge.pendiente { background: var(--md-warning-container); color: var(--md-on-warning-container); }
 .gcc-badge.aprobada,
-.gcc-badge.rendida   { background: #D1FAE5; color: #065F46; }
-.gcc-badge.rechazada { background: #FEE2E2; color: #991B1B; }
+.gcc-badge.rendida   { background: var(--md-success-container); color: var(--md-on-success-container); }
+.gcc-badge.rechazada { background: var(--md-error-container);   color: var(--md-on-error-container); }
 .gcc-badge.pagada,
-.gcc-badge.pagado    { background: #DBEAFE; color: #1E40AF; }
-.gcc-badge.parcial   { background: #FEF9C3; color: #854D0E; }
+.gcc-badge.pagado    { background: var(--md-info-container);    color: var(--md-on-info-container); }
+.gcc-badge.parcial   { background: var(--md-tertiary-container); color: var(--md-on-tertiary-container); }
 
 /* ── Buttons ── */
 .gcc-btn {
@@ -341,15 +330,15 @@
 }
 
 .gcc-btn-primary {
-  background: #2563EB;
-  color: #FFFFFF;
-  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.18), 0 4px 10px rgba(37, 99, 235, 0.22);
+  background: var(--md-primary);
+  color: var(--md-on-primary);
+  box-shadow: 0 1px 2px rgba(78, 122, 94, 0.18), 0 4px 10px rgba(78, 122, 94, 0.22);
 }
 
 .gcc-btn-primary:not(:disabled):hover {
-  background: #1D4ED8;
+  background: var(--md-primary-hover);
   transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.20), 0 6px 14px rgba(37, 99, 235, 0.28);
+  box-shadow: 0 2px 4px rgba(78, 122, 94, 0.20), 0 6px 14px rgba(78, 122, 94, 0.28);
 }
 
 .gcc-btn-primary:not(:disabled):active {
@@ -357,41 +346,41 @@
 }
 
 .gcc-btn-ghost {
-  background: #F1F5F9;
-  color: #334155;
+  background: var(--md-surface-variant);
+  color: var(--md-on-surface);
 }
 
 .gcc-btn-ghost:hover {
-  background: #E2E8F0;
+  background: var(--md-surface-container);
 }
 
 .gcc-btn-success {
-  background: #059669;
+  background: var(--md-success);
   color: white;
 }
 
 .gcc-btn-success:not(:disabled):hover {
-  background: #047857;
+  background: var(--md-on-success-container);
 }
 
 .gcc-btn-danger {
-  background: #FFFFFF;
-  color: #B91C1C;
-  border: 1px solid #FECACA;
+  background: var(--md-surface);
+  color: var(--md-error);
+  border: 1px solid var(--md-error-container);
 }
 
 .gcc-btn-danger:not(:disabled):hover {
-  background: #FEE2E2;
+  background: var(--md-error-container);
 }
 
 .gcc-btn-link {
   background: transparent;
-  color: #2563EB;
+  color: var(--md-primary);
   padding: 0.35rem 0.6rem;
 }
 
 .gcc-btn-link:hover {
-  background: #DBEAFE;
+  background: var(--md-primary-container);
 }
 
 /* ── Forms ── */
@@ -438,8 +427,8 @@
 .gcc-input:focus,
 .gcc-select:focus,
 .gcc-textarea:focus {
-  border-color: #2563EB;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+  border-color: var(--md-primary);
+  box-shadow: 0 0 0 3px rgba(78, 122, 94, 0.18);
 }
 
 .gcc-textarea {
@@ -547,7 +536,7 @@
 
 .gcc-bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, #2563EB, #60A5FA);
+  background: linear-gradient(90deg, var(--md-primary), #84A48D);
   border-radius: 999px;
   transition: width 0.8s cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -560,7 +549,7 @@
 }
 
 .gcc-bar-row.alt .gcc-bar-fill {
-  background: linear-gradient(90deg, #059669, #34D399);
+  background: linear-gradient(90deg, var(--md-success), #6CA079);
 }
 
 /* ── Donut placeholder ── */
@@ -569,10 +558,10 @@
   height: 160px;
   border-radius: 50%;
   background: conic-gradient(
-    #2563EB 0% 35%,
-    #F59E0B 35% 60%,
-    #10B981 60% 85%,
-    #E2E8F0 85% 100%
+    var(--md-primary)   0%  35%,
+    var(--md-warning)  35%  60%,
+    var(--md-success)  60%  85%,
+    var(--md-outline)  85% 100%
   );
   position: relative;
   margin: 0 auto;
@@ -627,16 +616,16 @@
 }
 
 .gcc-toggle.on {
-  background: #2563EB;        /* blue-600 */
+  background: var(--md-primary);
 }
 
 .gcc-toggle.on:hover {
-  background: #1D4ED8;
+  background: var(--md-primary-hover);
 }
 
 .gcc-toggle:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25);
+  box-shadow: 0 0 0 3px rgba(78, 122, 94, 0.28);
 }
 
 .gcc-toggle-thumb {
@@ -710,8 +699,8 @@
   font-size: 0.65rem;
   font-weight: 700;
   padding: 2px 7px;
-  background: #FEF3C7;
-  color: #92400E;
+  background: var(--md-warning-container);
+  color: var(--md-on-warning-container);
   border-radius: 999px;
   letter-spacing: 0.4px;
   text-transform: uppercase;
@@ -720,8 +709,8 @@
 }
 
 .gcc-config-card.is-on .gcc-config-summary {
-  background: #DBEAFE;
-  color: #1D4ED8;
+  background: var(--md-primary-container);
+  color: var(--md-on-primary-container);
 }
 
 .gcc-config-body {
@@ -787,9 +776,9 @@
 }
 
 .gcc-list-add:hover {
-  border-color: #2563EB;
-  color: #2563EB;
-  background: #EFF6FF;
+  border-color: var(--md-primary);
+  color: var(--md-primary);
+  background: var(--md-primary-container);
 }
 
 /* Compact number input */
@@ -817,8 +806,8 @@
 }
 
 .gcc-number-input input:focus {
-  border-color: #2563EB;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+  border-color: var(--md-primary);
+  box-shadow: 0 0 0 3px rgba(78, 122, 94, 0.18);
 }
 
 .gcc-number-input input.wide {

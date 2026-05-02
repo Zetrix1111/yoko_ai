@@ -285,13 +285,13 @@
 .fact-btn-primary {
   background: var(--md-primary);
   color: var(--md-on-primary);
-  box-shadow: 0 2px 8px rgba(197, 115, 122, 0.22);
+  box-shadow: 0 2px 8px rgba(78, 122, 94, 0.22);
 }
 
 .fact-btn-primary:not(:disabled):hover {
   background: var(--md-primary-hover);
   transform: translateY(-1px);
-  box-shadow: 0 4px 14px rgba(197, 115, 122, 0.32);
+  box-shadow: 0 4px 14px rgba(78, 122, 94, 0.32);
 }
 
 .fact-btn-secondary {

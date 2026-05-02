@@ -476,7 +476,7 @@ export function RendicionesSection() {
                 <td style={{ fontWeight: 500 }}>{r.usuario}</td>
                 <td className="num">{formatPEN(r.entregado)}</td>
                 <td className="num">{formatPEN(r.rendido)}</td>
-                <td className="num" style={{ color: r.diferencia > 0 ? '#B91C1C' : 'inherit' }}>
+                <td className="num" style={{ color: r.diferencia > 0 ? 'var(--md-error)' : 'inherit' }}>
                   {formatPEN(r.diferencia)}
                 </td>
                 <td><Badge value={r.estado} /></td>

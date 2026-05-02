@@ -5,38 +5,70 @@
 @import "tailwindcss";
 
 /* ─────────────────────────────────────────────
-   Design Tokens — Material Design 3 paleta
-   (tonos bajos/suaves, como estaba)
+   Design Tokens — Material Design 3
+   Paleta: Sage (cálida, desaturada, tonalidades bajas)
    ───────────────────────────────────────────── */
 :root {
-  /* Surface & Background */
-  --md-bg:               #FDFBF7;
-  --md-surface:          #FFFFFF;
-  --md-surface-variant:  #F3EFEA;
-  --md-surface-container:#EDE8E3;
+  /* Surface & Background — cremas conservadas */
+  --md-bg:                       #FDFBF7;
+  --md-surface:                  #FFFFFF;
+  --md-surface-variant:          #F3EFEA;
+  --md-surface-container:        #EDE8E3;
 
-  /* Primary — rosa rosewood suave */
-  --md-primary:          #C5737A;
-  --md-primary-hover:    #A85A61;
-  --md-on-primary:       #FFFFFF;
-  --md-primary-container:#F7EBEB;
-  --md-on-primary-container: #3D1F22;
+  /* Primary — Sage (CTAs, acción positiva) */
+  --md-primary:                  #4E7A5E;
+  --md-primary-hover:            #3F6249;
+  --md-on-primary:               #FFFFFF;
+  --md-primary-container:        #DDE9DF;
+  --md-on-primary-container:     #1E2F25;
+
+  /* Secondary — Dusty Plum (acciones secundarias, links activos) */
+  --md-secondary:                #715A6B;
+  --md-secondary-hover:          #5A4655;
+  --md-on-secondary:             #FFFFFF;
+  --md-secondary-container:      #EDE0E8;
+  --md-on-secondary-container:   #2A1F27;
+
+  /* Tertiary — Honey (badges decorativos, highlights) */
+  --md-tertiary:                 #876B30;
+  --md-tertiary-hover:           #6E5626;
+  --md-on-tertiary:              #FFFFFF;
+  --md-tertiary-container:       #F0E5CC;
+  --md-on-tertiary-container:    #3D3219;
 
   /* Text */
-  --md-on-surface:       #3D3935;
-  --md-on-surface-variant:#8A8379;
+  --md-on-surface:               #3D3935;
+  --md-on-surface-variant:       #6F6A63;
 
   /* Outline */
-  --md-outline:          rgba(0, 0, 0, 0.05);
-  --md-outline-variant:  rgba(0, 0, 0, 0.10);
+  --md-outline:                  #C9C2B8;
+  --md-outline-variant:          #E0DAD2;
 
-  /* State layers */
-  --md-state-hover:      rgba(197, 115, 122, 0.08);
-  --md-state-pressed:    rgba(197, 115, 122, 0.12);
+  /* State layers (sobre el primario sage) */
+  --md-state-hover:              rgba(78, 122, 94, 0.08);
+  --md-state-pressed:            rgba(78, 122, 94, 0.16);
 
-  /* Status */
-  --md-success:          #059669;
-  --md-error:            #B3261E;
+  /* Status — Success · Forest (más frío que primary) */
+  --md-success:                  #2F6B45;
+  --md-success-container:        #D2E7D9;
+  --md-on-success-container:     #102B1B;
+
+  /* Status — Warning · Muted Amber */
+  --md-warning:                  #8E6B26;
+  --md-warning-container:        #F4E5C4;
+  --md-on-warning-container:     #3D2C0F;
+
+  /* Status — Error · Muted Brick (única familia roja) */
+  --md-error:                    #8B4444;
+  --md-error-hover:              #6F3535;
+  --md-on-error:                 #FFFFFF;
+  --md-error-container:          #F0D6D6;
+  --md-on-error-container:       #3A1B1B;
+
+  /* Status — Info · Slate Blue */
+  --md-info:                     #4A6781;
+  --md-info-container:           #DCE3EC;
+  --md-on-info-container:        #1B2832;
 
   /* Aliases legacy (backward-compat) */
   --bg-color:            var(--md-bg);
@@ -374,12 +406,12 @@ body {
   color:           var(--md-on-primary);
   cursor:          pointer;
   transition:      background-color 0.2s, transform 0.15s, box-shadow 0.2s;
-  box-shadow:      0 2px 6px rgba(197,115,122,0.3);
+  box-shadow:      0 2px 6px rgba(78, 122, 94, 0.28);
 }
 .send-button:not(:disabled):hover {
   background:  var(--md-primary-hover);
   transform:   scale(1.06);
-  box-shadow:  0 4px 12px rgba(197,115,122,0.35);
+  box-shadow:  0 4px 12px rgba(78, 122, 94, 0.32);
 }
 .send-button:not(:disabled):active {
   transform: scale(0.96);
@@ -456,8 +488,8 @@ body {
 }
 
 @keyframes mic-pulse {
-  0%,100% { box-shadow: 0 0 0 0   rgba(197,115,122,0.55); }
-  50%     { box-shadow: 0 0 0 10px rgba(197,115,122,0);    }
+  0%,100% { box-shadow: 0 0 0 0   rgba(78, 122, 94, 0.50); }
+  50%     { box-shadow: 0 0 0 10px rgba(78, 122, 94, 0);    }
 }
 
 @keyframes spin {
@@ -639,7 +671,7 @@ body {
   cursor:        pointer;
   transition:    background-color 0.25s, transform 0.15s, box-shadow 0.25s;
   width:         100%;
-  box-shadow:    0 2px 8px rgba(197,115,122,0.22);
+  box-shadow:    0 2px 8px rgba(78, 122, 94, 0.22);
   position:      relative;
   overflow:      hidden;
   font-family:   inherit;
@@ -647,7 +679,7 @@ body {
 .login-btn:not(:disabled):hover {
   background:  var(--md-primary-hover);
   transform:   translateY(-1px);
-  box-shadow:  0 4px 14px rgba(197,115,122,0.32);
+  box-shadow:  0 4px 14px rgba(78, 122, 94, 0.32);
 }
 .login-btn:not(:disabled):active {
   transform: translateY(0) scale(0.98);
@@ -893,7 +925,7 @@ body {
 .module-icon-wrapper.request   { background: linear-gradient(135deg, #CE93D8, #7B1FA2); }
 .module-icon-wrapper.payment   { background: linear-gradient(135deg, #FFE082, #F57F17); }
 .module-icon-wrapper.invoice   { background: linear-gradient(135deg, #80DEEA, #00838F); }
-.module-icon-wrapper.finance   { background: linear-gradient(135deg, #93C5FD, #1D4ED8); }
+.module-icon-wrapper.finance   { background: linear-gradient(135deg, #BCD2C0, #4E7A5E); }
 
 /* ─────────────────────────────────────────────
    Accordion (módulos con submenús)
@@ -914,7 +946,7 @@ body {
 .module-card-parent.is-current {
   background: rgba(255, 255, 255, 0.7);
   border-color: var(--md-primary);
-  box-shadow: 0 6px 18px rgba(197, 115, 122, 0.10);
+  box-shadow: 0 6px 18px rgba(78, 122, 94, 0.10);
 }
 
 .module-card-parent:hover {
@@ -991,19 +1023,19 @@ body {
 }
 
 .module-submenu-item.active {
-  background: #DBEAFE;            /* blue-100 — soft blue */
-  color: #1D4ED8;                 /* blue-700 */
+  background: var(--md-primary-container);
+  color: var(--md-on-primary-container);
   font-weight: 600;
 }
 
 .module-submenu-item.active::before {
-  background: #2563EB;            /* blue-600 */
+  background: var(--md-primary);
   top: 18%;
   bottom: 18%;
 }
 
 .module-submenu-item.active svg {
-  color: #2563EB;
+  color: var(--md-primary);
 }
 
 .module-content {
