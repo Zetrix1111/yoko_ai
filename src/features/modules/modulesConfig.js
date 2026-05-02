@@ -47,8 +47,8 @@ export const MODULES = [
     ],
   },
   {
-    id: 'ventas-omnicanal',
-    path: '/modulos/ventas-omnicanal',
+    id: 'ventas-inteligentes',
+    path: '/modulos/ventas-inteligentes',
     name: 'Ventas Inteligentes',
     Icon: Sparkles,
     iconClass: 'sales',

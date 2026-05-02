@@ -9,7 +9,10 @@
     "name": "Aria"
   },
   "modules": [
-    "gestion-caja"
+    "gestion-caja",
+    "ventas-inteligentes",
+    "facturas-inteligentes",
+    "configuracion-empresa"
   ],
   "proceso": {
     "caja_chica": {

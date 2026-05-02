@@ -3,7 +3,7 @@ import ModuleLayout from '../ModuleLayout';
 import {
   InicioSection, CanalesSection, ClientesSection, CatalogoSection, ConfiguracionSection,
 } from './sections';
-import './VentasOmnicanal.css';
+import './VentasInteligentes.css';
 
 const SECTIONS = {
   inicio: InicioSection,
@@ -13,7 +13,7 @@ const SECTIONS = {
   configuracion: ConfiguracionSection,
 };
 
-export default function VentasOmnicanalScreen({ user, onOpenModules, onLogout }) {
+export default function VentasInteligentesScreen({ user, onOpenModules, onLogout }) {
   const [searchParams] = useSearchParams();
   const section = searchParams.get('section') || 'inicio';
   const ActiveComp = SECTIONS[section] || InicioSection;

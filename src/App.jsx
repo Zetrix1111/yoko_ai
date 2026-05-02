@@ -13,7 +13,7 @@ import AlertaSeguraScreen from './features/modules/alerta-segura/AlertaSeguraScr
 import ConfiguracionEmpresaScreen from './features/modules/configuracion-empresa/ConfiguracionEmpresaScreen';
 import FacturasInteligentesScreen from './features/modules/facturas-inteligentes/FacturasInteligentesScreen';
 import GestionCajaChicaScreen from './features/modules/gestion-caja-chica/GestionCajaChicaScreen';
-import VentasOmnicanalScreen from './features/modules/ventas-omnicanal/VentasOmnicanalScreen';
+import VentasInteligentesScreen from './features/modules/ventas-inteligentes/VentasInteligentesScreen';
 
 // Mapeo: id de módulo → componente que renderiza su pantalla.
 // Para enchufar un módulo nuevo, solo agrega aquí su entrada.
@@ -22,7 +22,7 @@ const MODULE_COMPONENTS = {
   'configuracion-empresa':  ConfiguracionEmpresaScreen,
   'facturas-inteligentes':  FacturasInteligentesScreen,
   'gestion-caja':           GestionCajaChicaScreen,
-  'ventas-omnicanal':       VentasOmnicanalScreen,
+  'ventas-inteligentes':    VentasInteligentesScreen,
 };
 
 function AuthenticatedApp({ user, onLogout }) {
