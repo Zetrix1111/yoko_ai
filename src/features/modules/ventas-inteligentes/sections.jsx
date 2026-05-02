@@ -1,15 +1,16 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Plus, X, Sparkles, Users, MessageCircle, ShoppingBag, ArrowUpRight,
   Pencil, Trash2, Check, TrendingUp, Activity, Search, Package,
-  Upload as UploadIcon, Image as ImageIcon,
+  Upload as UploadIcon, Image as ImageIcon, Loader2, AlertCircle,
 } from 'lucide-react';
 import {
-  STATS, FUNNEL, ACTIVIDAD, CANALES, PRODUCTOS, CLIENTES,
+  STATS, FUNNEL, ACTIVIDAD, CANALES, CLIENTES,
   CANAL_LABELS, ESTADO_LABELS, STOCK_LABELS, getStockStatus,
   formatPEN, formatNum, formatDate,
 } from './mockData';
+import { API, getJson, postJson, patchJson, deleteJson } from '../../../shared/api';
 
 // ─────────────────────────────────────
 // Helpers UI
@@ -339,14 +340,18 @@ function ProductoCard({ producto, onEdit, onDelete }) {
   );
 }
 
-function ProductoForm({ producto, onSubmit, onCancel }) {
+function ProductoForm({ producto, onSubmit, onCancel, saving }) {
   const editing = Boolean(producto?.id);
   const [foto, setFoto] = useState(producto?.foto || null);
+  // El backend no acepta blob: URLs (creadas localmente con createObjectURL).
+  // Para el MVP, si el usuario sube un archivo guardamos preview local pero
+  // mandamos foto=null a Airtable (necesita upload a CDN aparte). Si el
+  // usuario pega una URL pública (https://...) la guardamos tal cual.
+  const isLocalBlob = typeof foto === 'string' && foto.startsWith('blob:');
 
   const handleFile = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    // Mock: preview local. Cuando se integre con backend, subir y guardar URL.
     const url = URL.createObjectURL(file);
     setFoto(url);
   };
@@ -360,12 +365,15 @@ function ProductoForm({ producto, onSubmit, onCancel }) {
     const stockMinimo = stockMinStr === '' || stockMinStr === null ? null : Number(stockMinStr);
     const stockIniStr = f.get('stockInicial');
     const stockInicial = stockIniStr === '' || stockIniStr === null ? null : Number(stockIniStr);
+    // Si la foto es un blob:// local, no se la mandamos al backend (Airtable
+    // no la puede acceder). Quedará como null hasta que tengamos upload a CDN.
+    const fotoToSend = isLocalBlob ? null : foto;
     onSubmit({
       id:           producto?.id,
       nombre:       f.get('nombre'),
       precio:       Number(f.get('precio')),
       descripcion:  f.get('descripcion'),
-      foto,
+      foto:         fotoToSend,
       stockInicial,
       stock,
       stockMinimo,
@@ -442,10 +450,26 @@ function ProductoForm({ producto, onSubmit, onCancel }) {
         </div>
       </div>
 
+      {isLocalBlob && (
+        <div style={{ fontSize: '0.78rem', color: 'var(--md-warning)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          <AlertCircle size={14} />
+          La foto se previsualiza localmente. Para guardarla en el catálogo,
+          subila a un servicio público (Drive, Imgur) y pegá la URL.
+        </div>
+      )}
+
       <div className="vom-modal-actions">
-        <button type="button" className="vom-btn vom-btn-ghost" onClick={onCancel}>Cancelar</button>
-        <button type="submit" className="vom-btn vom-btn-primary">
-          {editing ? <><Check size={16} /> Guardar cambios</> : <><Plus size={16} /> Crear producto</>}
+        <button type="button" className="vom-btn vom-btn-ghost" onClick={onCancel} disabled={saving}>
+          Cancelar
+        </button>
+        <button type="submit" className="vom-btn vom-btn-primary" disabled={saving}>
+          {saving ? (
+            <><Loader2 size={16} style={{ animation: 'vom-fade 1s linear infinite' }} /> Guardando...</>
+          ) : editing ? (
+            <><Check size={16} /> Guardar cambios</>
+          ) : (
+            <><Plus size={16} /> Crear producto</>
+          )}
         </button>
       </div>
     </form>
@@ -453,47 +477,122 @@ function ProductoForm({ producto, onSubmit, onCancel }) {
 }
 
 export function ProductosSection() {
-  const [productos, setProductos] = useState(PRODUCTOS);
-  const [editing, setEditing] = useState(null); // null | {} (nuevo) | producto (editar)
+  const [productos, setProductos] = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [error, setError]         = useState(null);
+  const [editing, setEditing]     = useState(null); // null | {} (nuevo) | producto (editar)
+  const [saving, setSaving]       = useState(false);
 
-  const handleSave = (data) => {
-    if (data.id) {
-      setProductos(productos.map((p) => p.id === data.id ? { ...p, ...data } : p));
-    } else {
-      const nextId = Math.max(0, ...productos.map((p) => p.id)) + 1;
-      setProductos([{ ...data, id: nextId }, ...productos]);
+  // Carga inicial desde el API
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    getJson(API.PRODUCTOS)
+      .then((data) => {
+        if (cancelled) return;
+        setProductos(Array.isArray(data?.productos) ? data.productos : []);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.error('[productos]', err);
+        setError('No se pudieron cargar los productos. Verificá que la tabla "productos" exista en Airtable.');
+      })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const handleSave = async (data) => {
+    setSaving(true);
+    try {
+      if (data.id) {
+        const res = await patchJson(`${API.PRODUCTOS}?id=${encodeURIComponent(data.id)}`, data);
+        const updated = res.producto;
+        setProductos(productos.map((p) => p.id === data.id ? updated : p));
+      } else {
+        const res = await postJson(API.PRODUCTOS, data);
+        const created = res.producto;
+        setProductos([created, ...productos]);
+      }
+      setEditing(null);
+    } catch (err) {
+      console.error('[productos] save', err);
+      alert('No se pudo guardar el producto. Revisá la consola.');
+    } finally {
+      setSaving(false);
     }
-    setEditing(null);
   };
 
-  const handleDelete = (id) => {
-    setProductos(productos.filter((p) => p.id !== id));
+  const handleDelete = async (id) => {
+    if (!confirm('¿Eliminar este producto?')) return;
+    try {
+      await deleteJson(`${API.PRODUCTOS}?id=${encodeURIComponent(id)}`);
+      setProductos(productos.filter((p) => p.id !== id));
+    } catch (err) {
+      console.error('[productos] delete', err);
+      alert('No se pudo eliminar el producto.');
+    }
   };
 
   return (
     <>
       <SectionHeader
         title="Productos"
-        subtitle={`${productos.length} productos y servicios disponibles para venta automática`}
+        subtitle={
+          loading
+            ? 'Cargando catálogo...'
+            : `${productos.length} producto${productos.length === 1 ? '' : 's'} y servicio${productos.length === 1 ? '' : 's'} disponibles para venta automática`
+        }
         action={
-          <button className="vom-btn vom-btn-primary" onClick={() => setEditing({})}>
+          <button className="vom-btn vom-btn-primary" onClick={() => setEditing({})} disabled={loading}>
             <Plus size={16} /> Agregar producto
           </button>
         }
       />
 
-      <div className="vom-product-grid">
-        {productos.map((p) => (
-          <ProductoCard key={p.id} producto={p} onEdit={setEditing} onDelete={handleDelete} />
-        ))}
-      </div>
+      {loading && (
+        <div className="vom-card" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'center', padding: '2rem' }}>
+          <Loader2 size={18} style={{ animation: 'vom-fade 1s linear infinite' }} />
+          <span style={{ color: 'var(--md-on-surface-variant)' }}>Cargando productos desde Airtable...</span>
+        </div>
+      )}
+
+      {error && !loading && (
+        <div className="vom-card" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--md-error)' }}>
+          <AlertCircle size={18} />
+          <span>{error}</span>
+        </div>
+      )}
+
+      {!loading && !error && productos.length === 0 && (
+        <div className="vom-card" style={{ textAlign: 'center', padding: '2.5rem 1rem', color: 'var(--md-on-surface-variant)' }}>
+          <Package size={32} style={{ color: 'var(--md-outline)', marginBottom: '0.5rem' }} />
+          <p style={{ margin: 0 }}>Todavía no tenés productos cargados.</p>
+          <p style={{ margin: '0.25rem 0 0', fontSize: '0.85rem' }}>
+            Hacé click en <strong>"Agregar producto"</strong> para empezar tu catálogo.
+          </p>
+        </div>
+      )}
+
+      {!loading && !error && productos.length > 0 && (
+        <div className="vom-product-grid">
+          {productos.map((p) => (
+            <ProductoCard key={p.id} producto={p} onEdit={setEditing} onDelete={handleDelete} />
+          ))}
+        </div>
+      )}
 
       {editing && (
         <Modal
           title={editing.id ? 'Editar producto' : 'Nuevo producto'}
-          onClose={() => setEditing(null)}
+          onClose={() => !saving && setEditing(null)}
         >
-          <ProductoForm producto={editing} onSubmit={handleSave} onCancel={() => setEditing(null)} />
+          <ProductoForm
+            producto={editing}
+            onSubmit={handleSave}
+            onCancel={() => setEditing(null)}
+            saving={saving}
+          />
         </Modal>
       )}
     </>

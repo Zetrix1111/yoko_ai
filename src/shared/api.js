@@ -34,6 +34,7 @@ export const API = {
   FACTURAS_PROCESAR: '/api/facturas_procesar',
   FACTURAS_CONCAR: '/api/facturas_concar',
   CENTROS_COSTO: '/api/centros_costo',
+  PRODUCTOS: '/api/productos',
 };
 
 export async function getJson(url) {
@@ -46,4 +47,24 @@ export async function getJson(url) {
     return res.json();
   }
   return res.text();
+}
+
+export async function patchJson(url, body) {
+  const res = await fetch(url, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function deleteJson(url) {
+  const res = await fetch(url, { method: 'DELETE' });
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`);
+  }
+  return res.json();
 }

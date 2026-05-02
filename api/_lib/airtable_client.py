@@ -120,3 +120,9 @@ def update_record(table: str, record_id: str, fields: dict) -> dict:
     url = f"{_table_url(table)}/{urllib.parse.quote(record_id)}"
     data = _request("PATCH", url, body={"fields": fields})
     return _normalize(data)
+
+
+def delete_record(table: str, record_id: str) -> dict:
+    """Elimina un registro. Devuelve {'deleted': True, 'id': ...}."""
+    url = f"{_table_url(table)}/{urllib.parse.quote(record_id)}"
+    return _request("DELETE", url)
