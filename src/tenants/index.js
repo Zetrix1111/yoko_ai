@@ -3,18 +3,19 @@
 // Si no está definida o el tenant no existe, cae al fallback "cmejia".
 //
 // Para agregar un cliente nuevo:
-//   1) Crear src/tenants/<id>/config.json + logo.png
-//   2) Importar el config + logo abajo y registrar la entrada en TENANTS
+//   1) Crear src/tenants/<id>/config.json
+//   2) Importar el config abajo y registrar la entrada en TENANTS
 //   3) En su Vercel project nuevo, setear VITE_TENANT_ID=<id> + sus env vars (Airtable/Make/OpenAI)
+//
+// Nota: el logo es único de la app (src/assets/logo.png), ya no es por tenant.
 
 import cmejiaConfig from './cmejia/config.json';
-import cmejiaLogo   from './cmejia/logo.png';
 import demoConfig   from './demo/config.json';
-import demoLogo     from './demo/logo.png';
+import appLogo      from '../assets/logo.png';
 
 const TENANTS = {
-  cmejia: { config: cmejiaConfig, logo: cmejiaLogo },
-  demo:   { config: demoConfig,   logo: demoLogo   },
+  cmejia: { config: cmejiaConfig },
+  demo:   { config: demoConfig   },
 };
 
 const FALLBACK_ID = 'cmejia';
@@ -56,8 +57,10 @@ const active = TENANTS[resolvedId];
 
 export const tenantId      = resolvedId;
 export const tenantConfig  = active.config;
-export const tenantLogo    = active.logo;
 export const tenantModules = new Set(active.config.modules || []);
+
+// Logo único de la app (no per-tenant)
+export { appLogo };
 
 // Helper para checkear si un módulo está habilitado en este tenant
 export function isModuleEnabled(moduleId) {
