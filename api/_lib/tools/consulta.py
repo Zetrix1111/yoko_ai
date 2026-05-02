@@ -103,7 +103,10 @@ def _listar_por_dni(
     description=(
         "Consulta las solicitudes de caja chica del usuario. Útil para "
         "preguntas como '¿cómo va mi solicitud?' o '¿qué tengo pendiente?'. "
-        "El parámetro DNI debe ser el del usuario autenticado."
+        "El parámetro DNI debe ser el del usuario autenticado. "
+        "El filtro de estado hace match parcial (uppercase): por ejemplo "
+        "'pendiente_aprobacion' matchea PENDIENTE_APROBACION_RESIDENTE y "
+        "PENDIENTE_APROBACION_JEFATURA_SEDE."
     ),
     parameters={
         "type": "object",
@@ -111,8 +114,24 @@ def _listar_por_dni(
             "dni":     {"type": "string", "description": "DNI del solicitante (8 dígitos)."},
             "estado":  {
                 "type": "string",
-                "enum": ["pendiente", "aprobada", "rechazada", "pagada"],
-                "description": "Filtra por estado. Omitir para traer todos.",
+                "enum": [
+                    "pendiente_aprobacion",
+                    "por_pagar",
+                    "por_contabilizar",
+                    "por_rendir",
+                    "finalizado",
+                    "rechazado",
+                ],
+                "description": (
+                    "Filtra por etapa del ciclo. "
+                    "pendiente_aprobacion=en revisión; "
+                    "por_pagar=esperando desembolso del tesorero; "
+                    "por_contabilizar=esperando registro contable; "
+                    "por_rendir=usuario debe rendir gastos; "
+                    "finalizado=ciclo cerrado; "
+                    "rechazado=denegado en cualquier etapa. "
+                    "Omitir para traer todos."
+                ),
             },
             "periodo": {"type": "string", "description": "Mes en formato YYYY-MM."},
         },
@@ -384,3 +403,215 @@ def consultar_tipos_gasto(args: dict, context: dict) -> dict:
         for t in tipos if t.get("activo")
     ]
     return {"tipos_gasto": activos, "total": len(activos)}
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# 8. consultar_resumen_caja_chica
+# ─────────────────────────────────────────────────────────────────────────
+# Etapas del ciclo de caja chica (en orden) según el negocio:
+#   PENDIENTE_APROBACION_*  → en revisión, todavía no se puede pagar
+#   POR_PAGAR              → aprobada, esperando desembolso del tesorero
+#   POR_CONTABILIZAR       → pagada, esperando registro contable
+#   POR_RENDIR             → desembolsada, usuario debe rendir gastos
+#   FINALIZADO             → ciclo cerrado
+#   RECHAZADO              → puede ocurrir en cualquier etapa
+_BUCKETS_ESTADO = (
+    "pendiente_aprobacion",
+    "por_pagar",
+    "por_contabilizar",
+    "por_rendir",
+    "finalizado",
+    "rechazado",
+    "sin_estado",
+)
+
+
+def _clasificar_estado(estado_raw) -> str:
+    """Mapea el ESTADO crudo de Airtable a uno de los buckets del ciclo."""
+    if not estado_raw:
+        return "sin_estado"
+    e = str(estado_raw).strip().upper()
+    if not e:
+        return "sin_estado"
+    if e.startswith("PENDIENTE_APROBACION"):
+        return "pendiente_aprobacion"
+    if e == "POR_PAGAR":
+        return "por_pagar"
+    if e == "POR_CONTABILIZAR":
+        return "por_contabilizar"
+    if e == "POR_RENDIR":
+        return "por_rendir"
+    if e == "FINALIZADO":
+        return "finalizado"
+    if e == "RECHAZADO":
+        return "rechazado"
+    # Estado desconocido: lo agrupamos como sin_estado para no perderlo
+    return "sin_estado"
+
+
+@register(
+    name="consultar_resumen_caja_chica",
+    description=(
+        "Devuelve un resumen agregado de las solicitudes de caja chica del "
+        "usuario: conteo y monto total agrupados por etapa del ciclo "
+        "(pendiente_aprobacion, por_pagar, por_contabilizar, por_rendir, "
+        "finalizado, rechazado). Úsalo para responder preguntas como "
+        "'¿cuánto tengo pendiente?', '¿cuánto me falta rendir?', '¿cómo voy "
+        "este mes?', '¿cuánto me deben pagar?'. Si se especifica `periodo` "
+        "filtra por mes de creación del registro."
+    ),
+    parameters={
+        "type": "object",
+        "properties": {
+            "dni":     {"type": "string", "description": "DNI del usuario (8 dígitos)."},
+            "periodo": {
+                "type": "string",
+                "description": "Mes en formato YYYY-MM (filtra por createdTime).",
+            },
+        },
+        "required": ["dni"],
+    },
+    category="consulta",
+)
+def consultar_resumen_caja_chica(args: dict, context: dict) -> dict:
+    dni = args["dni"]
+    periodo = args.get("periodo")
+
+    partes = [f"{{{_CAMPO_DNI_SOLICITUDES}}}='{dni}'"]
+    if periodo:
+        # Filtramos por createdTime() ya que la tabla no tiene un campo
+        # 'fecha' explícito visible.
+        partes.append(f"DATETIME_FORMAT(CREATED_TIME(), 'YYYY-MM')='{periodo}'")
+    formula = _formula_y(*partes)
+
+    records = airtable_client.list_records(
+        _TABLA_SOLICITUDES, filter_formula=formula
+    )
+
+    # Inicializar buckets con counts y montos en 0
+    por_estado = {
+        b: {"count": 0, "monto": 0.0} for b in _BUCKETS_ESTADO
+    }
+
+    monto_total = 0.0
+    for r in records:
+        f = r.get("fields", {})
+        bucket = _clasificar_estado(f.get(_CAMPO_ESTADO))
+        try:
+            monto = float(f.get("TOTAL_GENERAL") or 0)
+        except (ValueError, TypeError):
+            monto = 0.0
+        por_estado[bucket]["count"] += 1
+        por_estado[bucket]["monto"] += monto
+        monto_total += monto
+
+    # Redondear todos los montos a 2 decimales
+    for b in por_estado:
+        por_estado[b]["monto"] = round(por_estado[b]["monto"], 2)
+
+    return {
+        "dni": dni,
+        "periodo": periodo,
+        "total_solicitudes": len(records),
+        "monto_total": round(monto_total, 2),
+        "por_estado": por_estado,
+        # Resúmenes interpretables que el LLM suele necesitar de un solo tiro
+        "monto_en_revision":      por_estado["pendiente_aprobacion"]["monto"],
+        "monto_por_cobrar":       por_estado["por_pagar"]["monto"],
+        "monto_pendiente_rendir": por_estado["por_rendir"]["monto"],
+        "monto_finalizado":       por_estado["finalizado"]["monto"],
+        "monto_rechazado":        por_estado["rechazado"]["monto"],
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# 9. consultar_solicitud_por_id
+# ─────────────────────────────────────────────────────────────────────────
+
+def _es_record_id_airtable(s: str) -> bool:
+    """Heurística: los IDs internos de Airtable empiezan con 'rec' y tienen 17 chars."""
+    return bool(s) and s.startswith("rec") and len(s) >= 14
+
+
+@register(
+    name="consultar_solicitud_por_id",
+    description=(
+        "Busca una solicitud de caja chica específica por su folio (campo "
+        "NUMERO en Airtable, formato típico '000003 - 2026') o por su ID "
+        "interno de Airtable. Acepta variantes: '000003 - 2026', '000003', "
+        "'3' o el recId. Devuelve los datos completos si la encuentra, o "
+        "{encontrado: false} si no."
+    ),
+    parameters={
+        "type": "object",
+        "properties": {
+            "id": {
+                "type": "string",
+                "description": (
+                    "Folio (NUMERO) o ID interno de Airtable. Ejemplos: "
+                    "'000003 - 2026', '000003', '3', 'rec3eziJJhRpd3Wzs'."
+                ),
+            },
+        },
+        "required": ["id"],
+    },
+    category="consulta",
+)
+def consultar_solicitud_por_id(args: dict, context: dict) -> dict:
+    raw = (args.get("id") or "").strip()
+    if not raw:
+        return {"encontrado": False, "motivo": "ID vacío."}
+
+    # Caso 1: ID interno de Airtable
+    if _es_record_id_airtable(raw):
+        try:
+            rec = airtable_client.get_record(_TABLA_SOLICITUDES, raw)
+            return {"encontrado": True, "solicitud": rec.get("fields", {}), "id": rec.get("id")}
+        except Exception as e:
+            # 404 u otro error: lo tratamos como no encontrado para que el LLM
+            # pueda explicarlo sin propagar el stacktrace.
+            return {"encontrado": False, "motivo": f"No se pudo obtener el registro: {e}"}
+
+    # Caso 2: folio (NUMERO). Aceptamos:
+    #   "000003 - 2026"  → match exacto
+    #   "000003"         → FIND parcial
+    #   "3"              → padding a 6 dígitos
+    candidatos = [raw]
+    if raw.isdigit():
+        candidatos.append(raw.zfill(6))
+
+    # Escapamos comillas simples por si el folio las trae (defensivo).
+    def _esc(s: str) -> str:
+        return s.replace("'", "\\'")
+
+    or_terms = [
+        f"FIND('{_esc(c)}', {{NUMERO}} & '')>0" for c in candidatos
+    ]
+    formula = "OR(" + ", ".join(or_terms) + ")" if len(or_terms) > 1 else or_terms[0]
+
+    records = airtable_client.list_records(
+        _TABLA_SOLICITUDES, filter_formula=formula, max_records=5
+    )
+    if not records:
+        return {"encontrado": False, "motivo": f"No existe solicitud con folio '{raw}'."}
+
+    if len(records) == 1:
+        r = records[0]
+        return {"encontrado": True, "solicitud": r.get("fields", {}), "id": r.get("id")}
+
+    # Múltiples coincidencias: devolvemos un listado mínimo para que el LLM
+    # le pida al usuario que aclare cuál.
+    return {
+        "encontrado": True,
+        "ambiguo": True,
+        "candidatos": [
+            {
+                "id":     r.get("id"),
+                "numero": r.get("fields", {}).get("NUMERO"),
+                "estado": r.get("fields", {}).get(_CAMPO_ESTADO),
+                "monto":  r.get("fields", {}).get("TOTAL_GENERAL"),
+                "motivo": r.get("fields", {}).get("MOTIVO"),
+            }
+            for r in records
+        ],
+    }
