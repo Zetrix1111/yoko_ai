@@ -23,6 +23,7 @@ import {
   Sparkles,
   Package,
   Users,
+  MessageSquareText,
 } from 'lucide-react';
 
 export const MODULES = [
@@ -52,10 +53,11 @@ export const MODULES = [
     Icon: Sparkles,
     iconClass: 'sales',
     submenus: [
-      { id: 'inicio',        label: 'Dashboard',     Icon: LayoutDashboard },
-      { id: 'clientes',      label: 'Clientes',      Icon: Users },
-      { id: 'productos',     label: 'Productos',     Icon: Package },
-      { id: 'configuracion', label: 'Configuración', Icon: Settings },
+      { id: 'inicio',         label: 'Dashboard',     Icon: LayoutDashboard },
+      { id: 'respuestas-ia',  label: 'Respuestas IA', Icon: MessageSquareText },
+      { id: 'clientes',       label: 'Clientes',      Icon: Users },
+      { id: 'productos',      label: 'Productos',     Icon: Package },
+      { id: 'configuracion',  label: 'Configuración', Icon: Settings },
     ],
   },
   {

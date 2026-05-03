@@ -2,14 +2,16 @@ import { useSearchParams } from 'react-router-dom';
 import ModuleLayout from '../ModuleLayout';
 import {
   InicioSection, ClientesSection, ProductosSection, ConfiguracionSection,
+  RespuestasIASection,
 } from './sections';
 import './VentasInteligentes.css';
 
 const SECTIONS = {
-  inicio:        InicioSection,
-  clientes:      ClientesSection,
-  productos:     ProductosSection,
-  configuracion: ConfiguracionSection,
+  inicio:          InicioSection,
+  'respuestas-ia': RespuestasIASection,
+  clientes:        ClientesSection,
+  productos:       ProductosSection,
+  configuracion:   ConfiguracionSection,
 };
 
 export default function VentasInteligentesScreen({ user, onOpenModules, onLogout }) {

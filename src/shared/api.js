@@ -35,6 +35,12 @@ export const API = {
   FACTURAS_CONCAR: '/api/facturas_concar',
   CENTROS_COSTO: '/api/centros_costo',
   PRODUCTOS: '/api/productos',
+  // Ventas Inteligentes
+  WA: '/api/wa',
+  CONVERSACIONES: '/api/conversaciones',
+  MENSAJES: '/api/mensajes',
+  CONVERSACIONES_MODO: '/api/conversaciones_modo',
+  SALES_CHAT: '/api/sales_chat',
 };
 
 export async function getJson(url) {

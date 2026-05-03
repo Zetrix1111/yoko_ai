@@ -71,10 +71,13 @@ export class SessionManager {
         return;
       }
 
+      const seenInAirtable = new Set<string>();
+
       for (const row of rows) {
         const empresaId: string = row.fields.empresa_id;
         const status: string = row.fields.status || "disconnected";
         if (!empresaId) continue;
+        seenInAirtable.add(empresaId);
 
         const inMap = this.sessions.has(empresaId);
         const shouldBeActive = ACTIVE_STATUSES.has(status);
@@ -82,6 +85,16 @@ export class SessionManager {
         if (shouldBeActive && !inMap) {
           await this.startSession(empresaId);
         } else if (!shouldBeActive && inMap) {
+          await this.stopSession(empresaId);
+        }
+      }
+
+      // Matar sesiones zombie: rows borradas en Airtable mientras la sesión seguía
+      // en memoria. Sin esto, una row borrada por el usuario se recrea por el
+      // heartbeat y nunca termina la sesión.
+      for (const empresaId of Array.from(this.sessions.keys())) {
+        if (!seenInAirtable.has(empresaId)) {
+          console.log(`[manager] Row borrada en Airtable para ${empresaId} → cerrando sesión zombie`);
           await this.stopSession(empresaId);
         }
       }
@@ -118,14 +131,18 @@ export class SessionManager {
     this.sessions.delete(empresaId);
   }
 
-  /** Heartbeat: actualiza last_seen_at en Airtable para sesiones activas. */
+  /**
+   * Heartbeat: actualiza last_seen_at en Airtable para sesiones activas.
+   * Usa touchWaSession (NO upsert) — si el usuario borró la row, no la
+   * recreamos. El próximo pollOnce detectará la ausencia y matará la sesión.
+   */
   private async heartbeat(): Promise<void> {
     const now = new Date().toISOString();
     for (const empresaId of this.sessions.keys()) {
       try {
-        await airtable.updateWaSession(empresaId, { last_seen_at: now });
-      } catch (err) {
-        // No bloqueante. Si Airtable está down, lo veremos en otros logs.
+        await airtable.touchWaSession(empresaId, { last_seen_at: now });
+      } catch {
+        // No bloqueante.
       }
     }
   }

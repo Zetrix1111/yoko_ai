@@ -102,7 +102,7 @@ export class WaSession {
       // Mostrar también en terminal como debugging fallback
       qrTerminal.generate(qr, { small: true });
       try {
-        await airtable.updateWaSession(this.empresaId, {
+        await airtable.touchWaSession(this.empresaId, {
           status:    "qr",
           qr_string: qr,
           phone:     "",
@@ -124,7 +124,7 @@ export class WaSession {
       const phone = numeric ? `+${numeric}` : "";
       console.log(`[${this.empresaId}] CONECTADO: ${phone}`);
       try {
-        await airtable.updateWaSession(this.empresaId, {
+        await airtable.touchWaSession(this.empresaId, {
           status:       "connected",
           qr_string:    "",
           phone,
@@ -142,7 +142,7 @@ export class WaSession {
       if (code === DisconnectReason.loggedOut) {
         // El usuario cerró sesión desde su WhatsApp → estado terminal, no reconectar
         try {
-          await airtable.updateWaSession(this.empresaId, {
+          await airtable.touchWaSession(this.empresaId, {
             status:    "disconnected",
             qr_string: "",
             phone:     "",

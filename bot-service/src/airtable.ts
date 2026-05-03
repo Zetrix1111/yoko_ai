@@ -88,6 +88,18 @@ export async function updateWaSession(empresaId: string, fields: Record<string, 
   }
 }
 
+/**
+ * Como updateWaSession pero NO crea la row si no existe.
+ * Útil para heartbeat: si el usuario borra la row en Airtable, no la recreamos.
+ * El SessionManager se encargará de matar la sesión en memoria en el próximo poll.
+ */
+export async function touchWaSession(empresaId: string, fields: Record<string, any>): Promise<boolean> {
+  const existing = await findWaSession(empresaId);
+  if (!existing) return false;
+  await updateRecord("wa_sessions", existing.id, fields);
+  return true;
+}
+
 // ─────────────────────────────────────────────────────────────────────────
 // conversaciones
 // ─────────────────────────────────────────────────────────────────────────

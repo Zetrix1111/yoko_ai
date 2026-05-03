@@ -1,16 +1,19 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Plus, X, Sparkles, Users, MessageCircle, ShoppingBag, ArrowUpRight,
   Pencil, Trash2, Check, TrendingUp, Activity, Search, Package,
   Upload as UploadIcon, Image as ImageIcon, Loader2, AlertCircle,
+  Power, PowerOff, Send, Trash, Bot, User as UserIcon,
 } from 'lucide-react';
+import QRCode from 'react-qr-code';
 import {
   STATS, FUNNEL, ACTIVIDAD, CANALES, CLIENTES,
   CANAL_LABELS, ESTADO_LABELS, STOCK_LABELS, getStockStatus,
   formatPEN, formatNum, formatDate,
 } from './mockData';
 import { API, getJson, postJson, patchJson, deleteJson } from '../../../shared/api';
+import { tenantConfig } from '../../../tenants';
 
 // ─────────────────────────────────────
 // Helpers UI
@@ -600,7 +603,335 @@ export function ProductosSection() {
 }
 
 // ─────────────────────────────────────
-// 4 · CONFIGURACIÓN (incluye Canales)
+// 4 · RESPUESTAS IA (chats)
+// ─────────────────────────────────────
+
+export function RespuestasIASection() {
+  const [conversaciones, setConversaciones] = useState([]);
+  const [loading, setLoading]               = useState(true);
+  const [selectedId, setSelectedId]         = useState(null);
+  const [error, setError]                   = useState(null);
+
+  // Polling lista de conversaciones cada 3s
+  useEffect(() => {
+    let cancelled = false;
+    let timer = null;
+    const tick = async () => {
+      try {
+        const data = await getJson(API.CONVERSACIONES);
+        if (cancelled) return;
+        const list = Array.isArray(data?.conversaciones) ? data.conversaciones : [];
+        setConversaciones(list);
+        setError(null);
+        // Si no hay seleccionada, autoselect la primera
+        if (!selectedId && list.length > 0) {
+          setSelectedId(list[0].id);
+        }
+      } catch (err) {
+        if (cancelled) return;
+        console.error('[RespuestasIA] poll convs:', err);
+        setError('No se pudieron cargar las conversaciones.');
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+          timer = setTimeout(tick, 3000);
+        }
+      }
+    };
+    tick();
+    return () => { cancelled = true; if (timer) clearTimeout(timer); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const selected = conversaciones.find((c) => c.id === selectedId) || null;
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('¿Eliminar esta conversación y todos sus mensajes?')) return;
+    try {
+      await deleteJson(`${API.CONVERSACIONES}?id=${encodeURIComponent(id)}`);
+      setConversaciones((curr) => curr.filter((c) => c.id !== id));
+      if (selectedId === id) setSelectedId(null);
+    } catch (err) {
+      console.error('[RespuestasIA] delete:', err);
+      alert('No se pudo eliminar.');
+    }
+  };
+
+  const handleModoChange = async (convId, nuevoModo) => {
+    try {
+      await postJson(API.CONVERSACIONES_MODO, { conversacion_id: convId, modo: nuevoModo });
+      setConversaciones((curr) => curr.map((c) => c.id === convId ? { ...c, modo: nuevoModo } : c));
+    } catch (err) {
+      console.error('[RespuestasIA] modo:', err);
+      alert('No se pudo cambiar el modo.');
+    }
+  };
+
+  return (
+    <>
+      <SectionHeader
+        title="Respuestas IA"
+        subtitle="Conversaciones reales que la IA está manejando vía WhatsApp. Cambiá a modo HUMAN para tomar el control."
+      />
+
+      {loading && (
+        <div className="vom-card" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'center', padding: '2rem' }}>
+          <Loader2 size={18} className="ce-spin" />
+          <span style={{ color: 'var(--md-on-surface-variant)' }}>Cargando conversaciones...</span>
+        </div>
+      )}
+
+      {error && !loading && (
+        <div className="vom-card" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--md-error)' }}>
+          <AlertCircle size={18} />
+          <span>{error}</span>
+        </div>
+      )}
+
+      {!loading && !error && conversaciones.length === 0 && (
+        <div className="vom-card" style={{ textAlign: 'center', padding: '2.5rem 1rem', color: 'var(--md-on-surface-variant)' }}>
+          <MessageCircle size={32} style={{ color: 'var(--md-outline)', marginBottom: '0.5rem' }} />
+          <p style={{ margin: 0 }}>Todavía no hay conversaciones.</p>
+          <p style={{ margin: '0.25rem 0 0', fontSize: '0.85rem' }}>
+            Cuando alguien te escriba a tu WhatsApp conectado, va a aparecer acá.
+          </p>
+        </div>
+      )}
+
+      {!loading && !error && conversaciones.length > 0 && (
+        <div className="vom-chat-layout">
+          <ConversacionesList
+            items={conversaciones}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+          />
+          {selected ? (
+            <ConversacionPanel
+              conversacion={selected}
+              onModoChange={(modo) => handleModoChange(selected.id, modo)}
+              onDelete={() => handleDelete(selected.id)}
+            />
+          ) : (
+            <div className="vom-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '300px', color: 'var(--md-on-surface-variant)' }}>
+              Seleccioná una conversación
+            </div>
+          )}
+        </div>
+      )}
+    </>
+  );
+}
+
+function ConversacionesList({ items, selectedId, onSelect }) {
+  return (
+    <div className="vom-card vom-conv-list">
+      <h3 className="vom-card-title" style={{ marginBottom: '0.6rem' }}>
+        {items.length} conversaci{items.length === 1 ? 'ón' : 'ones'}
+      </h3>
+      <div className="vom-conv-list-items">
+        {items.map((c) => {
+          const isSelected = c.id === selectedId;
+          return (
+            <button
+              key={c.id}
+              type="button"
+              className={`vom-conv-item ${isSelected ? 'is-selected' : ''}`}
+              onClick={() => onSelect(c.id)}
+            >
+              <div className="vom-conv-item-top">
+                <span className="vom-conv-item-name">{c.nombre || c.phone || '—'}</span>
+                <span className={`vom-conv-modo-badge ${c.modo === 'HUMAN' ? 'human' : 'ai'}`}>
+                  {c.modo === 'HUMAN' ? 'HUMAN' : 'IA'}
+                </span>
+              </div>
+              <div className="vom-conv-item-meta">
+                {c.phone}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function ConversacionPanel({ conversacion, onModoChange, onDelete }) {
+  const [mensajes, setMensajes] = useState([]);
+  const [draft, setDraft]       = useState('');
+  const [sending, setSending]   = useState(false);
+  const [loadingMsgs, setLoadingMsgs] = useState(true);
+  const scrollRef = useRef(null);
+
+  // Polling de mensajes cada 2.5s
+  useEffect(() => {
+    let cancelled = false;
+    let timer = null;
+    const tick = async () => {
+      try {
+        const data = await getJson(`${API.MENSAJES}?conversacion_id=${encodeURIComponent(conversacion.id)}`);
+        if (cancelled) return;
+        const list = Array.isArray(data?.mensajes) ? data.mensajes : [];
+        setMensajes((prev) => {
+          // Solo actualizar si cambió el count o el último id (evita re-render innecesario)
+          if (prev.length === list.length && prev[prev.length - 1]?.id === list[list.length - 1]?.id) {
+            return prev;
+          }
+          return list;
+        });
+      } catch (err) {
+        if (cancelled) return;
+        console.error('[Panel] poll msgs:', err);
+      } finally {
+        if (!cancelled) {
+          setLoadingMsgs(false);
+          timer = setTimeout(tick, 2500);
+        }
+      }
+    };
+    setLoadingMsgs(true);
+    tick();
+    return () => { cancelled = true; if (timer) clearTimeout(timer); };
+  }, [conversacion.id]);
+
+  // Auto-scroll al fondo cuando llegan mensajes
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [mensajes.length]);
+
+  const isHuman = conversacion.modo === 'HUMAN';
+
+  const handleSend = async () => {
+    const txt = draft.trim();
+    if (!txt) return;
+    setSending(true);
+    try {
+      await postJson(API.MENSAJES, {
+        conversacion_id: conversacion.id,
+        role: 'human',
+        content: txt,
+      });
+      setDraft('');
+    } catch (err) {
+      console.error('[Panel] send:', err);
+      alert('No se pudo enviar.');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="vom-card vom-conv-panel">
+      {/* Header del panel */}
+      <div className="vom-conv-panel-header">
+        <div>
+          <div className="vom-conv-panel-name">{conversacion.nombre || conversacion.phone}</div>
+          <div className="vom-conv-panel-phone">{conversacion.phone}</div>
+        </div>
+        <div className="vom-conv-panel-actions">
+          <ModeToggle modo={conversacion.modo} onChange={onModoChange} />
+          <button className="vom-icon-btn danger" title="Borrar" onClick={onDelete}>
+            <Trash size={14} />
+          </button>
+        </div>
+      </div>
+
+      {/* Mensajes */}
+      <div className="vom-conv-msgs" ref={scrollRef}>
+        {loadingMsgs && mensajes.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--md-on-surface-variant)' }}>
+            Cargando mensajes...
+          </div>
+        ) : mensajes.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--md-on-surface-variant)' }}>
+            Sin mensajes todavía.
+          </div>
+        ) : (
+          mensajes.map((m) => <MessageBubble key={m.id} mensaje={m} />)
+        )}
+      </div>
+
+      {/* Composer (solo en HUMAN) */}
+      <div className="vom-conv-composer">
+        {isHuman ? (
+          <>
+            <input
+              type="text"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !sending) handleSend(); }}
+              placeholder="Escribí tu respuesta..."
+              disabled={sending}
+              className="vom-composer-input"
+            />
+            <button
+              className="vom-btn vom-btn-primary"
+              onClick={handleSend}
+              disabled={sending || !draft.trim()}
+              style={{ padding: '0.55rem 0.95rem' }}
+            >
+              {sending ? <Loader2 size={14} className="ce-spin" /> : <Send size={14} />}
+            </button>
+          </>
+        ) : (
+          <div className="vom-composer-disabled">
+            <Bot size={14} /> El bot responde automáticamente. Cambiá a modo HUMAN para tomar el control.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ModeToggle({ modo, onChange }) {
+  return (
+    <div className="vom-mode-toggle">
+      <button
+        type="button"
+        className={`vom-mode-option ${modo === 'AI' ? 'is-active ai' : ''}`}
+        onClick={() => onChange('AI')}
+      >
+        <Bot size={12} /> IA
+      </button>
+      <button
+        type="button"
+        className={`vom-mode-option ${modo === 'HUMAN' ? 'is-active human' : ''}`}
+        onClick={() => onChange('HUMAN')}
+      >
+        <UserIcon size={12} /> HUMAN
+      </button>
+    </div>
+  );
+}
+
+function MessageBubble({ mensaje }) {
+  // user → izquierda (cliente), assistant/human → derecha (la empresa)
+  const isInbound = mensaje.role === 'user';
+  const variant = mensaje.role === 'human' ? 'human' : (mensaje.role === 'assistant' ? 'ai' : 'user');
+  return (
+    <div className={`vom-msg-row ${isInbound ? 'inbound' : 'outbound'}`}>
+      <div className={`vom-msg-bubble ${variant}`}>
+        <div className="vom-msg-content">{mensaje.content}</div>
+        <div className="vom-msg-time">
+          {mensaje.created_at ? formatTime(mensaje.created_at) : ''}
+          {mensaje.role === 'human' && <span className="vom-msg-who"> · humano</span>}
+          {mensaje.role === 'assistant' && <span className="vom-msg-who"> · IA</span>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function formatTime(iso) {
+  try {
+    const d = new Date(iso);
+    return d.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
+  } catch { return ''; }
+}
+
+// ─────────────────────────────────────
+// 5 · CONFIGURACIÓN (incluye Canales)
 // ─────────────────────────────────────
 
 function ConfigCard({ title, description, summary, enabled, onToggle, children }) {
@@ -622,11 +953,77 @@ function ConfigCard({ title, description, summary, enabled, onToggle, children }
 }
 
 function CanalesBlock() {
-  const [canales, setCanales] = useState(CANALES);
-  const toggleCanal = (id) => {
-    setCanales(canales.map((c) => c.id === id ? { ...c, conectado: !c.conectado } : c));
+  const [session, setSession] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const empresaId = tenantConfig.id || 'cmejia';
+
+  // Polling de /api/wa: cada 2s si no está conectado, cada 15s si lo está
+  // (para detectar desconexiones externas).
+  useEffect(() => {
+    let cancelled = false;
+    let timer = null;
+
+    const tick = async () => {
+      try {
+        const data = await getJson(`${API.WA}?empresa_id=${encodeURIComponent(empresaId)}`);
+        if (cancelled) return;
+        setSession(data.session);
+        setError(null);
+      } catch (err) {
+        if (cancelled) return;
+        console.error('[CanalesBlock] poll error:', err);
+        setError('No se pudo consultar el estado. Reintentando...');
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+          // El delay depende del estado actual leído (de session)
+          // Releemos session via callback de setState para evitar stale closure
+          setSession((curr) => {
+            const status = curr?.status;
+            const next = status === 'connected' ? 15000 : 2000;
+            timer = setTimeout(tick, next);
+            return curr;
+          });
+        }
+      }
+    };
+    tick();
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [empresaId]);
+
+  const handleConnect = async () => {
+    setActionLoading(true);
+    try {
+      await postJson(`${API.WA}?action=connect`, { empresa_id: empresaId });
+    } catch (err) {
+      console.error('[CanalesBlock] connect:', err);
+      alert('No se pudo iniciar la conexión.');
+    } finally {
+      setActionLoading(false);
+    }
   };
-  const conectados = canales.filter((c) => c.conectado).length;
+
+  const handleDisconnect = async () => {
+    if (!window.confirm('¿Desconectar WhatsApp? El bot dejará de recibir y enviar mensajes.')) return;
+    setActionLoading(true);
+    try {
+      await postJson(`${API.WA}?action=disconnect`, { empresa_id: empresaId });
+    } catch (err) {
+      console.error('[CanalesBlock] disconnect:', err);
+      alert('No se pudo desconectar.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const status = session?.status || 'disconnected';
+  const qrString = session?.qr_string;
+  const phone = session?.phone;
 
   return (
     <div className="vom-card">
@@ -634,47 +1031,156 @@ function CanalesBlock() {
         <div className="vom-config-title-block">
           <h3 className="vom-card-title">Canales</h3>
           <p className="vom-config-description">
-            Conecta tus canales de mensajería para que la IA reciba y responda
-            mensajes en una sola bandeja unificada.
+            Conecta tu WhatsApp Business para que la IA reciba y responda
+            mensajes automáticamente. Más canales próximamente.
           </p>
         </div>
         <div className="vom-config-controls">
           <span className="vom-config-summary">
-            {conectados} de {canales.length} conectados
+            {status === 'connected' ? '1 conectado' : 'Sin conectar'}
           </span>
-          <button className="vom-btn vom-btn-ghost" style={{ padding: '0.45rem 0.85rem', fontSize: '0.82rem' }}>
-            <Plus size={14} /> Conectar canal
-          </button>
         </div>
       </div>
 
       <div className="vom-config-body" style={{ marginTop: '1.1rem', paddingTop: '1.1rem', borderTop: '1px solid #E2E8F0' }}>
-        <div className="vom-channel-list">
-          {canales.map((c) => (
-            <div key={c.id} className={`vom-channel-row ${c.conectado ? 'connected' : 'disconnected'}`}>
+        {loading ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--md-on-surface-variant)', padding: '1rem' }}>
+            <Loader2 size={16} className="ce-spin" />
+            Consultando estado de la conexión...
+          </div>
+        ) : (
+          <WhatsAppCard
+            status={status}
+            qrString={qrString}
+            phone={phone}
+            error={error}
+            actionLoading={actionLoading}
+            onConnect={handleConnect}
+            onDisconnect={handleDisconnect}
+          />
+        )}
+
+        {/* Otros canales — placeholders */}
+        <div className="vom-channel-list" style={{ marginTop: '0.85rem' }}>
+          {[
+            { id: 'facebook',  nombre: 'Facebook Messenger' },
+            { id: 'instagram', nombre: 'Instagram DM' },
+            { id: 'linkedin',  nombre: 'LinkedIn' },
+          ].map((c) => (
+            <div key={c.id} className="vom-channel-row disconnected" style={{ opacity: 0.5 }}>
               <div className="vom-channel-icon">
                 <MessageCircle size={18} />
               </div>
               <div className="vom-channel-info">
                 <div className="vom-channel-name">{c.nombre}</div>
-                <div className="vom-channel-meta">
-                  {c.numero} {c.conectado && `· ${c.mensajesHoy} mensajes hoy`}
-                </div>
+                <div className="vom-channel-meta">Próximamente</div>
               </div>
-              <span className={`vom-channel-status ${c.conectado ? 'connected' : 'disconnected'}`}>
-                {c.conectado ? 'Conectado' : 'No conectado'}
-              </span>
-              <Toggle
-                checked={c.conectado}
-                onChange={() => toggleCanal(c.id)}
-                ariaLabel={`Conectar ${c.nombre}`}
-              />
+              <span className="vom-channel-status disconnected">No disponible</span>
             </div>
           ))}
         </div>
       </div>
     </div>
   );
+}
+
+function WhatsAppCard({ status, qrString, phone, error, actionLoading, onConnect, onDisconnect }) {
+  // Estados visuales:
+  //   - disconnected → CTA "Vincular WhatsApp"
+  //   - qr (sin qr_string aún) → "Generando QR..."
+  //   - qr (con qr_string)     → mostrar QR escaneable
+  //   - connecting             → "Conectando..."
+  //   - connected              → "Conectado · phone" + Desconectar
+  return (
+    <div className={`vom-channel-row ${status === 'connected' ? 'connected' : 'disconnected'}`} style={{ flexDirection: 'column', alignItems: 'stretch', gap: '1rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', width: '100%' }}>
+        <div className="vom-channel-icon">
+          <MessageCircle size={18} />
+        </div>
+        <div className="vom-channel-info" style={{ flex: 1 }}>
+          <div className="vom-channel-name">WhatsApp Business</div>
+          <div className="vom-channel-meta">
+            {status === 'connected' && phone ? phone : statusLabel(status)}
+          </div>
+        </div>
+        <span className={`vom-channel-status ${status === 'connected' ? 'connected' : 'disconnected'}`}>
+          {statusLabel(status)}
+        </span>
+
+        {status === 'disconnected' && (
+          <button
+            className="vom-btn vom-btn-primary"
+            onClick={onConnect}
+            disabled={actionLoading}
+            style={{ padding: '0.5rem 0.95rem', fontSize: '0.85rem' }}
+          >
+            {actionLoading ? <Loader2 size={14} className="ce-spin" /> : <Power size={14} />}
+            Vincular WhatsApp
+          </button>
+        )}
+
+        {status === 'connected' && (
+          <button
+            className="vom-btn vom-btn-ghost"
+            onClick={onDisconnect}
+            disabled={actionLoading}
+            style={{ padding: '0.5rem 0.95rem', fontSize: '0.85rem' }}
+          >
+            {actionLoading ? <Loader2 size={14} className="ce-spin" /> : <PowerOff size={14} />}
+            Desconectar
+          </button>
+        )}
+      </div>
+
+      {/* QR */}
+      {(status === 'qr' || status === 'connecting') && (
+        <div style={{
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          padding: '1.25rem', background: 'var(--md-surface)', borderRadius: '12px',
+          border: '1px solid var(--md-outline-variant)',
+        }}>
+          {qrString ? (
+            <>
+              <div style={{ background: 'white', padding: '12px', borderRadius: '12px' }}>
+                <QRCode value={qrString} size={240} />
+              </div>
+              <p style={{ marginTop: '1rem', fontSize: '0.88rem', color: 'var(--md-on-surface)', textAlign: 'center', maxWidth: 320 }}>
+                <strong>Escaneá con tu WhatsApp:</strong><br />
+                Ajustes → Dispositivos vinculados → Vincular un dispositivo
+              </p>
+              <p style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: 'var(--md-on-surface-variant)', textAlign: 'center' }}>
+                El QR se actualiza cada ~30 segundos automáticamente.
+              </p>
+            </>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.6rem', padding: '2rem' }}>
+              <Loader2 size={32} className="ce-spin" style={{ color: 'var(--md-primary)' }} />
+              <p style={{ fontSize: '0.88rem', color: 'var(--md-on-surface-variant)' }}>
+                {status === 'connecting' ? 'Conectando...' : 'Generando código QR...'}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {error && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.78rem', color: 'var(--md-error)' }}>
+          <AlertCircle size={14} />
+          {error}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function statusLabel(status) {
+  switch (status) {
+    case 'connected':    return 'Conectado';
+    case 'connecting':   return 'Conectando...';
+    case 'qr':           return 'Esperando escaneo';
+    case 'disconnected':
+    default:             return 'No conectado';
+  }
 }
 
 export function ConfiguracionSection() {
