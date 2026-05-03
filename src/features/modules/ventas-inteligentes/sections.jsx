@@ -6,10 +6,8 @@ import {
   Upload as UploadIcon, Image as ImageIcon, Loader2, AlertCircle,
   Power, PowerOff, Send, Trash, Bot, User as UserIcon,
 } from 'lucide-react';
-// react-qr-code es CJS y Vite a veces interopera mal el default,
-// devolviendo el namespace object en lugar del componente. Fallback robusto.
-import * as ReactQRCodeMod from 'react-qr-code';
-const QRCode = ReactQRCodeMod.default || ReactQRCodeMod;
+// qrcode.react: named exports estables, sin problemas de interop CJS/ESM.
+import { QRCodeSVG } from 'qrcode.react';
 import {
   STATS, FUNNEL, ACTIVIDAD, CANALES, CLIENTES,
   CANAL_LABELS, ESTADO_LABELS, STOCK_LABELS, getStockStatus,
@@ -1000,6 +998,15 @@ function ConfigCard({ title, description, summary, enabled, onToggle, children }
 }
 
 function CanalesBlock() {
+  return (
+    <>
+      <WhatsAppBlock />
+      <ProximamenteBlock />
+    </>
+  );
+}
+
+function WhatsAppBlock() {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -1074,15 +1081,15 @@ function CanalesBlock() {
     <div className="vom-card">
       <div className="vom-config-header">
         <div className="vom-config-title-block">
-          <h3 className="vom-card-title">Canales</h3>
+          <h3 className="vom-card-title">WhatsApp Business</h3>
           <p className="vom-config-description">
-            Conecta tu WhatsApp Business para que la IA reciba y responda
-            mensajes automáticamente. Más canales próximamente.
+            Conectá tu número de WhatsApp para que la IA reciba y responda
+            mensajes automáticamente.
           </p>
         </div>
         <div className="vom-config-controls">
           <span className="vom-config-summary">
-            {status === 'connected' ? '1 conectado' : 'Sin conectar'}
+            {status === 'connected' ? 'Conectado' : 'Sin conectar'}
           </span>
         </div>
       </div>
@@ -1104,9 +1111,25 @@ function CanalesBlock() {
             onDisconnect={handleDisconnect}
           />
         )}
+      </div>
+    </div>
+  );
+}
 
-        {/* Otros canales — placeholders */}
-        <div className="vom-channel-list" style={{ marginTop: '0.85rem' }}>
+// Bloque separado para canales en roadmap. Sin lógica, solo placeholders.
+function ProximamenteBlock() {
+  return (
+    <div className="vom-card">
+      <div className="vom-config-header">
+        <div className="vom-config-title-block">
+          <h3 className="vom-card-title">Próximamente</h3>
+          <p className="vom-config-description">
+            Estos canales se podrán conectar en próximas versiones.
+          </p>
+        </div>
+      </div>
+      <div className="vom-config-body" style={{ marginTop: '1.1rem', paddingTop: '1.1rem', borderTop: '1px solid #E2E8F0' }}>
+        <div className="vom-channel-list">
           {[
             { id: 'facebook',  nombre: 'Facebook Messenger' },
             { id: 'instagram', nombre: 'Instagram DM' },
@@ -1193,7 +1216,7 @@ function WhatsAppCard({ status, qrString, phone, error, actionLoading, onConnect
           {qrStr ? (
             <>
               <div style={{ background: 'white', padding: '12px', borderRadius: '12px' }}>
-                <QRCode value={qrStr} size={240} />
+                <QRCodeSVG value={qrStr} size={240} level="M" />
               </div>
               <p style={{ marginTop: '1rem', fontSize: '0.88rem', color: 'var(--md-on-surface)', textAlign: 'center', maxWidth: 320 }}>
                 <strong>Escaneá con tu WhatsApp:</strong><br />
