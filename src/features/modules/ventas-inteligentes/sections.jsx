@@ -976,26 +976,9 @@ function formatTime(iso) {
 }
 
 // ─────────────────────────────────────
-// 5 · CONFIGURACIÓN (incluye Canales)
+// 5 · CONFIGURACIÓN (solo Canales WhatsApp)
 // ─────────────────────────────────────
 
-function ConfigCard({ title, description, summary, enabled, onToggle, children }) {
-  return (
-    <div className={`vom-card vom-config-card ${enabled ? 'is-on' : ''}`}>
-      <div className="vom-config-header">
-        <div className="vom-config-title-block">
-          <h3 className="vom-card-title">{title}</h3>
-          {description && <p className="vom-config-description">{description}</p>}
-        </div>
-        <div className="vom-config-controls">
-          {summary && <span className="vom-config-summary">{summary}</span>}
-          <Toggle checked={enabled} onChange={onToggle} ariaLabel={title} />
-        </div>
-      </div>
-      {enabled && children && <div className="vom-config-body">{children}</div>}
-    </div>
-  );
-}
 
 function CanalesBlock() {
   return (
@@ -1258,58 +1241,17 @@ function statusLabel(status) {
 }
 
 export function ConfiguracionSection() {
-  const [webhooks, setWebhooks] = useState(true);
-  const [integraciones, setIntegraciones] = useState(true);
-  const [ajustes, setAjustes] = useState(false);
-
   return (
     <>
       <SectionHeader
         title="Configuración"
-        subtitle="Conecta canales, dispara automatizaciones externas y personaliza el comportamiento de la IA."
+        subtitle="Conectá tu WhatsApp para que la IA reciba y responda mensajes automáticamente."
       />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        {/* Canales como bloque destacado dentro de Configuración */}
         <SectionErrorBoundary>
           <CanalesBlock />
         </SectionErrorBoundary>
-
-        <ConfigCard
-          title="Webhooks"
-          description="Dispara eventos hacia URLs externas: lead nuevo, venta cerrada, mensaje escalado a humano."
-          summary={webhooks ? '3 endpoints activos' : 'Sin endpoints'}
-          enabled={webhooks}
-          onToggle={setWebhooks}
-        >
-          <div style={{ fontSize: '0.85rem', color: 'var(--md-on-surface-variant)' }}>
-            lead.created · sale.closed · message.escalated
-          </div>
-        </ConfigCard>
-
-        <ConfigCard
-          title="Integraciones (Make)"
-          description="Automatiza con Make, n8n o Zapier. Genera cotizaciones, registra ventas en CONCAR, notifica vendedores."
-          summary={integraciones ? '2 escenarios activos' : 'Sin escenarios'}
-          enabled={integraciones}
-          onToggle={setIntegraciones}
-        >
-          <div style={{ fontSize: '0.85rem', color: 'var(--md-on-surface-variant)' }}>
-            Cotización automática · Registro contable
-          </div>
-        </ConfigCard>
-
-        <ConfigCard
-          title="Ajustes generales"
-          description="Tono, idioma y reglas de negocio que aplica la IA al responder a tus clientes."
-          summary={ajustes ? 'Personalizado' : 'Default'}
-          enabled={ajustes}
-          onToggle={setAjustes}
-        >
-          <div style={{ fontSize: '0.85rem', color: 'var(--md-on-surface-variant)' }}>
-            Tono: profesional cálido · Idioma: español peruano
-          </div>
-        </ConfigCard>
       </div>
     </>
   );
