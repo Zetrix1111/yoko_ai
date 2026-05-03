@@ -74,32 +74,14 @@ class handler(BaseHTTPRequestHandler):
                 print(f"[chat] User inválido: {e}", file=sys.stderr)
                 return self._json(400, {"error": "Datos del usuario inválidos."})
 
-            # 4) Cargar configuración (estática + dinámica)
+            # 4) Cargar configuración (estática + dinámica). Desde el paso 6
+            # los datos editables viven en Airtable (Config_Empresa /
+            # Config_Ventas), así que el body ya no necesita inyectar overrides.
             try:
                 config = config_loader.load_full_config()
             except AirtableError as e:
                 print(f"[chat] AirtableError al cargar config: {e}", file=sys.stderr)
                 return self._json(502, {"error": "Error al consultar la base de datos."})
-
-            # 4b) Override desde el body (paso 5: localStorage bridge).
-            # El frontend persiste name/ruc/razon_social/sistema_contable y los
-            # toggles del proceso en localStorage. Acá los inyectamos al config
-            # para que el prompt los use sin tocar config_loader ni Airtable.
-            empresa_ctx = body.get("empresa_context") or {}
-            if isinstance(empresa_ctx, dict) and empresa_ctx:
-                emp = config.setdefault("empresa", {})
-                for key in ("name", "razon_social", "ruc", "sistema_contable"):
-                    val = empresa_ctx.get(key)
-                    if val:
-                        emp[key] = val
-
-            proceso_ctx = body.get("proceso_context") or {}
-            if isinstance(proceso_ctx, dict):
-                cc_override = proceso_ctx.get("caja_chica") or {}
-                if isinstance(cc_override, dict) and cc_override:
-                    proc = config.setdefault("proceso", {})
-                    cc = proc.setdefault("caja_chica", {})
-                    cc.update(cc_override)
 
             # 5) Armar el system prompt y la lista de tools
             try:

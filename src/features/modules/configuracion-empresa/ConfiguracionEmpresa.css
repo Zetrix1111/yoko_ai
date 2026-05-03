@@ -637,21 +637,6 @@
   font-weight: 500;
 }
 
-/* Banner de aviso "guardado en localStorage" — se quita cuando esté Airtable */
-.ce-warning-banner {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0.75rem 1rem;
-  margin-bottom: 1rem;
-  border: 1px solid #FCD34D;
-  border-radius: 10px;
-  background: #FEF3C7;
-  color: #92400E;
-  font-size: 0.85rem;
-  line-height: 1.4;
-}
-
 @media (max-width: 640px) {
   .ce-redes-row { grid-template-columns: 110px 1fr auto; }
 }

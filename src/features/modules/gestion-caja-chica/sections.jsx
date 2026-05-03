@@ -1,31 +1,16 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Plus, X, Check, XCircle, CreditCard, Search,
   TrendingUp, Wallet, Clock, ShieldCheck, ArrowUpRight,
-  Upload as UploadIcon, AlertCircle, CheckCircle2,
+  Upload as UploadIcon, AlertCircle, CheckCircle2, Loader2,
 } from 'lucide-react';
 import {
   STATS, SOLICITUDES, PAGOS, RENDICIONES,
   REPORTE_AREAS, REPORTE_USUARIOS, TIPOS_GASTO,
   AREAS, formatPEN, formatDate,
 } from './mockData';
-import { tenantConfig } from '../../../tenants';
-
-// Bridge a localStorage hasta que la persistencia en Airtable esté lista (paso 5).
-// Se reusa la MISMA key que ConfiguracionEmpresaScreen para guardar empresa
-// + proceso en un solo blob por tenant.
-const EMPRESA_STORAGE_KEY = `empresa_context_${tenantConfig.id}`;
-
-function loadProcesoCajaChica() {
-  try {
-    const raw = localStorage.getItem(EMPRESA_STORAGE_KEY);
-    const ctx = raw ? JSON.parse(raw) : {};
-    return ctx.proceso?.caja_chica || {};
-  } catch {
-    return {};
-  }
-}
+import { useEmpresaConfig } from '../../../shared/useEmpresaConfig';
 
 // ─────────────────────────────────────
 // Helpers UI
@@ -656,51 +641,63 @@ function ConfigCard({ title, titleBadge, description, summary, enabled, onToggle
 // 6 · CONFIGURACIÓN
 // ─────────────────────────────────────
 export function ConfiguracionSection() {
-  // Estado inicial leído desde localStorage (paso 5: bridge a Airtable).
-  // Defaults vacíos / off cuando el cliente entra por primera vez.
-  const proceso = loadProcesoCajaChica();
+  // Estado inicial leído desde Airtable (Config_Empresa.data.proceso.caja_chica).
+  // Esta pantalla no edita basicos ni info_extendida, pero al guardar los preserva.
+  const { data, loading, saving, save } = useEmpresaConfig('empresa');
 
-  const [aprobadoresEnabled,  setAprobadoresEnabled]  = useState(proceso.requiere_aprobacion ?? true);
-  const [aprobadores,         setAprobadores]         = useState(proceso.num_aprobadores ?? 2);
-  const [maxMontoEnabled,     setMaxMontoEnabled]     = useState(proceso.monto_maximo_activo ?? false);
-  const [maxMonto,            setMaxMonto]            = useState(proceso.monto_maximo ?? 0);
-  const [aprobRendicionEnabled, setAprobRendicionEnabled] = useState(proceso.aprobacion_rendicion ?? false);
-  const [aplicaCentroCosto,   setAplicaCentroCosto]   = useState(proceso.aplica_centro_costo ?? false);
-  const [aplicaTipoGasto,     setAplicaTipoGasto]     = useState(proceso.aplica_tipo_gasto ?? false);
-  const [seguimientoIA,       setSeguimientoIA]       = useState(proceso.seguimiento_ia ?? false);
+  const [aprobadoresEnabled,  setAprobadoresEnabled]  = useState(true);
+  const [aprobadores,         setAprobadores]         = useState(2);
+  const [maxMontoEnabled,     setMaxMontoEnabled]     = useState(false);
+  const [maxMonto,            setMaxMonto]            = useState(0);
+  const [aprobRendicionEnabled, setAprobRendicionEnabled] = useState(false);
+  const [aplicaCentroCosto,   setAplicaCentroCosto]   = useState(false);
+  const [aplicaTipoGasto,     setAplicaTipoGasto]     = useState(false);
+  const [seguimientoIA,       setSeguimientoIA]       = useState(false);
 
   const [savedHint, setSavedHint] = useState(false);
   const [saveError, setSaveError] = useState(null);
 
-  const handleSave = () => {
+  // Hidratar el form cuando llegan los datos de Airtable.
+  useEffect(() => {
+    if (!data) return;
+    const cc = data.proceso?.caja_chica || {};
+    setAprobadoresEnabled(cc.requiere_aprobacion ?? true);
+    setAprobadores(cc.num_aprobadores ?? 2);
+    setMaxMontoEnabled(cc.monto_maximo_activo ?? false);
+    setMaxMonto(cc.monto_maximo ?? 0);
+    setAprobRendicionEnabled(cc.aprobacion_rendicion ?? false);
+    setAplicaCentroCosto(cc.aplica_centro_costo ?? false);
+    setAplicaTipoGasto(cc.aplica_tipo_gasto ?? false);
+    setSeguimientoIA(cc.seguimiento_ia ?? false);
+  }, [data]);
+
+  // Guardar SOLO el bloque proceso. basicos e info_extendida se preservan
+  // intactos para no pisar lo que escribió Configuración Empresa.
+  const handleSave = async () => {
     setSaveError(null);
-    try {
-      // Merge no destructivo: respetamos lo que haya guardado la pantalla
-      // de Configuración Empresa (name, ruc, razon_social, sistema_contable).
-      const raw = localStorage.getItem(EMPRESA_STORAGE_KEY);
-      const existing = raw ? JSON.parse(raw) : {};
-      const updated = {
-        ...existing,
-        proceso: {
-          ...(existing.proceso || {}),
-          caja_chica: {
-            requiere_aprobacion:  aprobadoresEnabled,
-            num_aprobadores:      aprobadores,
-            monto_maximo_activo:  maxMontoEnabled,
-            monto_maximo:         maxMonto,
-            aprobacion_rendicion: aprobRendicionEnabled,
-            aplica_centro_costo:  aplicaCentroCosto,
-            aplica_tipo_gasto:    aplicaTipoGasto,
-            seguimiento_ia:       seguimientoIA,
-          },
+    const payload = {
+      basicos:        data?.basicos || {},
+      info_extendida: data?.info_extendida || {},
+      proceso: {
+        ...(data?.proceso || {}),
+        caja_chica: {
+          requiere_aprobacion:  aprobadoresEnabled,
+          num_aprobadores:      aprobadores,
+          monto_maximo_activo:  maxMontoEnabled,
+          monto_maximo:         maxMonto,
+          aprobacion_rendicion: aprobRendicionEnabled,
+          aplica_centro_costo:  aplicaCentroCosto,
+          aplica_tipo_gasto:    aplicaTipoGasto,
+          seguimiento_ia:       seguimientoIA,
         },
-      };
-      localStorage.setItem(EMPRESA_STORAGE_KEY, JSON.stringify(updated));
+      },
+    };
+    const ok = await save(payload);
+    if (ok) {
       setSavedHint(true);
       setTimeout(() => setSavedHint(false), 2500);
-    } catch (err) {
-      console.error('[GestionCaja] save proceso:', err);
-      setSaveError('No se pudo guardar localmente.');
+    } else {
+      setSaveError('No se pudo guardar. Intentá de nuevo.');
     }
   };
 
@@ -710,12 +707,6 @@ export function ConfiguracionSection() {
         title="Configuración"
         subtitle="Activa o desactiva las reglas de negocio que aplican a los procesos."
       />
-
-      <div className="gcc-warning-banner">
-        <AlertCircle size={16} />
-        Estos datos se guardan localmente en este navegador. La sincronización
-        con Airtable se habilitará próximamente.
-      </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         <ConfigCard
@@ -799,8 +790,13 @@ export function ConfiguracionSection() {
             type="button"
             className="gcc-btn-primary"
             onClick={handleSave}
+            disabled={saving || loading}
           >
-            Guardar configuración
+            {saving ? (
+              <><Loader2 size={14} className="ce-spin" /> Guardando...</>
+            ) : (
+              <>Guardar configuración</>
+            )}
           </button>
           {savedHint && (
             <span className="gcc-saved-hint">

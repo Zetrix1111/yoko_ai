@@ -823,21 +823,6 @@
   .gcc-stat-value { font-size: 1.5rem; }
 }
 
-/* ── Banner de aviso "guardado en localStorage" (paso 5, transitorio) ── */
-.gcc-warning-banner {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0.75rem 1rem;
-  margin-bottom: 1rem;
-  border: 1px solid #FCD34D;
-  border-radius: 10px;
-  background: #FEF3C7;
-  color: #92400E;
-  font-size: 0.85rem;
-  line-height: 1.4;
-}
-
 /* ── Action bar de la pantalla de Configuración ── */
 .gcc-config-actions {
   display: flex;

@@ -80,7 +80,6 @@ class handler(BaseHTTPRequestHandler):
             if r == "wa":             return _wa_get(self)
             if r == "conversaciones": return _conversaciones_get(self)
             if r == "mensajes":       return _mensajes_get(self)
-            if r == "config":         return _ventas_config_get(self)
             return self._json(400, {"error": f"resource '{r}' no soporta GET."})
         except Exception as e:
             return self._handle_unhandled(e)
@@ -92,7 +91,6 @@ class handler(BaseHTTPRequestHandler):
             if r == "mensajes":            return _mensajes_post(self)
             if r == "conversaciones_modo": return _modo_post(self)
             if r == "sales_chat":          return _sales_chat_post(self)
-            if r == "config":              return _ventas_config_post(self)
             return self._json(400, {"error": f"resource '{r}' no soporta POST."})
         except Exception as e:
             return self._handle_unhandled(e)
@@ -466,13 +464,16 @@ def _sales_chat_post(self):
 
         empresa_full = full_config.get("empresa") or {}
 
+        # Desde el paso 6: Airtable (Config_Empresa) es la fuente de verdad.
+        # El body solo se usa como fallback por si el bot llama antes de que
+        # la fila exista en Airtable.
         config = {
             "empresa": {
                 "id":               empresa_id,
-                "name":             (body.get("name") or "").strip() or empresa_full.get("name"),
-                "razon_social":     (body.get("razon_social") or "").strip() or empresa_full.get("razon_social"),
-                "ruc":              (body.get("ruc") or "").strip() or empresa_full.get("ruc"),
-                "sistema_contable": (body.get("sistema_contable") or "").strip() or empresa_full.get("sistema_contable"),
+                "name":             empresa_full.get("name") or (body.get("name") or "").strip(),
+                "razon_social":     empresa_full.get("razon_social") or (body.get("razon_social") or "").strip(),
+                "ruc":              empresa_full.get("ruc") or (body.get("ruc") or "").strip(),
+                "sistema_contable": empresa_full.get("sistema_contable") or (body.get("sistema_contable") or "").strip(),
                 "info_extendida":   empresa_full.get("info_extendida", {}),
             },
             "ventas": full_config.get("ventas", {}),
@@ -510,214 +511,3 @@ def _sales_chat_post(self):
         return self._json(200, {"reply": reply})
     except json.JSONDecodeError:
         return self._json(400, {"error": "JSON inválido."})
-
-
-# ─────────────────────────────────────────────────────────────────────────
-# resource=config — CRUD del bloque ventas (consumido por la UI)
-# ─────────────────────────────────────────────────────────────────────────
-
-_TABLA_CFG_VENTAS = "Config_Ventas"
-
-
-def _validate_ventas_payload(payload: dict) -> dict:
-    """
-    Valida y normaliza el payload entrante. Reglas:
-      • Cada toggle debe tener {activo, valor} con tipo correcto.
-      • Enums fuera del listado permitido → reemplazo por el default del campo.
-      • info_adicional.valor[] → cada entrada con categoria/titulo/respuesta válidos;
-        truncado a INFO_ADICIONAL_MAX entradas.
-      • Campos no en el schema se ignoran silenciosamente.
-    Devuelve el dict listo para serializar a Airtable.
-    """
-    cleaned = config_loader._default_ventas_config()
-    if not isinstance(payload, dict):
-        return cleaned
-
-    enums = config_loader.VENTAS_ENUMS
-
-    # estilo_vendedor
-    src = payload.get("estilo_vendedor")
-    if isinstance(src, dict):
-        cleaned["estilo_vendedor"]["activo"] = bool(src.get("activo"))
-        v = src.get("valor")
-        if v in enums["estilo_vendedor"]:
-            cleaned["estilo_vendedor"]["valor"] = v
-
-    # nombre_vendedor
-    src = payload.get("nombre_vendedor")
-    if isinstance(src, dict):
-        cleaned["nombre_vendedor"]["activo"] = bool(src.get("activo"))
-        cleaned["nombre_vendedor"]["valor"] = str(src.get("valor") or "").strip()
-
-    # tipo_cliente
-    src = payload.get("tipo_cliente")
-    if isinstance(src, dict):
-        cleaned["tipo_cliente"]["activo"] = bool(src.get("activo"))
-        v = src.get("valor")
-        if v in enums["tipo_cliente"]:
-            cleaned["tipo_cliente"]["valor"] = v
-
-    # zona_cobertura, tiempo_entrega → texto libre
-    for key in ("zona_cobertura", "tiempo_entrega"):
-        src = payload.get(key)
-        if isinstance(src, dict):
-            cleaned[key]["activo"] = bool(src.get("activo"))
-            cleaned[key]["valor"] = str(src.get("valor") or "").strip()
-
-    # metodos_pago: array de enums
-    src = payload.get("metodos_pago")
-    if isinstance(src, dict):
-        cleaned["metodos_pago"]["activo"] = bool(src.get("activo"))
-        valores = src.get("valor")
-        if isinstance(valores, list):
-            cleaned["metodos_pago"]["valor"] = [
-                v for v in valores if v in enums["metodos_pago"]
-            ]
-
-    # politica_precios: dict {igv, comprobantes}
-    src = payload.get("politica_precios")
-    if isinstance(src, dict):
-        cleaned["politica_precios"]["activo"] = bool(src.get("activo"))
-        v = src.get("valor")
-        if isinstance(v, dict):
-            igv = v.get("igv")
-            comp = v.get("comprobantes")
-            if igv in enums["politica_precios.igv"]:
-                cleaned["politica_precios"]["valor"]["igv"] = igv
-            if comp in enums["politica_precios.comprobantes"]:
-                cleaned["politica_precios"]["valor"]["comprobantes"] = comp
-
-    # asesor_humano: dict {nombre, telefono}
-    src = payload.get("asesor_humano")
-    if isinstance(src, dict):
-        cleaned["asesor_humano"]["activo"] = bool(src.get("activo"))
-        v = src.get("valor")
-        if isinstance(v, dict):
-            cleaned["asesor_humano"]["valor"] = {
-                "nombre":   str(v.get("nombre") or "").strip(),
-                "telefono": str(v.get("telefono") or "").strip(),
-            }
-
-    # criterios_derivacion: array de enums
-    src = payload.get("criterios_derivacion")
-    if isinstance(src, dict):
-        cleaned["criterios_derivacion"]["activo"] = bool(src.get("activo"))
-        valores = src.get("valor")
-        if isinstance(valores, list):
-            cleaned["criterios_derivacion"]["valor"] = [
-                v for v in valores if v in enums["criterios_derivacion"]
-            ]
-
-    # horario_ia
-    src = payload.get("horario_ia")
-    if isinstance(src, dict):
-        cleaned["horario_ia"]["activo"] = bool(src.get("activo"))
-        v = src.get("valor")
-        if v in enums["horario_ia"]:
-            cleaned["horario_ia"]["valor"] = v
-
-    # info_adicional: array de entradas
-    src = payload.get("info_adicional")
-    if isinstance(src, dict):
-        cleaned["info_adicional"]["activo"] = bool(src.get("activo"))
-        valores = src.get("valor")
-        if isinstance(valores, list):
-            entradas = []
-            for e in valores:
-                if not isinstance(e, dict):
-                    continue
-                cat = e.get("categoria")
-                if cat not in enums["info_adicional.categoria"]:
-                    continue
-                titulo = str(e.get("titulo") or "").strip()
-                respuesta = str(e.get("respuesta") or "").strip()
-                if not titulo or not respuesta:
-                    continue
-                entradas.append({
-                    "categoria":       cat,
-                    "titulo":          titulo[:120],
-                    "respuesta":       respuesta[:600],
-                    "vigencia_inicio": e.get("vigencia_inicio") or None,
-                    "vigencia_fin":    e.get("vigencia_fin") or None,
-                })
-            cleaned["info_adicional"]["valor"] = entradas[:config_loader.INFO_ADICIONAL_MAX]
-
-    return cleaned
-
-
-def _ventas_config_find_row(empresa_id: str) -> dict | None:
-    formula = f"{{empresa_id}}='{empresa_id}'"
-    try:
-        rows = airtable_client.list_records(_TABLA_CFG_VENTAS, filter_formula=formula, max_records=1)
-    except AirtableError as e:
-        print(
-            f"[ventas/config] No se pudo leer {_TABLA_CFG_VENTAS} (status={e.status}): {e}",
-            file=sys.stderr,
-        )
-        return None
-    return rows[0] if rows else None
-
-
-def _ventas_config_get(self):
-    try:
-        empresa_id = _tenant_id()
-        try:
-            full = config_loader.load_full_config()
-        except AirtableError as e:
-            print(f"[ventas/config] AirtableError GET: {e}", file=sys.stderr)
-            return self._json(502, {"error": "No se pudo cargar la configuración."})
-        ventas = full.get("ventas") or config_loader._default_ventas_config()
-        return self._json(200, {
-            "empresa_id": empresa_id,
-            "ventas":     ventas,
-        })
-    except Exception as e:
-        print(f"[ventas/config] Error GET: {type(e).__name__}: {e}", file=sys.stderr)
-        return self._json(500, {"error": "Error interno del servidor."})
-
-
-def _ventas_config_post(self):
-    try:
-        try:
-            payload = self._read_body()
-        except json.JSONDecodeError:
-            return self._json(400, {"error": "JSON inválido."})
-
-        # El payload puede venir como `ventas: {...}` o ya como el dict directamente.
-        ventas_input = payload.get("ventas") if "ventas" in payload else payload
-        if not isinstance(ventas_input, dict):
-            return self._json(400, {"error": "Body debe contener un objeto 'ventas'."})
-
-        cleaned = _validate_ventas_payload(ventas_input)
-        empresa_id = _tenant_id()
-        data_json = json.dumps(cleaned, ensure_ascii=False)
-
-        existing = _ventas_config_find_row(empresa_id)
-        try:
-            if existing:
-                rec = airtable_client.update_record(_TABLA_CFG_VENTAS, existing["id"], {"data": data_json})
-            else:
-                rec = airtable_client.create_record(_TABLA_CFG_VENTAS, {
-                    "empresa_id": empresa_id,
-                    "data":       data_json,
-                })
-        except AirtableError as e:
-            print(f"[ventas/config] AirtableError persist: {e}", file=sys.stderr)
-            return self._json(502, {
-                "error": f"No se pudo persistir. Verificá que la tabla "
-                         f"'{_TABLA_CFG_VENTAS}' exista en Airtable con columnas "
-                         "'empresa_id' (Single line text) y 'data' (Long text)."
-            })
-
-        # Invalidar cache para que la próxima request del agente vea los cambios.
-        config_loader.invalidate_cache()
-
-        return self._json(200, {
-            "ok":         True,
-            "empresa_id": empresa_id,
-            "ventas":     cleaned,
-            "record_id":  rec.get("id"),
-        })
-    except Exception as e:
-        print(f"[ventas/config] Error POST: {type(e).__name__}: {e}", file=sys.stderr)
-        return self._json(500, {"error": "Error interno del servidor."})

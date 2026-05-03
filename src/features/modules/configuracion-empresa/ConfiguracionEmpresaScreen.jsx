@@ -4,8 +4,8 @@ import {
   Plus, Trash2, Sparkles,
 } from 'lucide-react';
 import ModuleLayout from '../ModuleLayout';
-import { tenantConfig } from '../../../tenants';
-import { API, getJson, postJson } from '../../../shared/api';
+import { API, getJson } from '../../../shared/api';
+import { useEmpresaConfig } from '../../../shared/useEmpresaConfig';
 import './ConfiguracionEmpresa.css';
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -178,67 +178,51 @@ function CampoRedes({ campo, label, helpText, activo, valor, onActivoChange, onV
   );
 }
 
-// Bridge a localStorage hasta que la persistencia en Airtable esté lista (paso 5).
-// Key prefijada por tenant para soportar múltiples empresas en un mismo browser.
-const EMPRESA_STORAGE_KEY = `empresa_context_${tenantConfig.id}`;
-
-function loadEmpresaContext() {
-  try {
-    const raw = localStorage.getItem(EMPRESA_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {};
-  }
-}
-
 export default function ConfiguracionEmpresaScreen({ user, onOpenModules, onLogout }) {
-  // Datos de la empresa — leídos desde localStorage (paso 5).
-  // En el primer login (sin nada guardado) los inputs aparecen vacíos.
-  const initialCtx = loadEmpresaContext();
-  const [name, setName] = useState(initialCtx.name || '');
-  const [ruc, setRuc] = useState(initialCtx.ruc || '');
-  const [razonSocial, setRazonSocial] = useState(initialCtx.razon_social || '');
-  const [sistemaContable, setSistemaContable] = useState(initialCtx.sistema_contable || 'concar');
+  // Persistencia centralizada en Airtable (paso 6).
+  // Esta pantalla lee y escribe la fila de Config_Empresa.data, que también
+  // contiene `proceso` (lo edita Gestión Caja Chica). Al guardar hay que
+  // preservar `proceso` para no pisarlo.
+  const { data, loading: configLoading, saving: configSaving, save: saveConfig } = useEmpresaConfig('empresa');
+
+  // Datos básicos
+  const [name, setName] = useState('');
+  const [ruc, setRuc] = useState('');
+  const [razonSocial, setRazonSocial] = useState('');
+  const [sistemaContable, setSistemaContable] = useState('concar');
 
   const [savedHint, setSavedHint] = useState(false);
   const [empresaSaveError, setEmpresaSaveError] = useState(null);
 
-  // ── Información extendida (info_extendida del config) ──
+  // Información extendida
   const [infoExtendida, setInfoExtendida] = useState(DEFAULT_INFO_EXTENDIDA);
-  const [infoLoaded, setInfoLoaded] = useState(false);
   const [infoSaving, setInfoSaving] = useState(false);
   const [infoSavedHint, setInfoSavedHint] = useState(false);
   const [infoSaveError, setInfoSaveError] = useState(null);
+  const infoLoaded = !configLoading;
 
+  // Hidratar el form cuando llegan los datos de Airtable.
   useEffect(() => {
-    let cancelled = false;
-    getJson(API.EMPRESA_CONFIG)
-      .then((data) => {
-        if (cancelled) return;
-        if (data?.info_extendida) {
-          // Merge defensivo: si el backend manda menos campos que el schema,
-          // los faltantes quedan en default (apagados).
-          const merged = { ...DEFAULT_INFO_EXTENDIDA };
-          for (const key of Object.keys(merged)) {
-            if (data.info_extendida[key]) {
-              merged[key] = {
-                activo: !!data.info_extendida[key].activo,
-                valor:  data.info_extendida[key].valor ?? merged[key].valor,
-              };
-            }
-          }
-          setInfoExtendida(merged);
+    if (!data) return;
+    const basicos = data.basicos || {};
+    setName(basicos.name || '');
+    setRuc(basicos.ruc || '');
+    setRazonSocial(basicos.razon_social || '');
+    setSistemaContable(basicos.sistema_contable || 'concar');
+
+    if (data.info_extendida) {
+      const merged = { ...DEFAULT_INFO_EXTENDIDA };
+      for (const key of Object.keys(merged)) {
+        if (data.info_extendida[key]) {
+          merged[key] = {
+            activo: !!data.info_extendida[key].activo,
+            valor:  data.info_extendida[key].valor ?? merged[key].valor,
+          };
         }
-      })
-      .catch((err) => {
-        // El backend puede no estar listo aún. Mantenemos defaults y permitimos editar.
-        console.warn('[ConfigEmpresa] No se pudo cargar info_extendida:', err);
-      })
-      .finally(() => {
-        if (!cancelled) setInfoLoaded(true);
-      });
-    return () => { cancelled = true; };
-  }, []);
+      }
+      setInfoExtendida(merged);
+    }
+  }, [data]);
 
   const setActivo = (campo, activo) =>
     setInfoExtendida((prev) => ({ ...prev, [campo]: { ...prev[campo], activo } }));
@@ -246,16 +230,23 @@ export default function ConfiguracionEmpresaScreen({ user, onOpenModules, onLogo
   const setValor = (campo, valor) =>
     setInfoExtendida((prev) => ({ ...prev, [campo]: { ...prev[campo], valor } }));
 
+  // Guardar info_extendida — preserva basicos y proceso.
   const handleSaveInfoExtendida = async () => {
     setInfoSaving(true);
     setInfoSaveError(null);
     try {
-      await postJson(API.EMPRESA_CONFIG, { info_extendida: infoExtendida });
-      setInfoSavedHint(true);
-      setTimeout(() => setInfoSavedHint(false), 2500);
-    } catch (err) {
-      console.error('[ConfigEmpresa] save info_extendida:', err);
-      setInfoSaveError('No se pudo guardar. Intentá de nuevo.');
+      const payload = {
+        basicos: data?.basicos || { name, razon_social: razonSocial, ruc, sistema_contable: sistemaContable },
+        info_extendida: infoExtendida,
+        proceso: data?.proceso || {},
+      };
+      const ok = await saveConfig(payload);
+      if (ok) {
+        setInfoSavedHint(true);
+        setTimeout(() => setInfoSavedHint(false), 2500);
+      } else {
+        setInfoSaveError('No se pudo guardar. Intentá de nuevo.');
+      }
     } finally {
       setInfoSaving(false);
     }
@@ -300,26 +291,26 @@ export default function ConfiguracionEmpresaScreen({ user, onOpenModules, onLogo
     setCentrosError(null);
   };
 
-  // Persiste los datos básicos en localStorage (paso 5: bridge a Airtable).
-  // Hace merge no destructivo con el bloque proceso (que escribe la pantalla
-  // de Gestión Caja Chica con la misma key).
-  const handleSaveEmpresa = () => {
+  // Persiste los datos básicos en Airtable (paso 6).
+  // IMPORTANTE: incluye info_extendida y proceso intactos para no pisarlos.
+  const handleSaveEmpresa = async () => {
     setEmpresaSaveError(null);
-    try {
-      const existing = loadEmpresaContext();
-      const updated = {
-        ...existing,
+    const payload = {
+      basicos: {
         name:             name.trim(),
         razon_social:     razonSocial.trim(),
         ruc:              ruc.trim(),
         sistema_contable: sistemaContable,
-      };
-      localStorage.setItem(EMPRESA_STORAGE_KEY, JSON.stringify(updated));
+      },
+      info_extendida: data?.info_extendida || infoExtendida,
+      proceso:        data?.proceso || {},
+    };
+    const ok = await saveConfig(payload);
+    if (ok) {
       setSavedHint(true);
       setTimeout(() => setSavedHint(false), 2500);
-    } catch (err) {
-      console.error('[ConfigEmpresa] save empresa:', err);
-      setEmpresaSaveError('No se pudo guardar localmente.');
+    } else {
+      setEmpresaSaveError('No se pudo guardar. Intentá de nuevo.');
     }
   };
 
@@ -339,12 +330,6 @@ export default function ConfiguracionEmpresaScreen({ user, onOpenModules, onLogo
         <div className="ce-header">
           <h1>Configuración de empresa</h1>
           <p>Ajustes generales que aplican a todos los procesos de tu empresa.</p>
-        </div>
-
-        <div className="ce-warning-banner">
-          <AlertCircle size={16} />
-          Estos datos se guardan localmente en este navegador. La sincronización
-          con Airtable se habilitará próximamente.
         </div>
 
         {/* ── Datos de la empresa ── */}
@@ -444,8 +429,13 @@ export default function ConfiguracionEmpresaScreen({ user, onOpenModules, onLogo
               type="button"
               className="ce-btn-primary"
               onClick={handleSaveEmpresa}
+              disabled={configSaving || configLoading}
             >
-              Guardar datos de la empresa
+              {configSaving ? (
+                <><Loader2 size={14} className="ce-spin" /> Guardando...</>
+              ) : (
+                <>Guardar datos de la empresa</>
+              )}
             </button>
             {savedHint && (
               <span className="ce-saved-hint inline">

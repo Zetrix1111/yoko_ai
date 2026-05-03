@@ -33,7 +33,7 @@ export const API = {
   FACTURAS_PROCESAR: '/api/facturas_procesar',
   FACTURAS_CONCAR: '/api/facturas_concar',
   CENTROS_COSTO: '/api/centros_costo',
-  EMPRESA_CONFIG: '/api/empresa_config',
+  CONFIG:         '/api/config',
   PRODUCTOS: '/api/productos',
   // Ventas Inteligentes — endpoints consolidados en /api/ventas?resource=...
   // (Vercel Hobby plan limita a 12 funciones serverless)
@@ -42,7 +42,6 @@ export const API = {
   MENSAJES:            '/api/ventas?resource=mensajes',
   CONVERSACIONES_MODO: '/api/ventas?resource=conversaciones_modo',
   SALES_CHAT:          '/api/ventas?resource=sales_chat',
-  VENTAS_CONFIG:       '/api/ventas?resource=config',
 };
 
 export async function getJson(url) {

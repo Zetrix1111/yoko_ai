@@ -14,6 +14,7 @@ import {
   formatPEN, formatNum, formatDate,
 } from './mockData';
 import { API, getJson, postJson, patchJson, deleteJson } from '../../../shared/api';
+import { useEmpresaConfig } from '../../../shared/useEmpresaConfig';
 import { tenantConfig } from '../../../tenants';
 
 // ─────────────────────────────────────
@@ -1625,42 +1626,27 @@ function InfoAdicionalEditor({ activo, valor, onActivoChange, onValorChange }) {
 }
 
 function ContextoAgenteBlock() {
+  // Persistencia centralizada en Airtable Config_Ventas (paso 6).
+  const { data, loading, saving, save } = useEmpresaConfig('ventas');
+
   const [config, setConfig] = useState(DEFAULT_VENTAS_CONFIG);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [savedHint, setSavedHint] = useState(false);
   const [saveError, setSaveError] = useState(null);
 
+  // Hidratar el form cuando llegan los datos de Airtable.
   useEffect(() => {
-    let cancelled = false;
-    getJson(API.VENTAS_CONFIG)
-      .then(data => {
-        if (cancelled) return;
-        if (data?.ventas) {
-          // Merge defensivo: si el backend manda menos campos que el schema,
-          // los faltantes quedan en default.
-          const merged = { ...DEFAULT_VENTAS_CONFIG };
-          for (const key of Object.keys(merged)) {
-            if (data.ventas[key]) {
-              merged[key] = {
-                activo: !!data.ventas[key].activo,
-                valor:  data.ventas[key].valor !== undefined
-                  ? data.ventas[key].valor
-                  : merged[key].valor,
-              };
-            }
-          }
-          setConfig(merged);
-        }
-      })
-      .catch(err => {
-        console.warn('[ContextoAgenteBlock] No se pudo cargar:', err);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => { cancelled = true; };
-  }, []);
+    if (!data) return;
+    const merged = { ...DEFAULT_VENTAS_CONFIG };
+    for (const key of Object.keys(merged)) {
+      if (data[key]) {
+        merged[key] = {
+          activo: !!data[key].activo,
+          valor:  data[key].valor !== undefined ? data[key].valor : merged[key].valor,
+        };
+      }
+    }
+    setConfig(merged);
+  }, [data]);
 
   const setActivo = (campo, activo) =>
     setConfig(prev => ({ ...prev, [campo]: { ...prev[campo], activo } }));
@@ -1676,17 +1662,13 @@ function ContextoAgenteBlock() {
     });
 
   const handleSave = async () => {
-    setSaving(true);
     setSaveError(null);
-    try {
-      await postJson(API.VENTAS_CONFIG, { ventas: config });
+    const ok = await save(config);
+    if (ok) {
       setSavedHint(true);
       setTimeout(() => setSavedHint(false), 2500);
-    } catch (err) {
-      console.error('[ContextoAgenteBlock] save:', err);
+    } else {
       setSaveError('No se pudo guardar. Intentá de nuevo.');
-    } finally {
-      setSaving(false);
     }
   };
 

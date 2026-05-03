@@ -146,3 +146,24 @@ def delete_record(table: str, record_id: str, base_id: str | None = None) -> dic
     """Elimina un registro. Devuelve {'deleted': True, 'id': ...}."""
     url = f"{_table_url(table, base_id=base_id)}/{urllib.parse.quote(record_id)}"
     return _request("DELETE", url)
+
+
+def upsert_by_field(
+    table: str,
+    match_field: str,
+    match_value: str,
+    fields: dict,
+    base_id: str | None = None,
+) -> dict:
+    """
+    Si existe una fila donde `match_field == match_value`, la actualiza (PATCH).
+    Si no existe, la crea con `fields` + el match_field seteado.
+
+    Las comillas simples en la fórmula están bien para `empresa_id` slugs
+    (cmejia, demo, etc). NO usar con valores que puedan tener apóstrofes.
+    """
+    formula = f"{{{match_field}}} = '{match_value}'"
+    existing = list_records(table, filter_formula=formula, max_records=1, base_id=base_id)
+    if existing:
+        return update_record(table, existing[0]["id"], fields, base_id=base_id)
+    return create_record(table, {**fields, match_field: match_value}, base_id=base_id)
