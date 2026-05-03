@@ -966,26 +966,24 @@ function CanalesBlock() {
     let timer = null;
 
     const tick = async () => {
+      let nextDelay = 2000;
       try {
         const data = await getJson(`${API.WA}&empresa_id=${encodeURIComponent(empresaId)}`);
         if (cancelled) return;
-        setSession(data.session);
+        const newSession = data?.session || null;
+        setSession(newSession);
         setError(null);
+        // Decidimos el delay con la data que ACABAMOS de leer (sin tocar state)
+        nextDelay = newSession?.status === 'connected' ? 15000 : 2000;
       } catch (err) {
         if (cancelled) return;
         console.error('[CanalesBlock] poll error:', err);
         setError('No se pudo consultar el estado. Reintentando...');
+        nextDelay = 5000;
       } finally {
         if (!cancelled) {
           setLoading(false);
-          // El delay depende del estado actual leído (de session)
-          // Releemos session via callback de setState para evitar stale closure
-          setSession((curr) => {
-            const status = curr?.status;
-            const next = status === 'connected' ? 15000 : 2000;
-            timer = setTimeout(tick, next);
-            return curr;
-          });
+          timer = setTimeout(tick, nextDelay);
         }
       }
     };
