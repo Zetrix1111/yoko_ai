@@ -112,10 +112,108 @@ def _format_aprobadores(aprobadores: list) -> str:
 
 
 # ─────────────────────────────────────────────────────────────────────────
+# Sales prompt (modo "ventas") — usado por /api/sales_chat
+# ─────────────────────────────────────────────────────────────────────────
+
+def _format_producto_inline(p: dict) -> str:
+    """Una línea compacta por producto para el catálogo del prompt."""
+    estado = p.get("estado_stock", "")
+    estado_label = {
+        "disponible":  "disponible",
+        "bajo_stock":  "BAJO STOCK",
+        "sin_stock":   "AGOTADO",
+        "servicio":    "servicio",
+    }.get(estado, estado)
+    precio = p.get("precio") or 0
+    try:
+        precio_f = float(precio)
+    except (ValueError, TypeError):
+        precio_f = 0.0
+    nombre = p.get("nombre") or "—"
+    rec_id = p.get("id") or ""
+    line = f"- [{rec_id}] {nombre} — S/ {precio_f:,.2f} ({estado_label})"
+    return line
+
+
+def _build_sales_prompt(config: dict, ctx: dict) -> str:
+    """
+    Prompt especializado para el agente de ventas que corre detrás del
+    bot-baileys. NO incluye la secuencia de caja chica. Embebe el catálogo
+    de productos y reglas de tono comercial.
+    """
+    empresa = (config or {}).get("empresa", {}) or {}
+    razon_social = empresa.get("razon_social") or empresa.get("id") or "la empresa"
+    ruc = empresa.get("ruc") or ""
+
+    productos = ctx.get("productos") or []
+    sender = ctx.get("sender") or {}
+    sender_nombre = sender.get("nombre") or "el cliente"
+    sender_phone = sender.get("phone") or ""
+
+    identidad = f"Eres un vendedor virtual de {razon_social}"
+    if ruc:
+        identidad += f" (RUC {ruc})"
+    identidad += "."
+
+    lines: list[str] = [
+        identidad,
+        "Estás respondiendo conversaciones de WhatsApp con clientes potenciales.",
+        "Tu objetivo: ayudar al cliente a encontrar el producto que necesita y darle "
+        "información clara y precisa para que pueda decidir comprar.",
+        "",
+        "# CLIENTE ACTUAL",
+        f"- Nombre (pushname WhatsApp): {sender_nombre}",
+        f"- Teléfono: {sender_phone or '—'}",
+        "",
+        "# CATÁLOGO DISPONIBLE",
+        f"({len(productos)} productos/servicios activos del catálogo)",
+        "",
+    ]
+
+    if productos:
+        for p in productos:
+            lines.append(_format_producto_inline(p))
+    else:
+        lines.append("(No hay productos cargados aún en el catálogo.)")
+
+    lines.extend([
+        "",
+        "# HERRAMIENTAS",
+        "Tienes dos herramientas disponibles:",
+        "- `consultar_productos(query?, solo_disponibles?, categoria?)` → "
+        "búsqueda más detallada en el catálogo. Úsala si necesitás más info que la "
+        "del listado de arriba (descripción completa, keywords, foto).",
+        "- `consultar_stock(producto_id | nombre)` → stock exacto de un producto.",
+        "",
+        "# COMPORTAMIENTO",
+        "1. Saludá cordialmente la primera vez. En mensajes siguientes ya no saludes.",
+        "2. Respondé en español neutro, profesional, cálido. Mensajes BREVES (2-4 líneas).",
+        "3. NUNCA inventes precios, stock o características. Si no está en el catálogo, "
+        "decí honestamente que vas a consultarlo con un asesor.",
+        "4. Si el producto está AGOTADO, decílo con claridad y ofrecé alternativas similares.",
+        "5. Si el cliente pregunta por algo que no vendés, sugerí lo más cercano que "
+        "tengas o decí que no manejas ese rubro.",
+        "6. Cuando el cliente muestra intención clara de compra ('quiero comprar', "
+        "'me interesa', 'cómo lo pago'), pasá a modo cierre: confirmá producto y "
+        "precio, pedí cantidad, y avisá que un asesor humano lo va a contactar para "
+        "concretar el pago y la entrega.",
+        "7. NO uses emojis. NO uses markdown (**, *, #). El cliente lo lee en WhatsApp.",
+        "8. Si el cliente pide algo fuera de tu alcance (cotización formal, cambio "
+        "de pedido, queja), respondé: 'Te derivo con un asesor humano para que te ayude.'",
+    ])
+
+    return "\n".join(lines)
+
+
+# ─────────────────────────────────────────────────────────────────────────
 # API pública
 # ─────────────────────────────────────────────────────────────────────────
 
-def build_system_prompt(config: dict, user: dict) -> str:
+def build_system_prompt(
+    config: dict,
+    user: dict,
+    extra_context: dict | None = None,
+) -> str:
     """
     Construye el system prompt en español a partir de la config completa
     (estática + dinámica) y los datos del usuario actual.
@@ -128,7 +226,16 @@ def build_system_prompt(config: dict, user: dict) -> str:
       • aprobacion_rendicion                 → si las rendiciones se aprueban
       • aplica_centro_costo                  → muestra lista de centros activos
       • aplica_tipo_gasto                    → muestra lista de tipos
+
+    `extra_context` permite cambiar el modo del prompt:
+      • {"modo": "ventas", "productos": [...], "sender": {phone, nombre}}
+        → prompt especializado para el agente de ventas (WhatsApp via
+        bot-baileys), con catálogo embebido y reglas de venta. NO incluye
+        la secuencia de caja chica.
     """
+    if extra_context and extra_context.get("modo") == "ventas":
+        return _build_sales_prompt(config, extra_context)
+
     empresa = (config or {}).get("empresa", {}) or {}
     proceso = ((config or {}).get("proceso", {}) or {}).get("caja_chica", {}) or {}
 

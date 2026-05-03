@@ -4,6 +4,15 @@ Cliente HTTP mínimo para Airtable usando solo urllib.
 No depende de paquetes externos (mismo patrón que api/login.py).
 Lee credenciales de las env vars AIRTABLE_TOKEN y AIRTABLE_BASE_ID.
 
+Soporta dos bases en paralelo:
+  • AIRTABLE_BASE_ID         → base original ("Tablas CMEJIA SAC"):
+                                Empleados, productos, solicitudes_caja, obras...
+  • AIRTABLE_VENTAS_BASE_ID  → base nueva ("ventas_inteligentes"):
+                                wa_sessions, conversaciones, mensajes, outbox
+
+Todas las funciones públicas aceptan un parámetro opcional `base_id`. Si
+no se pasa, se usa AIRTABLE_BASE_ID (comportamiento legacy, no rompe nada).
+
 Forma de los registros devueltos: {"id": <recId>, "fields": {...}}.
 """
 
@@ -26,26 +35,40 @@ class AirtableError(Exception):
         self.body = body
 
 
-def _get_credentials() -> tuple[str, str]:
-    """Lee y valida AIRTABLE_TOKEN y AIRTABLE_BASE_ID."""
+def _get_token() -> str:
+    """Lee y valida AIRTABLE_TOKEN."""
     token = os.environ.get("AIRTABLE_TOKEN")
-    base_id = os.environ.get("AIRTABLE_BASE_ID")
-    if not token or not base_id:
+    if not token:
+        raise AirtableError("Falta AIRTABLE_TOKEN en las variables de entorno.")
+    return token
+
+
+def _resolve_base_id(base_id: str | None) -> str:
+    """Si `base_id` viene None, usa AIRTABLE_BASE_ID del env (legacy)."""
+    if base_id:
+        return base_id
+    env_base = os.environ.get("AIRTABLE_BASE_ID")
+    if not env_base:
         raise AirtableError(
-            "Faltan AIRTABLE_TOKEN o AIRTABLE_BASE_ID en las variables de entorno."
+            "Falta AIRTABLE_BASE_ID en env y no se pasó base_id explícito."
         )
-    return token, base_id
+    return env_base
 
 
-def _table_url(table: str) -> str:
-    """Construye la URL base para una tabla."""
-    _, base_id = _get_credentials()
-    return f"{_BASE_URL}/{base_id}/{urllib.parse.quote(table)}"
+def _get_credentials() -> tuple[str, str]:
+    """Compat legacy: token + base_id default. Algunos endpoints viejos lo importan."""
+    return _get_token(), _resolve_base_id(None)
+
+
+def _table_url(table: str, base_id: str | None = None) -> str:
+    """Construye la URL base para una tabla en una base específica."""
+    base = _resolve_base_id(base_id)
+    return f"{_BASE_URL}/{base}/{urllib.parse.quote(table)}"
 
 
 def _request(method: str, url: str, body: dict | None = None, timeout: int = 15) -> dict:
     """Ejecuta una request HTTP a Airtable y devuelve el JSON parseado."""
-    token, _ = _get_credentials()
+    token = _get_token()
 
     headers = {"Authorization": f"Bearer {token}"}
     data = None
@@ -83,46 +106,61 @@ def list_records(
     table: str,
     filter_formula: str | None = None,
     max_records: int = 100,
+    base_id: str | None = None,
 ) -> list[dict]:
     """
     Lista registros de una tabla, opcionalmente filtrados por una fórmula
     Airtable. No pagina: devuelve hasta `max_records` registros (Airtable
     devuelve hasta 100 por página, así que valores >100 quedan capeados).
+
+    Si `base_id` viene None, se usa AIRTABLE_BASE_ID del env.
     """
     params: list[tuple[str, str]] = [("maxRecords", str(max_records))]
     if filter_formula:
-        # urlencode hace el quote internamente; explícito por si el formula
-        # tiene caracteres especiales como llaves o comillas.
         params.append(("filterByFormula", filter_formula))
     qs = urllib.parse.urlencode(params)
-    url = f"{_table_url(table)}?{qs}"
+    url = f"{_table_url(table, base_id=base_id)}?{qs}"
 
     data = _request("GET", url)
     return [_normalize(r) for r in data.get("records", [])]
 
 
-def get_record(table: str, record_id: str) -> dict:
+def get_record(table: str, record_id: str, base_id: str | None = None) -> dict:
     """Obtiene un registro específico por su recId."""
-    url = f"{_table_url(table)}/{urllib.parse.quote(record_id)}"
+    url = f"{_table_url(table, base_id=base_id)}/{urllib.parse.quote(record_id)}"
     data = _request("GET", url)
     return _normalize(data)
 
 
-def create_record(table: str, fields: dict) -> dict:
+def create_record(table: str, fields: dict, base_id: str | None = None) -> dict:
     """Crea un registro en la tabla y devuelve la versión normalizada."""
-    url = _table_url(table)
+    url = _table_url(table, base_id=base_id)
     data = _request("POST", url, body={"fields": fields})
     return _normalize(data)
 
 
-def update_record(table: str, record_id: str, fields: dict) -> dict:
+def update_record(table: str, record_id: str, fields: dict, base_id: str | None = None) -> dict:
     """Actualiza campos de un registro (PATCH no destruye los no enviados)."""
-    url = f"{_table_url(table)}/{urllib.parse.quote(record_id)}"
+    url = f"{_table_url(table, base_id=base_id)}/{urllib.parse.quote(record_id)}"
     data = _request("PATCH", url, body={"fields": fields})
     return _normalize(data)
 
 
-def delete_record(table: str, record_id: str) -> dict:
+def delete_record(table: str, record_id: str, base_id: str | None = None) -> dict:
     """Elimina un registro. Devuelve {'deleted': True, 'id': ...}."""
-    url = f"{_table_url(table)}/{urllib.parse.quote(record_id)}"
+    url = f"{_table_url(table, base_id=base_id)}/{urllib.parse.quote(record_id)}"
     return _request("DELETE", url)
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Helpers semánticos para la base de ventas
+# ─────────────────────────────────────────────────────────────────────────
+
+def get_ventas_base_id() -> str:
+    """Devuelve el ID de la base de ventas_inteligentes (env: AIRTABLE_VENTAS_BASE_ID)."""
+    base = os.environ.get("AIRTABLE_VENTAS_BASE_ID")
+    if not base:
+        raise AirtableError(
+            "Falta AIRTABLE_VENTAS_BASE_ID en las variables de entorno."
+        )
+    return base

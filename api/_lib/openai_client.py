@@ -20,6 +20,7 @@ que el frontend pueda hacer el routing además de mostrar el texto.
 import json
 import os
 import sys
+from typing import Callable
 
 from openai import OpenAI
 
@@ -27,6 +28,9 @@ from . import tool_registry
 
 
 _MODEL = "gpt-4.1-mini-2025-04-14"
+
+# Tipo del executor de tools: callable(name, args, context) -> dict
+ToolExecutor = Callable[[str, dict, dict], dict]
 
 _FALLBACK_MAX_ITER = (
     "Lo siento, no pude resolver tu pedido en los pasos disponibles. "
@@ -48,6 +52,7 @@ def run_chat(
     tools: list[dict],
     context: dict,
     max_iterations: int = 6,
+    executor: ToolExecutor | None = None,
 ) -> dict:
     """
     Ejecuta el loop de chat con tool calling. Devuelve dict con la
@@ -56,12 +61,20 @@ def run_chat(
     `messages` debe venir en el formato OpenAI:
         [{"role": "user"|"assistant", "content": "..."}]
 
-    `tools` viene de `prompt_builder.build_tools_list(config)`. Si está
-    vacío, el modelo no puede llamar tools (chat plano).
+    `tools` viene de `prompt_builder.build_tools_list(config)` para Yoko,
+    o de `tools.ventas.VENTAS_TOOLS_OPENAI` para el agente de ventas.
+    Si está vacío, el modelo no puede llamar tools (chat plano).
 
-    `context` se pasa tal cual a cada `tool_registry.execute_tool` —
-    típicamente `{"user": <dict>, "config": <dict>}`.
+    `context` se pasa tal cual al executor — típicamente
+    `{"user": <dict>, "config": <dict>}` para Yoko, o
+    `{"empresa_id": "..."}` para ventas.
+
+    `executor` es la función que ejecuta tools. Default: `tool_registry.execute_tool`
+    (registry global de Yoko). Para el agente de ventas pasar
+    `tools.ventas.execute_ventas_tool` para evitar contaminar el registry global.
     """
+    if executor is None:
+        executor = tool_registry.execute_tool
     full_messages: list[dict] = (
         [{"role": "system", "content": system_prompt}]
         + list(messages or [])
@@ -113,7 +126,7 @@ def run_chat(
             except json.JSONDecodeError:
                 args = {}
 
-            result = tool_registry.execute_tool(tc.function.name, args, context)
+            result = executor(tc.function.name, args, context)
 
             # Captura la última _action (la siguiente sobrescribe).
             if isinstance(result, dict) and "_action" in result:
