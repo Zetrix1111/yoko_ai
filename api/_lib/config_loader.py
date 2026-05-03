@@ -197,6 +197,103 @@ def load_dynamic_config() -> dict:
 
 
 # ─────────────────────────────────────────────────────────────────────────
+# Empresa.info_extendida — defaults y deep merge
+# ─────────────────────────────────────────────────────────────────────────
+
+# Schema fijo. Cada campo: {activo: bool, valor: <tipo>}. Los toggles arrancan
+# en false → el prompt no los menciona (compat backward total con tenants
+# existentes que no definen este bloque).
+_INFO_EXTENDIDA_SCHEMA = {
+    "rubro":            "",
+    "descripcion":      "",
+    "direccion":        "",
+    "email_contacto":   "",
+    "horario_atencion": "",
+    "redes_sociales":   [],  # array de {red, url}
+}
+
+
+def _default_empresa_info_extendida() -> dict:
+    """Devuelve el shape default con todos los toggles en false."""
+    return {
+        key: {"activo": False, "valor": _clone_default(default_valor)}
+        for key, default_valor in _INFO_EXTENDIDA_SCHEMA.items()
+    }
+
+
+def _clone_default(v):
+    """Copia profunda de los defaults primitivos del schema."""
+    if isinstance(v, list):
+        return list(v)
+    if isinstance(v, dict):
+        return dict(v)
+    return v
+
+
+def _merge_info_extendida(provided: dict | None) -> dict:
+    """
+    Deep merge entre los defaults y lo que venga del tenant. Lo que provee
+    el tenant gana; campos faltantes quedan default. Campos extra que NO
+    están en el schema se ignoran silenciosamente (no fallar).
+    """
+    merged = _default_empresa_info_extendida()
+    if not isinstance(provided, dict):
+        return merged
+    for key in _INFO_EXTENDIDA_SCHEMA:
+        if key not in provided:
+            continue
+        incoming = provided[key]
+        if not isinstance(incoming, dict):
+            continue  # malformado, dejamos default
+        # Merge campo por campo dentro de cada toggle
+        if "activo" in incoming:
+            merged[key]["activo"] = bool(incoming["activo"])
+        if "valor" in incoming:
+            merged[key]["valor"] = incoming["valor"]
+    return merged
+
+
+def _load_info_extendida_dynamic(tenant_id: str) -> dict | None:
+    """
+    Lee `info_extendida` desde Airtable si existe la tabla `Config_Empresa_Info`.
+    Hoy esta tabla puede no existir aún; en ese caso devolvemos None (sin error).
+
+    Schema esperado (1 fila por tenant):
+      • empresa_id (single line text)
+      • data       (long text con JSON serializado de info_extendida)
+
+    TODO: si en el futuro se prefiere columnas individuales en lugar de un
+    JSON blob, ajustar acá.
+    """
+    rows = _safe_list("Config_Empresa_Info", f"{{empresa_id}}='{tenant_id}'")
+    if not rows:
+        return None
+    row = rows[0].get("fields", {})
+    raw = row.get("data") or row.get("info_extendida")
+    if not raw:
+        return None
+    try:
+        parsed = json.loads(raw) if isinstance(raw, str) else raw
+        return parsed if isinstance(parsed, dict) else None
+    except (json.JSONDecodeError, ValueError) as e:
+        print(
+            f"[config_loader] Config_Empresa_Info.data tiene JSON inválido: {e}",
+            file=sys.stderr,
+        )
+        return None
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Cache management
+# ─────────────────────────────────────────────────────────────────────────
+
+def invalidate_cache() -> None:
+    """Fuerza el reload del cache en la próxima llamada a load_dynamic_config()."""
+    _cache["data"] = None
+    _cache["expires_at"] = 0.0
+
+
+# ─────────────────────────────────────────────────────────────────────────
 # Combinada (estática + dinámica)
 # ─────────────────────────────────────────────────────────────────────────
 def _merge_proceso(static_proceso: dict, dynamic_proceso: dict) -> dict:
@@ -247,6 +344,17 @@ def load_full_config() -> dict:
     static = load_static_config()
     dynamic = load_dynamic_config()
 
+    # info_extendida: deep merge defaults ← static ← dynamic.
+    # 1. Defaults (todos apagados)
+    # 2. static.empresa.info_extendida del config.json
+    # 3. Airtable (Config_Empresa_Info) si existe — gana sobre static.
+    static_info = (static.get("empresa", {}) or {}).get("info_extendida") \
+        or static.get("info_extendida")  # tolerar shape legacy en root
+    info_extendida = _merge_info_extendida(static_info)
+    dynamic_info = _load_info_extendida_dynamic(_get_tenant_id())
+    if dynamic_info:
+        info_extendida = _merge_info_extendida({**info_extendida, **dynamic_info})
+
     empresa = {
         "id": static.get("id"),
         "razon_social": static.get("razonSocial", ""),
@@ -254,6 +362,7 @@ def load_full_config() -> dict:
         "sistema_contable": static.get("sistemaContable", "concar"),
         "agent": static.get("agent", {}),
         "modules": static.get("modules", []),
+        "info_extendida": info_extendida,
     }
 
     proceso = _merge_proceso(

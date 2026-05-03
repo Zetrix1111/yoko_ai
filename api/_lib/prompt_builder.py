@@ -24,6 +24,93 @@ MODULE_NAMES = {
     "configuracion-empresa": "Configuración de Empresa",
 }
 
+# Labels visibles para los IDs de redes sociales en empresa.info_extendida.
+REDES_LABELS = {
+    "instagram": "Instagram",
+    "facebook":  "Facebook",
+    "linkedin":  "LinkedIn",
+    "tiktok":    "TikTok",
+    "whatsapp":  "WhatsApp",
+    "youtube":   "YouTube",
+    "otro":      "Otro",
+}
+
+
+def _campo_activo(campo: dict | None) -> bool:
+    """
+    True solo si el toggle está prendido Y el valor no es vacío.
+
+    Casos que cuentan como "vacío" → False:
+      • valor None
+      • string ""
+      • list []
+      • dict {}
+    """
+    if not campo or not campo.get("activo"):
+        return False
+    valor = campo.get("valor")
+    if valor in (None, ""):
+        return False
+    if isinstance(valor, (list, dict)) and not valor:
+        return False
+    return True
+
+
+def _format_redes(redes_valor: list) -> str:
+    """Renderiza redes_sociales.valor como 'Instagram (url), Facebook (url)'."""
+    if not isinstance(redes_valor, list):
+        return ""
+    items = []
+    for r in redes_valor:
+        if not isinstance(r, dict):
+            continue
+        red_id = r.get("red")
+        url = r.get("url")
+        if not red_id or not url:
+            continue
+        label = REDES_LABELS.get(red_id, red_id.title())
+        items.append(f"{label} ({url})")
+    return ", ".join(items)
+
+
+def _build_sobre_empresa_block(info_extendida: dict | None) -> list[str]:
+    """
+    Devuelve las líneas del bloque '# SOBRE LA EMPRESA'.
+    Si NINGÚN campo está activo, devuelve [] → caller no imprime nada.
+
+    Orden de los campos en el output (estable):
+      rubro, descripcion, direccion, email_contacto, horario_atencion, redes_sociales.
+    """
+    if not isinstance(info_extendida, dict):
+        return []
+
+    lines: list[str] = []
+    rubro = info_extendida.get("rubro")
+    desc = info_extendida.get("descripcion")
+    direc = info_extendida.get("direccion")
+    email = info_extendida.get("email_contacto")
+    horario = info_extendida.get("horario_atencion")
+    redes = info_extendida.get("redes_sociales")
+
+    if _campo_activo(rubro):
+        lines.append(f"- Rubro: {rubro['valor']}")
+    if _campo_activo(desc):
+        lines.append(f"- Descripción: {desc['valor']}")
+    if _campo_activo(direc):
+        lines.append(f"- Dirección: {direc['valor']}")
+    if _campo_activo(email):
+        lines.append(f"- Email de contacto: {email['valor']}")
+    if _campo_activo(horario):
+        lines.append(f"- Horario de atención: {horario['valor']}")
+    if _campo_activo(redes):
+        rendered = _format_redes(redes["valor"])
+        if rendered:
+            lines.append(f"- Redes: {rendered}")
+
+    if not lines:
+        return []
+    return ["", "# SOBRE LA EMPRESA", *lines]
+
 
 # ─────────────────────────────────────────────────────────────────────────
 # Helpers de formateo
@@ -267,6 +354,16 @@ def build_system_prompt(
         "# CAPACIDADES",
         f"En esta sesión puedes ayudar con los módulos: {_format_modules(modules)}.",
         "Tienes herramientas para consultar información del usuario, registrar acciones, y llevar al usuario a pantallas específicas de la app.",
+    ]
+
+    # # SOBRE LA EMPRESA — solo si al menos un campo de info_extendida está activo.
+    # Si todos los toggles están en false (default), esta sección no aparece y
+    # el prompt queda byte-idéntico al previo a esta feature.
+    sobre_empresa = _build_sobre_empresa_block(empresa.get("info_extendida"))
+    if sobre_empresa:
+        lines.extend(sobre_empresa)
+
+    lines.extend([
         "",
         "# USUARIO ACTUAL",
         f"- Nombre: {user.get('nombre') or '—'}",
@@ -285,7 +382,7 @@ def build_system_prompt(
         "Para todo lo demás (Dashboard, Aprobaciones, Pagos, Reportes o Configuración), NO intentes gestionarlo por el chat. Debes explicarle al usuario que esa acción se realiza desde el módulo visual correspondiente y usar tus herramientas (tools) para redirigirlo a esa pantalla.",
         "",
         "# REGLAS Y LÍMITES DEL PROCESO",
-    ]
+    ])
 
     # ── Monto máximo por solicitud ──
     if monto_max_activo and monto_max:
