@@ -1,9 +1,35 @@
 import { useEffect, useState } from 'react';
-import { Check, CheckCircle2, Building2, Briefcase, Loader2, AlertCircle, ChevronDown } from 'lucide-react';
+import {
+  Check, CheckCircle2, Building2, Briefcase, Loader2, AlertCircle, ChevronDown,
+  Plus, Trash2, Sparkles,
+} from 'lucide-react';
 import ModuleLayout from '../ModuleLayout';
 import { tenantConfig } from '../../../tenants';
-import { API, getJson } from '../../../shared/api';
+import { API, getJson, postJson } from '../../../shared/api';
 import './ConfiguracionEmpresa.css';
+
+// ─────────────────────────────────────────────────────────────────────────
+// info_extendida — schema y defaults (mismo shape que api/empresa_config.py)
+// ─────────────────────────────────────────────────────────────────────────
+
+const REDES_OPCIONES = [
+  { id: 'instagram', label: 'Instagram' },
+  { id: 'facebook',  label: 'Facebook' },
+  { id: 'linkedin',  label: 'LinkedIn' },
+  { id: 'tiktok',    label: 'TikTok' },
+  { id: 'whatsapp',  label: 'WhatsApp' },
+  { id: 'youtube',   label: 'YouTube' },
+  { id: 'otro',      label: 'Otro' },
+];
+
+const DEFAULT_INFO_EXTENDIDA = {
+  rubro:            { activo: false, valor: '' },
+  descripcion:      { activo: false, valor: '' },
+  direccion:        { activo: false, valor: '' },
+  email_contacto:   { activo: false, valor: '' },
+  horario_atencion: { activo: false, valor: '' },
+  redes_sociales:   { activo: false, valor: [] },
+};
 
 const SISTEMAS_CONTABLES = [
   { id: 'concar',   name: 'CONCAR',   description: 'Sistema contable peruano más usado en pymes y constructoras.' },
@@ -27,6 +53,131 @@ function Toggle({ checked, onChange, ariaLabel }) {
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// Helpers de campo para "Información extendida"
+// ─────────────────────────────────────────────────────────────────────────
+
+/**
+ * Wrapper genérico de una fila de campo: toggle + label + children (input/textarea/etc).
+ * El input se deshabilita visualmente cuando el toggle está off.
+ */
+function CampoRow({ campo, label, activo, onActivoChange, helpText, children }) {
+  return (
+    <div className={`ce-campo-row ${activo ? '' : 'disabled'}`}>
+      <div className="ce-campo-header">
+        <Toggle checked={activo} onChange={onActivoChange} ariaLabel={label} />
+        <label className="ce-campo-label" htmlFor={`ce-campo-${campo}`}>
+          {label}
+          <span className="ce-campo-optional"> (opcional)</span>
+        </label>
+      </div>
+      <div className="ce-campo-input-wrap">
+        {children}
+      </div>
+      <div className="ce-campo-help">{helpText}</div>
+    </div>
+  );
+}
+
+function CampoTexto({ campo, label, helpText, placeholder, type = 'text', activo, valor, onActivoChange, onValorChange }) {
+  return (
+    <CampoRow campo={campo} label={label} activo={activo} onActivoChange={onActivoChange} helpText={helpText}>
+      <input
+        id={`ce-campo-${campo}`}
+        className="ce-input"
+        type={type}
+        placeholder={placeholder}
+        value={valor}
+        disabled={!activo}
+        onChange={(e) => onValorChange(e.target.value)}
+      />
+    </CampoRow>
+  );
+}
+
+function CampoTextarea({ campo, label, helpText, placeholder, maxLength = 300, activo, valor, onActivoChange, onValorChange }) {
+  const len = (valor || '').length;
+  return (
+    <CampoRow campo={campo} label={label} activo={activo} onActivoChange={onActivoChange} helpText={helpText}>
+      <textarea
+        id={`ce-campo-${campo}`}
+        className="ce-input ce-textarea"
+        placeholder={placeholder}
+        value={valor}
+        disabled={!activo}
+        maxLength={maxLength}
+        rows={3}
+        onChange={(e) => onValorChange(e.target.value)}
+      />
+      <div className="ce-textarea-counter">{len} / {maxLength}</div>
+    </CampoRow>
+  );
+}
+
+function CampoRedes({ campo, label, helpText, activo, valor, onActivoChange, onValorChange }) {
+  const lista = Array.isArray(valor) ? valor : [];
+
+  const updateItem = (idx, patch) => {
+    const next = lista.map((item, i) => i === idx ? { ...item, ...patch } : item);
+    onValorChange(next);
+  };
+  const removeItem = (idx) => {
+    onValorChange(lista.filter((_, i) => i !== idx));
+  };
+  const addItem = () => {
+    onValorChange([...lista, { red: 'instagram', url: '' }]);
+  };
+
+  return (
+    <CampoRow campo={campo} label={label} activo={activo} onActivoChange={onActivoChange} helpText={helpText}>
+      <div className="ce-redes-list">
+        {lista.map((item, idx) => {
+          const urlOk = !item.url || /^https?:\/\//i.test(item.url);
+          return (
+            <div key={idx} className="ce-redes-row">
+              <select
+                className="ce-redes-select"
+                value={item.red || 'instagram'}
+                disabled={!activo}
+                onChange={(e) => updateItem(idx, { red: e.target.value })}
+              >
+                {REDES_OPCIONES.map((o) => (
+                  <option key={o.id} value={o.id}>{o.label}</option>
+                ))}
+              </select>
+              <input
+                className={`ce-input ce-redes-url ${!urlOk ? 'warn' : ''}`}
+                type="url"
+                placeholder="https://..."
+                value={item.url || ''}
+                disabled={!activo}
+                onChange={(e) => updateItem(idx, { url: e.target.value })}
+              />
+              <button
+                type="button"
+                className="ce-redes-remove"
+                onClick={() => removeItem(idx)}
+                disabled={!activo}
+                aria-label="Eliminar red"
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
+          );
+        })}
+        <button
+          type="button"
+          className="ce-redes-add"
+          onClick={addItem}
+          disabled={!activo}
+        >
+          <Plus size={14} /> Agregar red social
+        </button>
+      </div>
+    </CampoRow>
+  );
+}
+
 export default function ConfiguracionEmpresaScreen({ user, onOpenModules, onLogout }) {
   // Datos de la empresa (default desde el tenant config)
   const [ruc, setRuc] = useState(tenantConfig.ruc || '');
@@ -36,6 +187,64 @@ export default function ConfiguracionEmpresaScreen({ user, onOpenModules, onLogo
   const [sistemaContable, setSistemaContable] = useState('concar');
 
   const [savedHint, setSavedHint] = useState(false);
+
+  // ── Información extendida (info_extendida del config) ──
+  const [infoExtendida, setInfoExtendida] = useState(DEFAULT_INFO_EXTENDIDA);
+  const [infoLoaded, setInfoLoaded] = useState(false);
+  const [infoSaving, setInfoSaving] = useState(false);
+  const [infoSavedHint, setInfoSavedHint] = useState(false);
+  const [infoSaveError, setInfoSaveError] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getJson(API.EMPRESA_CONFIG)
+      .then((data) => {
+        if (cancelled) return;
+        if (data?.info_extendida) {
+          // Merge defensivo: si el backend manda menos campos que el schema,
+          // los faltantes quedan en default (apagados).
+          const merged = { ...DEFAULT_INFO_EXTENDIDA };
+          for (const key of Object.keys(merged)) {
+            if (data.info_extendida[key]) {
+              merged[key] = {
+                activo: !!data.info_extendida[key].activo,
+                valor:  data.info_extendida[key].valor ?? merged[key].valor,
+              };
+            }
+          }
+          setInfoExtendida(merged);
+        }
+      })
+      .catch((err) => {
+        // El backend puede no estar listo aún. Mantenemos defaults y permitimos editar.
+        console.warn('[ConfigEmpresa] No se pudo cargar info_extendida:', err);
+      })
+      .finally(() => {
+        if (!cancelled) setInfoLoaded(true);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  const setActivo = (campo, activo) =>
+    setInfoExtendida((prev) => ({ ...prev, [campo]: { ...prev[campo], activo } }));
+
+  const setValor = (campo, valor) =>
+    setInfoExtendida((prev) => ({ ...prev, [campo]: { ...prev[campo], valor } }));
+
+  const handleSaveInfoExtendida = async () => {
+    setInfoSaving(true);
+    setInfoSaveError(null);
+    try {
+      await postJson(API.EMPRESA_CONFIG, { info_extendida: infoExtendida });
+      setInfoSavedHint(true);
+      setTimeout(() => setInfoSavedHint(false), 2500);
+    } catch (err) {
+      console.error('[ConfigEmpresa] save info_extendida:', err);
+      setInfoSaveError('No se pudo guardar. Intentá de nuevo.');
+    } finally {
+      setInfoSaving(false);
+    }
+  };
 
   // ── Centros de costo ──
   const [centrosEnabled, setCentrosEnabled] = useState(true);
@@ -191,6 +400,126 @@ export default function ConfiguracionEmpresaScreen({ user, onOpenModules, onLogo
               Cambios guardados
             </div>
           )}
+        </div>
+
+        {/* ── Información extendida (info_extendida) ── */}
+        <div className="ce-card">
+          <div className="ce-card-header">
+            <div className="ce-card-title-row">
+              <div className="ce-card-icon">
+                <Sparkles size={18} />
+              </div>
+              <div>
+                <h3>Información extendida</h3>
+                <p>
+                  Datos opcionales que enriquecen el contexto que tienen las IAs sobre tu empresa.
+                  Activá solo los campos que quieras compartir; los apagados no se incluyen en el
+                  comportamiento de las IAs.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="ce-campos-list">
+            {!infoLoaded && (
+              <div className="ce-list-status">
+                <Loader2 size={14} className="ce-spin" />
+                Cargando información...
+              </div>
+            )}
+
+            <CampoTexto
+              campo="rubro"
+              label="Rubro / actividad principal"
+              helpText="Texto corto que define a qué se dedica la empresa. Ej: 'Construcción civil y suministro de materiales para obras'."
+              placeholder="Construcción civil y suministro de materiales..."
+              activo={infoExtendida.rubro.activo}
+              valor={infoExtendida.rubro.valor}
+              onActivoChange={(v) => setActivo('rubro', v)}
+              onValorChange={(v) => setValor('rubro', v)}
+            />
+
+            <CampoTextarea
+              campo="descripcion"
+              label="Descripción de la empresa"
+              helpText="1-2 oraciones describiendo a la empresa. Aparece cuando el cliente pregunta '¿quiénes son ustedes?'."
+              placeholder="Empresa peruana con 20 años de experiencia en proyectos eléctricos..."
+              maxLength={300}
+              activo={infoExtendida.descripcion.activo}
+              valor={infoExtendida.descripcion.valor}
+              onActivoChange={(v) => setActivo('descripcion', v)}
+              onValorChange={(v) => setValor('descripcion', v)}
+            />
+
+            <CampoTexto
+              campo="direccion"
+              label="Dirección física"
+              helpText="Dirección física principal (oficina o almacén). Incluí distrito y ciudad."
+              placeholder="Av. Javier Prado 1234, San Isidro, Lima"
+              activo={infoExtendida.direccion.activo}
+              valor={infoExtendida.direccion.valor}
+              onActivoChange={(v) => setActivo('direccion', v)}
+              onValorChange={(v) => setValor('direccion', v)}
+            />
+
+            <CampoTexto
+              campo="email_contacto"
+              label="Email de contacto"
+              helpText="Email de contacto general que el agente puede compartir con clientes."
+              placeholder="contacto@empresa.com"
+              type="email"
+              activo={infoExtendida.email_contacto.activo}
+              valor={infoExtendida.email_contacto.valor}
+              onActivoChange={(v) => setActivo('email_contacto', v)}
+              onValorChange={(v) => setValor('email_contacto', v)}
+            />
+
+            <CampoTexto
+              campo="horario_atencion"
+              label="Horario de atención"
+              helpText="Horario en lenguaje natural. Ej: 'Lunes a viernes 8am-6pm, sábados 8am-1pm'."
+              placeholder="Lunes a viernes 8am-6pm"
+              activo={infoExtendida.horario_atencion.activo}
+              valor={infoExtendida.horario_atencion.valor}
+              onActivoChange={(v) => setActivo('horario_atencion', v)}
+              onValorChange={(v) => setValor('horario_atencion', v)}
+            />
+
+            <CampoRedes
+              campo="redes_sociales"
+              label="Redes sociales"
+              helpText="Redes sociales activas de la empresa. El agente puede mencionarlas si el cliente pide más info."
+              activo={infoExtendida.redes_sociales.activo}
+              valor={infoExtendida.redes_sociales.valor}
+              onActivoChange={(v) => setActivo('redes_sociales', v)}
+              onValorChange={(v) => setValor('redes_sociales', v)}
+            />
+          </div>
+
+          <div className="ce-section-actions">
+            <button
+              type="button"
+              className="ce-btn-primary"
+              onClick={handleSaveInfoExtendida}
+              disabled={infoSaving}
+            >
+              {infoSaving ? (
+                <><Loader2 size={14} className="ce-spin" /> Guardando...</>
+              ) : (
+                <>Guardar</>
+              )}
+            </button>
+            {infoSavedHint && (
+              <span className="ce-saved-hint inline">
+                <CheckCircle2 size={14} /> Guardado
+              </span>
+            )}
+            {infoSaveError && (
+              <span className="ce-save-error">
+                <AlertCircle size={14} /> {infoSaveError}
+              </span>
+            )}
+          </div>
         </div>
 
         {/* ── Centros de costo ── */}
