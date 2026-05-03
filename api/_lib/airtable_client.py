@@ -4,14 +4,10 @@ Cliente HTTP mínimo para Airtable usando solo urllib.
 No depende de paquetes externos (mismo patrón que api/login.py).
 Lee credenciales de las env vars AIRTABLE_TOKEN y AIRTABLE_BASE_ID.
 
-Soporta dos bases en paralelo:
-  • AIRTABLE_BASE_ID         → base original ("Tablas CMEJIA SAC"):
-                                Empleados, productos, solicitudes_caja, obras...
-  • AIRTABLE_VENTAS_BASE_ID  → base nueva ("ventas_inteligentes"):
-                                wa_sessions, conversaciones, mensajes, outbox
-
-Todas las funciones públicas aceptan un parámetro opcional `base_id`. Si
-no se pasa, se usa AIRTABLE_BASE_ID (comportamiento legacy, no rompe nada).
+Todas las funciones públicas aceptan un parámetro opcional `base_id`.
+Si no se pasa, se usa AIRTABLE_BASE_ID del env (comportamiento normal).
+El parámetro queda disponible como foundation por si en el futuro se
+necesita acceder a otra base; hoy todas las tablas viven en una sola.
 
 Forma de los registros devueltos: {"id": <recId>, "fields": {...}}.
 """
@@ -150,17 +146,3 @@ def delete_record(table: str, record_id: str, base_id: str | None = None) -> dic
     """Elimina un registro. Devuelve {'deleted': True, 'id': ...}."""
     url = f"{_table_url(table, base_id=base_id)}/{urllib.parse.quote(record_id)}"
     return _request("DELETE", url)
-
-
-# ─────────────────────────────────────────────────────────────────────────
-# Helpers semánticos para la base de ventas
-# ─────────────────────────────────────────────────────────────────────────
-
-def get_ventas_base_id() -> str:
-    """Devuelve el ID de la base de ventas_inteligentes (env: AIRTABLE_VENTAS_BASE_ID)."""
-    base = os.environ.get("AIRTABLE_VENTAS_BASE_ID")
-    if not base:
-        raise AirtableError(
-            "Falta AIRTABLE_VENTAS_BASE_ID en las variables de entorno."
-        )
-    return base

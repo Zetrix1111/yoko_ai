@@ -10,12 +10,11 @@ En su lugar, exponemos:
     `client.chat.completions.create`.
   • `execute_ventas_tool(name, args, context)`: dispatcher.
 
-Las tablas de productos viven en la base ORIGINAL (`AIRTABLE_BASE_ID`,
-"Tablas CMEJIA SAC"). Las tablas de mensajes/conversaciones viven en la
-base de ventas (`AIRTABLE_VENTAS_BASE_ID`). Estas tools solo leen productos.
+Todas las tablas (productos, conversaciones, mensajes, wa_sessions, outbox)
+viven en la base default `AIRTABLE_BASE_ID`. Multi-tenant via la columna
+`empresa_id`. Estas tools solo leen productos.
 """
 
-import os
 from .. import airtable_client
 from ..airtable_client import AirtableError
 

@@ -1,7 +1,7 @@
 """
 api/mensajes.py — historial + envío de mensajes humanos.
 
-Tabla: `mensajes` en AIRTABLE_VENTAS_BASE_ID.
+Tabla: `mensajes` (en la base default AIRTABLE_BASE_ID).
 
 Métodos:
   GET ?conversacion_id=recXXX   → historial completo (orden ASC)
@@ -35,10 +35,6 @@ _TABLA_CONV = "conversaciones"
 _TABLA_OUTBOX = "outbox"
 
 
-def _ventas_base() -> str:
-    return airtable_client.get_ventas_base_id()
-
-
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -68,11 +64,10 @@ class handler(BaseHTTPRequestHandler):
             if not conv_id:
                 return self._json(400, {"error": "Falta conversacion_id."})
 
-            base = _ventas_base()
             # Linked records en Airtable se filtran con FIND sobre el ID
             formula = f"FIND('{conv_id}', ARRAYJOIN({{conversacion_id}}))"
             records = airtable_client.list_records(
-                _TABLA_MSGS, filter_formula=formula, max_records=100, base_id=base,
+                _TABLA_MSGS, filter_formula=formula, max_records=100,
             )
             mensajes = [_normalize_msg(r) for r in records]
             mensajes.sort(key=lambda m: m.get("created_at") or "")
@@ -101,10 +96,8 @@ class handler(BaseHTTPRequestHandler):
             if role not in ("user", "assistant", "human"):
                 return self._json(400, {"error": "role debe ser user|assistant|human."})
 
-            base = _ventas_base()
-
             # Cargar conversación para obtener empresa_id + phone (para outbox)
-            conv_rec = airtable_client.get_record(_TABLA_CONV, conv_id, base_id=base)
+            conv_rec = airtable_client.get_record(_TABLA_CONV, conv_id)
             conv_f = conv_rec.get("fields", {})
             empresa_id = conv_f.get("empresa_id")
             phone = conv_f.get("phone")
@@ -123,7 +116,6 @@ class handler(BaseHTTPRequestHandler):
                     "content":         content,
                     "created_at":      now,
                 },
-                base_id=base,
             )
 
             # 2) Si es human, encolar en outbox para que el bot lo envíe
@@ -138,7 +130,6 @@ class handler(BaseHTTPRequestHandler):
                         "sent":            False,
                         "created_at":      now,
                     },
-                    base_id=base,
                 )
 
             # 3) Actualizar last_message_at en la conversación
@@ -146,7 +137,6 @@ class handler(BaseHTTPRequestHandler):
                 airtable_client.update_record(
                     _TABLA_CONV, conv_id,
                     {"last_message_at": now},
-                    base_id=base,
                 )
             except AirtableError as e:
                 print(f"[mensajes] No se actualizó last_message_at: {e}", file=sys.stderr)

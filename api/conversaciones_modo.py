@@ -25,10 +25,6 @@ from _lib.airtable_client import AirtableError        # noqa: E402
 _TABLA = "conversaciones"
 
 
-def _ventas_base() -> str:
-    return airtable_client.get_ventas_base_id()
-
-
 class handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
@@ -45,7 +41,7 @@ class handler(BaseHTTPRequestHandler):
                 return self._json(400, {"error": "modo debe ser 'AI' o 'HUMAN'."})
 
             rec = airtable_client.update_record(
-                _TABLA, conv_id, {"modo": modo}, base_id=_ventas_base(),
+                _TABLA, conv_id, {"modo": modo},
             )
             return self._json(200, {
                 "ok":   True,

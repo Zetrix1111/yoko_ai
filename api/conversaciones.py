@@ -1,7 +1,8 @@
 """
 api/conversaciones.py — CRUD de conversaciones del módulo Ventas Inteligentes.
 
-Tabla Airtable: `conversaciones` en la base AIRTABLE_VENTAS_BASE_ID.
+Tabla Airtable: `conversaciones` (en la base default AIRTABLE_BASE_ID).
+Multi-tenant via columna empresa_id.
 
 Métodos:
   GET                 → listar conversaciones del tenant (ordenadas por last_message_at desc)
@@ -32,10 +33,6 @@ def _tenant_id() -> str:
     return os.environ.get("TENANT_ID") or _FALLBACK_TENANT
 
 
-def _ventas_base() -> str:
-    return airtable_client.get_ventas_base_id()
-
-
 def _normalize(rec: dict) -> dict:
     f = rec.get("fields", {})
     return {
@@ -57,13 +54,13 @@ class handler(BaseHTTPRequestHandler):
             rec_id = (qs.get("id") or [None])[0]
 
             if rec_id:
-                rec = airtable_client.get_record(_TABLA, rec_id, base_id=_ventas_base())
+                rec = airtable_client.get_record(_TABLA, rec_id)
                 return self._json(200, {"conversacion": _normalize(rec)})
 
             tenant = _tenant_id()
             formula = f"{{empresa_id}}='{tenant}'"
             records = airtable_client.list_records(
-                _TABLA, filter_formula=formula, max_records=100, base_id=_ventas_base(),
+                _TABLA, filter_formula=formula, max_records=100,
             )
             convs = [_normalize(r) for r in records]
             # Ordenar por last_message_at desc (más reciente arriba). Airtable no
@@ -85,21 +82,19 @@ class handler(BaseHTTPRequestHandler):
             if not rec_id:
                 return self._json(400, {"error": "Falta query param 'id'."})
 
-            base = _ventas_base()
-
             # Borrar mensajes asociados primero
             try:
                 msgs = airtable_client.list_records(
                     _TABLA_MENSAJES,
                     filter_formula=f"{{conversacion_id}}='{rec_id}'",
-                    max_records=100, base_id=base,
+                    max_records=100,
                 )
                 for m in msgs:
-                    airtable_client.delete_record(_TABLA_MENSAJES, m["id"], base_id=base)
+                    airtable_client.delete_record(_TABLA_MENSAJES, m["id"])
             except AirtableError as e:
                 print(f"[conversaciones] No se pudo borrar mensajes: {e}", file=sys.stderr)
 
-            airtable_client.delete_record(_TABLA, rec_id, base_id=base)
+            airtable_client.delete_record(_TABLA, rec_id)
             return self._json(200, {"ok": True, "id": rec_id})
 
         except AirtableError as e:

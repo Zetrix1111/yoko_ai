@@ -1,7 +1,7 @@
 """
 api/wa.py — estado de sesión WhatsApp + comandos connect/disconnect.
 
-Tabla: `wa_sessions` (1 row por tenant) en AIRTABLE_VENTAS_BASE_ID.
+Tabla: `wa_sessions` (1 row por tenant) en la base default AIRTABLE_BASE_ID.
 
 Métodos:
   GET  ?empresa_id=cmejia              → estado de sesión + qr_string raw
@@ -35,10 +35,6 @@ _TABLA = "wa_sessions"
 _FALLBACK_TENANT = "cmejia"
 
 
-def _ventas_base() -> str:
-    return airtable_client.get_ventas_base_id()
-
-
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -47,7 +43,7 @@ def _find_session(empresa_id: str) -> dict | None:
     """Devuelve la row de wa_sessions del tenant o None si no existe."""
     formula = f"{{empresa_id}}='{empresa_id}'"
     records = airtable_client.list_records(
-        _TABLA, filter_formula=formula, max_records=1, base_id=_ventas_base(),
+        _TABLA, filter_formula=formula, max_records=1,
     )
     return records[0] if records else None
 
@@ -129,7 +125,6 @@ class handler(BaseHTTPRequestHandler):
         cuando ve una row con status disconnected y no la tiene en memoria,
         arranca un nuevo socket Baileys para ese tenant).
         """
-        base = _ventas_base()
         existing = _find_session(empresa_id)
         fields = {
             "empresa_id": empresa_id,
@@ -138,23 +133,19 @@ class handler(BaseHTTPRequestHandler):
             "phone":      "",
         }
         if existing:
-            rec = airtable_client.update_record(
-                _TABLA, existing["id"], fields, base_id=base,
-            )
+            rec = airtable_client.update_record(_TABLA, existing["id"], fields)
         else:
-            rec = airtable_client.create_record(_TABLA, fields, base_id=base)
+            rec = airtable_client.create_record(_TABLA, fields)
         return self._json(200, {"session": _normalize(rec)})
 
     def _do_disconnect(self, empresa_id: str):
         """Bota la sesión: setea status=disconnected y limpia qr/phone."""
-        base = _ventas_base()
         existing = _find_session(empresa_id)
         if not existing:
             return self._json(200, {"ok": True, "note": "Tenant sin sesión."})
         rec = airtable_client.update_record(
             _TABLA, existing["id"],
             {"status": "disconnected", "qr_string": "", "phone": ""},
-            base_id=base,
         )
         return self._json(200, {"session": _normalize(rec)})
 
