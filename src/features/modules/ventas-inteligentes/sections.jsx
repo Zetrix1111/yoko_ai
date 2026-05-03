@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, Component } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Plus, X, Sparkles, Users, MessageCircle, ShoppingBag, ArrowUpRight,
@@ -52,6 +52,50 @@ function Toggle({ checked, onChange, ariaLabel }) {
       <span className="vom-toggle-thumb" />
     </button>
   );
+}
+
+// Error Boundary local — captura crashes en sub-secciones para no dejar
+// la página en blanco. Muestra el mensaje del error para diagnóstico.
+class SectionErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, info) {
+    console.error('[SectionErrorBoundary] Crash:', error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      const err = this.state.error;
+      const msg = err?.message || String(err);
+      const stack = err?.stack || '';
+      return (
+        <div className="vom-card" style={{ padding: '1.5rem', borderColor: 'var(--md-error)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--md-error)', marginBottom: '0.5rem' }}>
+            <AlertCircle size={18} />
+            <strong>Error en esta sección</strong>
+          </div>
+          <div style={{ fontSize: '0.85rem', color: 'var(--md-on-surface)', marginBottom: '0.5rem' }}>
+            {msg}
+          </div>
+          <pre style={{ fontSize: '0.7rem', color: 'var(--md-on-surface-variant)', whiteSpace: 'pre-wrap', maxHeight: 200, overflow: 'auto', background: 'var(--md-surface-variant)', padding: '0.5rem', borderRadius: 6 }}>
+            {stack}
+          </pre>
+          <button
+            className="vom-btn vom-btn-ghost"
+            style={{ marginTop: '0.75rem' }}
+            onClick={() => this.setState({ hasError: false, error: null })}
+          >
+            Reintentar
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
 }
 
 function Modal({ title, onClose, children }) {
@@ -1083,14 +1127,20 @@ function CanalesBlock() {
 }
 
 function WhatsAppCard({ status, qrString, phone, error, actionLoading, onConnect, onDisconnect }) {
-  // Estados visuales:
-  //   - disconnected → CTA "Vincular WhatsApp"
-  //   - qr (sin qr_string aún) → "Generando QR..."
-  //   - qr (con qr_string)     → mostrar QR escaneable
-  //   - connecting             → "Conectando..."
-  //   - connected              → "Conectado · phone" + Desconectar
+  // Coerción defensiva: Airtable a veces devuelve campos como arrays/objetos
+  // si la columna fue cambiada de tipo. Si llega algo raro, lo serializamos
+  // a string en lugar de crashear React (#130 "Objects are not valid as a React child").
+  const safe = (v) => {
+    if (v == null) return '';
+    if (typeof v === 'string' || typeof v === 'number') return v;
+    if (Array.isArray(v)) return v.map(safe).join(', ');
+    try { return JSON.stringify(v); } catch { return ''; }
+  };
+  const phoneStr  = safe(phone);
+  const qrStr     = safe(qrString);
+  const statusStr = safe(status) || 'disconnected';
   return (
-    <div className={`vom-channel-row ${status === 'connected' ? 'connected' : 'disconnected'}`} style={{ flexDirection: 'column', alignItems: 'stretch', gap: '1rem' }}>
+    <div className={`vom-channel-row ${statusStr === 'connected' ? 'connected' : 'disconnected'}`} style={{ flexDirection: 'column', alignItems: 'stretch', gap: '1rem' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', width: '100%' }}>
         <div className="vom-channel-icon">
           <MessageCircle size={18} />
@@ -1098,11 +1148,11 @@ function WhatsAppCard({ status, qrString, phone, error, actionLoading, onConnect
         <div className="vom-channel-info" style={{ flex: 1 }}>
           <div className="vom-channel-name">WhatsApp Business</div>
           <div className="vom-channel-meta">
-            {status === 'connected' && phone ? phone : statusLabel(status)}
+            {statusStr === 'connected' && phoneStr ? phoneStr : statusLabel(statusStr)}
           </div>
         </div>
-        <span className={`vom-channel-status ${status === 'connected' ? 'connected' : 'disconnected'}`}>
-          {statusLabel(status)}
+        <span className={`vom-channel-status ${statusStr === 'connected' ? 'connected' : 'disconnected'}`}>
+          {statusLabel(statusStr)}
         </span>
 
         {status === 'disconnected' && (
@@ -1131,16 +1181,16 @@ function WhatsAppCard({ status, qrString, phone, error, actionLoading, onConnect
       </div>
 
       {/* QR */}
-      {(status === 'qr' || status === 'connecting') && (
+      {(statusStr === 'qr' || statusStr === 'connecting') && (
         <div style={{
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
           padding: '1.25rem', background: 'var(--md-surface)', borderRadius: '12px',
           border: '1px solid var(--md-outline-variant)',
         }}>
-          {qrString ? (
+          {qrStr ? (
             <>
               <div style={{ background: 'white', padding: '12px', borderRadius: '12px' }}>
-                <QRCode value={qrString} size={240} />
+                <QRCode value={qrStr} size={240} />
               </div>
               <p style={{ marginTop: '1rem', fontSize: '0.88rem', color: 'var(--md-on-surface)', textAlign: 'center', maxWidth: 320 }}>
                 <strong>Escaneá con tu WhatsApp:</strong><br />
@@ -1154,7 +1204,7 @@ function WhatsAppCard({ status, qrString, phone, error, actionLoading, onConnect
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.6rem', padding: '2rem' }}>
               <Loader2 size={32} className="ce-spin" style={{ color: 'var(--md-primary)' }} />
               <p style={{ fontSize: '0.88rem', color: 'var(--md-on-surface-variant)' }}>
-                {status === 'connecting' ? 'Conectando...' : 'Generando código QR...'}
+                {statusStr === 'connecting' ? 'Conectando...' : 'Generando código QR...'}
               </p>
             </div>
           )}
@@ -1164,7 +1214,7 @@ function WhatsAppCard({ status, qrString, phone, error, actionLoading, onConnect
       {error && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.78rem', color: 'var(--md-error)' }}>
           <AlertCircle size={14} />
-          {error}
+          {safe(error)}
         </div>
       )}
     </div>
@@ -1195,7 +1245,9 @@ export function ConfiguracionSection() {
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         {/* Canales como bloque destacado dentro de Configuración */}
-        <CanalesBlock />
+        <SectionErrorBoundary>
+          <CanalesBlock />
+        </SectionErrorBoundary>
 
         <ConfigCard
           title="Webhooks"
