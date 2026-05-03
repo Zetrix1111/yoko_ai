@@ -42,6 +42,7 @@ export const API = {
   MENSAJES:            '/api/ventas?resource=mensajes',
   CONVERSACIONES_MODO: '/api/ventas?resource=conversaciones_modo',
   SALES_CHAT:          '/api/ventas?resource=sales_chat',
+  VENTAS_CONFIG:       '/api/ventas?resource=config',
 };
 
 export async function getJson(url) {

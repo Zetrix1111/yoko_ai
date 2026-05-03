@@ -1293,3 +1293,333 @@
 @keyframes ce-spin {
   to { transform: rotate(360deg); }
 }
+
+/* ─────────────────────────────────────────────────────────────────────
+   Contexto del agente IA — config.ventas.* (paso 4)
+   ───────────────────────────────────────────────────────────────────── */
+
+.via-config-block {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.via-config-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding-top: 1rem;
+  border-top: 1px solid #E2E8F0;
+}
+
+.via-config-group:first-of-type {
+  border-top: none;
+  padding-top: 0;
+}
+
+.via-config-group-title {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--md-on-surface-variant);
+}
+
+.via-config-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.85rem;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 12px;
+  background: var(--md-surface);
+  transition: opacity 0.18s, border-color 0.18s;
+}
+
+.via-config-row.disabled {
+  opacity: 0.55;
+}
+
+.via-config-row.disabled .via-config-row-input {
+  pointer-events: none;
+}
+
+.via-config-row-header {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.via-config-row-label {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #0F172A;
+}
+
+.via-config-row-optional {
+  font-weight: 400;
+  font-size: 0.8rem;
+  color: var(--md-on-surface-variant);
+}
+
+.via-config-row-input {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.via-config-row-input .vom-input,
+.via-config-row-input .vom-textarea {
+  width: 100%;
+}
+
+.via-config-row-help {
+  font-size: 0.8rem;
+  color: var(--md-on-surface-variant);
+  line-height: 1.4;
+}
+
+/* Radio / checkbox groups */
+.via-radio-group,
+.via-check-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.via-radio-option,
+.via-check-option {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.88rem;
+  color: #0F172A;
+  background: var(--md-surface);
+  transition: border-color 0.18s, background 0.18s;
+}
+
+.via-radio-option:hover:not(.selected),
+.via-check-option:hover:not(.selected) {
+  border-color: var(--md-primary);
+  background: rgba(78, 122, 94, 0.04);
+}
+
+.via-radio-option.selected,
+.via-check-option.selected {
+  border-color: var(--md-primary);
+  background: rgba(78, 122, 94, 0.08);
+}
+
+.via-radio-option input,
+.via-check-option input {
+  margin: 0;
+  accent-color: var(--md-primary);
+}
+
+/* Subfield grid (politica_precios, asesor_humano) */
+.via-subfield-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.7rem;
+}
+
+.via-subfield {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.via-subfield-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+@media (max-width: 640px) {
+  .via-subfield-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Info adicional editor */
+.via-info-adicional {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.via-info-adicional-header {
+  font-size: 0.8rem;
+  color: var(--md-on-surface-variant);
+}
+
+.via-info-adicional-empty {
+  padding: 0.85rem;
+  border: 1.5px dashed var(--md-outline-variant);
+  border-radius: 10px;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--md-on-surface-variant);
+  font-style: italic;
+}
+
+.via-info-adicional-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.75rem;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 10px;
+  background: var(--md-surface-variant);
+}
+
+.via-info-adicional-entry-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.via-info-adicional-entry-head .vom-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.via-info-adicional-vencida {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: #E2E8F0;
+  color: #475569;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.via-info-adicional-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 8px;
+  background: var(--md-surface);
+  color: #94A3B8;
+  cursor: pointer;
+  transition: border-color 0.18s, color 0.18s;
+}
+
+.via-info-adicional-remove:hover:not(:disabled) {
+  border-color: var(--md-error);
+  color: var(--md-error);
+}
+
+.via-info-adicional-remove:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.via-info-adicional-counter {
+  font-size: 0.72rem;
+  color: var(--md-on-surface-variant);
+  text-align: right;
+}
+
+.via-info-adicional-vigencia {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.via-info-adicional-vigencia label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.via-info-adicional-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  align-self: flex-start;
+  padding: 0.5rem 0.85rem;
+  border: 1px dashed var(--md-primary);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--md-primary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.18s;
+}
+
+.via-info-adicional-add:hover:not(:disabled) {
+  background: rgba(78, 122, 94, 0.06);
+}
+
+.via-info-adicional-add:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Action bar */
+.via-config-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding-top: 1rem;
+  border-top: 1px solid #E2E8F0;
+  flex-wrap: wrap;
+}
+
+.via-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.65rem 1.2rem;
+  border: none;
+  border-radius: 10px;
+  background: var(--md-primary);
+  color: white;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.18s;
+}
+
+.via-btn-primary:hover:not(:disabled) {
+  background: var(--md-primary-hover);
+}
+
+.via-btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.via-saved-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--md-primary);
+}
+
+.via-save-error {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--md-error);
+}
