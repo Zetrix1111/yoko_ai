@@ -30,6 +30,24 @@ function getClient(): AxiosInstance {
     },
     timeout: 15000,
   });
+  // Interceptor: convierte errores de Airtable en mensajes legibles. Sin esto
+  // el log de Node trunca el body y solo vemos "[Object]".
+  _client.interceptors.response.use(
+    (res) => res,
+    (err) => {
+      const status = err?.response?.status;
+      const data = err?.response?.data;
+      const msg =
+        data?.error?.message ||
+        data?.error?.type ||
+        (typeof data === "string" ? data : JSON.stringify(data || {}));
+      const url = err?.config?.url;
+      const method = err?.config?.method?.toUpperCase();
+      err.airtableMessage = `[Airtable ${status}] ${method} ${url} → ${msg}`;
+      err.message = err.airtableMessage;
+      return Promise.reject(err);
+    },
+  );
   return _client;
 }
 

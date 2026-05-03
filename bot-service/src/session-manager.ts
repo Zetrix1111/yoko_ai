@@ -135,12 +135,14 @@ export class SessionManager {
    * Heartbeat: actualiza last_seen_at en Airtable para sesiones activas.
    * Usa touchWaSession (NO upsert) — si el usuario borró la row, no la
    * recreamos. El próximo pollOnce detectará la ausencia y matará la sesión.
+   *
+   * Formato YYYY-MM-DD porque el campo Airtable es Date sin hora.
    */
   private async heartbeat(): Promise<void> {
-    const now = new Date().toISOString();
+    const today = new Date().toISOString().slice(0, 10);
     for (const empresaId of this.sessions.keys()) {
       try {
-        await airtable.touchWaSession(empresaId, { last_seen_at: now });
+        await airtable.touchWaSession(empresaId, { last_seen_at: today });
       } catch {
         // No bloqueante.
       }

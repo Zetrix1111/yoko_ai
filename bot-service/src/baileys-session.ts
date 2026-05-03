@@ -128,7 +128,8 @@ export class WaSession {
           status:       "connected",
           qr_string:    "",
           phone,
-          connected_at: new Date().toISOString(),
+          // El campo Airtable es "Date" sin hora → mandamos solo YYYY-MM-DD.
+          connected_at: todayISODate(),
         });
       } catch (err) {
         console.error(`[${this.empresaId}] No se pudo persistir 'connected':`, err);
@@ -288,4 +289,9 @@ function phoneToJid(phone: string): string {
   // "+51 987 654 321" → "51987654321@s.whatsapp.net"
   const digits = phone.replace(/\D/g, "");
   return `${digits}@s.whatsapp.net`;
+}
+
+function todayISODate(): string {
+  // YYYY-MM-DD en UTC. Compatible con campos Airtable de tipo "Date" (sin hora).
+  return new Date().toISOString().slice(0, 10);
 }
