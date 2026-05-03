@@ -293,6 +293,8 @@ def _conversaciones_delete(self):
 
 def _msg_normalize(rec: dict) -> dict:
     f = rec.get("fields", {})
+    # conversacion_id es Single line text. Si por algún motivo viene como
+    # array (ej. el campo se cambió a Linked Record después), tomamos el primero.
     conv = f.get("conversacion_id")
     if isinstance(conv, list) and conv:
         conv = conv[0]
@@ -312,8 +314,8 @@ def _mensajes_get(self):
         conv_id = qs.get("conversacion_id")
         if not conv_id:
             return self._json(400, {"error": "Falta conversacion_id."})
-        # Linked records → FIND sobre ARRAYJOIN
-        formula = f"FIND('{conv_id}', ARRAYJOIN({{conversacion_id}}))"
+        # Text field → match directo
+        formula = f"{{conversacion_id}}='{conv_id}'"
         records = airtable_client.list_records(_TABLA_MSGS, filter_formula=formula, max_records=100)
         mensajes = [_msg_normalize(r) for r in records]
         mensajes.sort(key=lambda m: m.get("created_at") or "")
@@ -347,8 +349,9 @@ def _mensajes_post(self):
 
         now = _now_iso()
 
+        # conversacion_id es Single line text → string, no array
         msg_rec = airtable_client.create_record(_TABLA_MSGS, {
-            "conversacion_id": [conv_id],
+            "conversacion_id": conv_id,
             "empresa_id":      empresa_id,
             "role":            role,
             "content":         content,
@@ -357,7 +360,7 @@ def _mensajes_post(self):
 
         if role == "human":
             airtable_client.create_record(_TABLA_OUTBOX, {
-                "conversacion_id": [conv_id],
+                "conversacion_id": conv_id,
                 "empresa_id":      empresa_id,
                 "phone":           phone,
                 "content":         content,

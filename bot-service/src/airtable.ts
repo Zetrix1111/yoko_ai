@@ -168,8 +168,10 @@ export async function insertMensaje(
   role: "user" | "assistant" | "human",
   content: string,
 ): Promise<void> {
+  // conversacion_id es Single line text en Airtable (no Linked Record),
+  // así que enviamos string, NO array.
   await createRecord("mensajes", {
-    conversacion_id: [conversacionId],
+    conversacion_id: conversacionId,
     empresa_id:      empresaId,
     role,
     content,
@@ -178,9 +180,9 @@ export async function insertMensaje(
 }
 
 export async function getMensajesByConv(conversacionId: string, limit = 20): Promise<AirtableRecord[]> {
-  // Linked records se filtran con FIND sobre ARRAYJOIN
+  // Text field → match directo
   const records = await listRecords("mensajes", {
-    filterByFormula: `FIND('${escapeFormula(conversacionId)}', ARRAYJOIN({conversacion_id}))`,
+    filterByFormula: `{conversacion_id}='${escapeFormula(conversacionId)}'`,
     maxRecords: limit,
   });
   records.sort((a, b) =>
