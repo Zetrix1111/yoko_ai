@@ -179,13 +179,18 @@ def _build_sobre_empresa_block(info_extendida: dict | None) -> list[str]:
 # ─────────────────────────────────────────────────────────────────────────
 
 def _build_estilo_block(ventas: dict) -> list[str]:
+    """
+    Estándalone devuelve `["", "# ESTILO DE COMUNICACIÓN", "**Tono...** ...]`.
+    El prefijo `**Tono y tratamiento:**` está en el contenido, NO en el header,
+    para que sobreviva al strip cuando se agrupa bajo "# CÓMO COMUNICARTE".
+    """
     campo = ventas.get("estilo_vendedor")
     if not _campo_activo(campo):
         return []
     instr = ESTILO_INSTRUCCIONES.get(campo["valor"])
     if not instr:
         return []
-    return ["", "# ESTILO DE COMUNICACIÓN", instr]
+    return ["", "# ESTILO DE COMUNICACIÓN", f"**Tono y tratamiento:** {instr}"]
 
 
 def _build_identidad_vendedor_block(ventas: dict, razon_social: str) -> list[str]:
@@ -198,7 +203,7 @@ def _build_identidad_vendedor_block(ventas: dict, razon_social: str) -> list[str
     return [
         "",
         "# IDENTIDAD DEL VENDEDOR",
-        f"Te llamás {nombre} y representás a {razon_social}. Presentate por nombre solo en el primer mensaje, no en cada respuesta.",
+        f"**Tu nombre:** Te llamás {nombre} y representás a {razon_social}. Presentate por nombre solo en el primer mensaje, no en cada respuesta.",
     ]
 
 
@@ -209,7 +214,7 @@ def _build_cliente_objetivo_block(ventas: dict) -> list[str]:
     instr = TIPO_CLIENTE_INSTRUCCIONES.get(campo["valor"])
     if not instr:
         return []
-    return ["", "# CLIENTE OBJETIVO", instr]
+    return ["", "# CLIENTE OBJETIVO", f"**Tipo de cliente:** {instr}"]
 
 
 def _build_cobertura_block(ventas: dict) -> list[str]:
@@ -219,7 +224,7 @@ def _build_cobertura_block(ventas: dict) -> list[str]:
     return [
         "",
         "# COBERTURA",
-        f"Atendemos en: {campo['valor']}.",
+        f"**Zona de cobertura:** Atendemos en {campo['valor']}. "
         "Si el cliente está fuera de esta zona, decílo con claridad y derivá al asesor humano.",
     ]
 
@@ -231,7 +236,7 @@ def _build_tiempos_entrega_block(ventas: dict) -> list[str]:
     return [
         "",
         "# TIEMPOS DE ENTREGA / RESPUESTA",
-        str(campo["valor"]),
+        f"**Plazos:** {campo['valor']}",
         "No prometás plazos distintos a los indicados.",
     ]
 
@@ -246,7 +251,7 @@ def _build_metodos_pago_block(ventas: dict) -> list[str]:
     items = [METODOS_PAGO_LABELS[v] for v in valores if v in METODOS_PAGO_LABELS]
     if not items:
         return []
-    lines = ["", "# MÉTODOS DE PAGO ACEPTADOS"]
+    lines = ["", "# MÉTODOS DE PAGO ACEPTADOS", "**Métodos de pago aceptados:**"]
     lines.extend(f"- {it}" for it in items)
     lines.append(
         "Cuando el cliente confirme la compra, mencioná estos métodos. "
@@ -268,13 +273,17 @@ def _build_precios_block(ventas: dict) -> list[str]:
     comp_frase = COMPROBANTES_FRASES.get(comprobantes)
     if not igv_frase and not comp_frase:
         return []
-    lines = ["", "# PRECIOS Y COMPROBANTES"]
+    partes = []
     if igv_frase:
-        lines.append(f"Los precios del catálogo {igv_frase}.")
+        partes.append(f"Los precios del catálogo {igv_frase}.")
     if comp_frase:
-        lines.append(f"Comprobantes que emitimos: {comp_frase}.")
-    lines.append("Al cierre, pedí los datos correspondientes (RUC + razón social para factura, DNI para boleta).")
-    return lines
+        partes.append(f"Comprobantes que emitimos: {comp_frase}.")
+    return [
+        "",
+        "# PRECIOS Y COMPROBANTES",
+        f"**Precios y comprobantes:** {' '.join(partes)}",
+        "Al cierre, pedí los datos correspondientes (RUC + razón social para factura, DNI para boleta).",
+    ]
 
 
 def _build_derivacion_block(ventas: dict) -> list[str]:
@@ -299,7 +308,9 @@ def _build_derivacion_block(ventas: dict) -> list[str]:
     if not asesor_renderable and not criterios_renderable:
         return []
 
-    lines = ["", "# DERIVACIÓN A HUMANO"]
+    # La línea-etiqueta "**Derivación a humano:**" sobrevive al strip del header
+    # cuando este bloque se agrupa bajo "# CLIENTE OBJETIVO Y DERIVACIÓN".
+    lines = ["", "# DERIVACIÓN A HUMANO", "**Derivación a humano:**"]
     if asesor_renderable:
         partes = []
         if asesor_nombre:
@@ -332,9 +343,89 @@ def _build_horario_ia_block(ventas: dict, info_extendida: dict | None) -> list[s
     return [
         "",
         "# HORARIO DE LA IA",
-        f"Solo respondés en el horario de atención de la empresa: {horario}.",
+        f"**Horario de la IA:** Solo respondés en el horario de atención de la empresa: {horario}.",
         'Fuera de ese horario, respondé: "Hola, recibimos tu mensaje. Te respondemos en horario de atención."',
     ]
+
+
+def _strip_inner_header(block: list[str]) -> list[str]:
+    """
+    Elimina el header `# XYZ` y la línea en blanco que lo precede de un
+    sub-bloque, dejando solo el contenido. Usado por los wrappers de capa
+    cuando agrupan varios sub-bloques bajo un header común y no queremos
+    headers anidados.
+
+    Si el bloque no tiene header (p. ej. ya fue stripped), lo devuelve tal cual.
+    """
+    if not block:
+        return []
+    out = list(block)
+    # Quitar líneas en blanco iniciales
+    while out and out[0] == "":
+        out.pop(0)
+    # Quitar el header (si la primera línea empieza con "#")
+    if out and out[0].startswith("#"):
+        out.pop(0)
+    return out
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Wrappers de capa para el prompt de ventas (paso 7)
+# Agrupan sub-bloques bajo un header de capa y eliminan los headers
+# internos de los sub-bloques. Cada wrapper devuelve [] si NINGÚN
+# sub-bloque tiene contenido.
+# ─────────────────────────────────────────────────────────────────────────
+
+def _build_capa_comunicacion(ventas: dict, razon_social: str) -> list[str]:
+    """Capa 3: cómo comunicarte. Agrupa estilo + identidad del vendedor."""
+    estilo = _build_estilo_block(ventas)
+    identidad = _build_identidad_vendedor_block(ventas, razon_social)
+
+    sub_bloques = [b for b in (estilo, identidad) if b]
+    if not sub_bloques:
+        return []
+
+    out = ["", "# CÓMO COMUNICARTE"]
+    for sb in sub_bloques:
+        out.extend(_strip_inner_header(sb))
+    return out
+
+
+def _build_capa_reglas_operativas(ventas: dict) -> list[str]:
+    """Capa 5: reglas operativas. Cobertura + tiempos + métodos de pago + precios."""
+    cobertura = _build_cobertura_block(ventas)
+    tiempos   = _build_tiempos_entrega_block(ventas)
+    pagos     = _build_metodos_pago_block(ventas)
+    precios   = _build_precios_block(ventas)
+
+    sub_bloques = [b for b in (cobertura, tiempos, pagos, precios) if b]
+    if not sub_bloques:
+        return []
+
+    out = ["", "# REGLAS OPERATIVAS"]
+    for i, sb in enumerate(sub_bloques):
+        if i > 0:
+            out.append("")  # separador visual entre sub-bloques
+        out.extend(_strip_inner_header(sb))
+    return out
+
+
+def _build_capa_cliente_y_derivacion(ventas: dict, info_extendida: dict | None) -> list[str]:
+    """Capa 6: cliente objetivo + derivación a humano + horario de la IA."""
+    cliente_obj = _build_cliente_objetivo_block(ventas)
+    derivacion  = _build_derivacion_block(ventas)
+    horario     = _build_horario_ia_block(ventas, info_extendida)
+
+    sub_bloques = [b for b in (cliente_obj, derivacion, horario) if b]
+    if not sub_bloques:
+        return []
+
+    out = ["", "# CLIENTE OBJETIVO Y DERIVACIÓN"]
+    for i, sb in enumerate(sub_bloques):
+        if i > 0:
+            out.append("")
+        out.extend(_strip_inner_header(sb))
+    return out
 
 
 def _build_info_adicional_block(ventas: dict) -> list[str]:
@@ -487,9 +578,19 @@ def _format_producto_inline(p: dict) -> str:
 
 def _build_sales_prompt(config: dict, ctx: dict) -> str:
     """
-    Prompt especializado para el agente de ventas que corre detrás del
-    bot-baileys. NO incluye la secuencia de caja chica. Embebe el catálogo
-    de productos y reglas de tono comercial.
+    Prompt del agente de ventas (WhatsApp via bot-baileys), estructurado en 8 capas:
+
+      1. Identidad y cliente actual         (siempre)
+      2. Sobre la empresa                   (condicional, info_extendida)
+      3. Cómo comunicarte                   (condicional, estilo + nombre vendedor)
+      4. Catálogo y herramientas            (siempre)
+      5. Reglas operativas                  (condicional, cobertura/tiempos/pagos/precios)
+      6. Cliente objetivo y derivación      (condicional, tipo cliente/asesor/criterios/horario)
+      7. Conocimiento adicional             (condicional, info_adicional)
+      8. Comportamiento y formato           (siempre)
+
+    El orden va de lo más estable (identidad) a lo más volátil (FAQs/promos)
+    para que el LLM "ancle" en quién es antes de absorber reglas variables.
     """
     empresa = (config or {}).get("empresa", {}) or {}
     ventas = (config or {}).get("ventas", {}) or {}
@@ -502,12 +603,14 @@ def _build_sales_prompt(config: dict, ctx: dict) -> str:
     sender_nombre = sender.get("nombre") or "el cliente"
     sender_phone = sender.get("phone") or ""
 
+    lines: list[str] = []
+
+    # ── CAPA 1: Identidad y cliente actual (siempre) ──
     identidad = f"Eres un vendedor virtual de {razon_social}"
     if ruc:
         identidad += f" (RUC {ruc})"
     identidad += "."
-
-    lines: list[str] = [
+    lines.extend([
         identidad,
         "Estás respondiendo conversaciones de WhatsApp con clientes potenciales.",
         "Tu objetivo: ayudar al cliente a encontrar el producto que necesita y darle "
@@ -516,41 +619,47 @@ def _build_sales_prompt(config: dict, ctx: dict) -> str:
         "# CLIENTE ACTUAL",
         f"- Nombre (pushname WhatsApp): {sender_nombre}",
         f"- Teléfono: {sender_phone or '—'}",
+    ])
+
+    # ── CAPA 2: Sobre la empresa (condicional) ──
+    lines.extend(_build_sobre_empresa_block(info_extendida))
+
+    # ── CAPA 3: Cómo comunicarte (condicional, agrupada) ──
+    lines.extend(_build_capa_comunicacion(ventas, razon_social))
+
+    # ── CAPA 4: Catálogo y herramientas (siempre) ──
+    lines.extend([
         "",
         "# CATÁLOGO DISPONIBLE",
         f"({len(productos)} productos/servicios activos del catálogo)",
         "",
-    ]
-
+    ])
     if productos:
         for p in productos:
             lines.append(_format_producto_inline(p))
     else:
         lines.append("(No hay productos cargados aún en el catálogo.)")
 
-    # ── Bloques opcionales (config.ventas.* + empresa.info_extendida) ──
-    # Cada helper devuelve [] si está apagado / vacío. Si todos están apagados,
-    # el prompt queda byte-idéntico al original.
-    lines.extend(_build_sobre_empresa_block(info_extendida))
-    lines.extend(_build_estilo_block(ventas))
-    lines.extend(_build_identidad_vendedor_block(ventas, razon_social))
-    lines.extend(_build_cliente_objetivo_block(ventas))
-    lines.extend(_build_cobertura_block(ventas))
-    lines.extend(_build_tiempos_entrega_block(ventas))
-    lines.extend(_build_metodos_pago_block(ventas))
-    lines.extend(_build_precios_block(ventas))
-    lines.extend(_build_derivacion_block(ventas))
-    lines.extend(_build_horario_ia_block(ventas, info_extendida))
-    lines.extend(_build_info_adicional_block(ventas))
-
     lines.extend([
         "",
-        "# HERRAMIENTAS",
-        "Tienes dos herramientas disponibles:",
+        "## HERRAMIENTAS DEL CATÁLOGO",
         "- `consultar_productos(query?, solo_disponibles?, categoria?)` → "
         "búsqueda más detallada en el catálogo. Úsala si necesitás más info que la "
         "del listado de arriba (descripción completa, keywords, foto).",
         "- `consultar_stock(producto_id | nombre)` → stock exacto de un producto.",
+    ])
+
+    # ── CAPA 5: Reglas operativas (condicional, agrupada) ──
+    lines.extend(_build_capa_reglas_operativas(ventas))
+
+    # ── CAPA 6: Cliente objetivo y derivación (condicional, agrupada) ──
+    lines.extend(_build_capa_cliente_y_derivacion(ventas, info_extendida))
+
+    # ── CAPA 7: Conocimiento adicional (condicional) ──
+    lines.extend(_build_info_adicional_block(ventas))
+
+    # ── CAPA 8: Comportamiento y formato (siempre) ──
+    lines.extend([
         "",
         "# COMPORTAMIENTO",
         "1. Saludá cordialmente la primera vez. En mensajes siguientes ya no saludes.",
@@ -564,7 +673,9 @@ def _build_sales_prompt(config: dict, ctx: dict) -> str:
         "'me interesa', 'cómo lo pago'), pasá a modo cierre: confirmá producto y "
         "precio, pedí cantidad, y avisá que un asesor humano lo va a contactar para "
         "concretar el pago y la entrega.",
-        "7. NO uses emojis. NO uses markdown (**, *, #). El cliente lo lee en WhatsApp.",
+        "7. NO uses emojis. NO uses markdown (**, *, #) en tus respuestas. El cliente "
+        "lo lee en WhatsApp. Los `**` que ves arriba son solo etiquetas para que vos "
+        "identifiques cada sub-sección — NO los copies en tu respuesta.",
         "8. Si el cliente pide algo fuera de tu alcance (cotización formal, cambio "
         "de pedido, queja), respondé: 'Te derivo con un asesor humano para que te ayude.'",
     ])
