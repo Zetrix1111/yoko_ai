@@ -648,7 +648,7 @@ export function RespuestasIASection() {
   const handleDelete = async (id) => {
     if (!window.confirm('¿Eliminar esta conversación y todos sus mensajes?')) return;
     try {
-      await deleteJson(`${API.CONVERSACIONES}?id=${encodeURIComponent(id)}`);
+      await deleteJson(`${API.CONVERSACIONES}&id=${encodeURIComponent(id)}`);
       setConversaciones((curr) => curr.filter((c) => c.id !== id));
       if (selectedId === id) setSelectedId(null);
     } catch (err) {
@@ -768,7 +768,7 @@ function ConversacionPanel({ conversacion, onModoChange, onDelete }) {
     let timer = null;
     const tick = async () => {
       try {
-        const data = await getJson(`${API.MENSAJES}?conversacion_id=${encodeURIComponent(conversacion.id)}`);
+        const data = await getJson(`${API.MENSAJES}&conversacion_id=${encodeURIComponent(conversacion.id)}`);
         if (cancelled) return;
         const list = Array.isArray(data?.mensajes) ? data.mensajes : [];
         setMensajes((prev) => {
@@ -967,7 +967,7 @@ function CanalesBlock() {
 
     const tick = async () => {
       try {
-        const data = await getJson(`${API.WA}?empresa_id=${encodeURIComponent(empresaId)}`);
+        const data = await getJson(`${API.WA}&empresa_id=${encodeURIComponent(empresaId)}`);
         if (cancelled) return;
         setSession(data.session);
         setError(null);
@@ -999,7 +999,7 @@ function CanalesBlock() {
   const handleConnect = async () => {
     setActionLoading(true);
     try {
-      await postJson(`${API.WA}?action=connect`, { empresa_id: empresaId });
+      await postJson(`${API.WA}&action=connect`, { empresa_id: empresaId });
     } catch (err) {
       console.error('[CanalesBlock] connect:', err);
       alert('No se pudo iniciar la conexión.');
@@ -1012,7 +1012,7 @@ function CanalesBlock() {
     if (!window.confirm('¿Desconectar WhatsApp? El bot dejará de recibir y enviar mensajes.')) return;
     setActionLoading(true);
     try {
-      await postJson(`${API.WA}?action=disconnect`, { empresa_id: empresaId });
+      await postJson(`${API.WA}&action=disconnect`, { empresa_id: empresaId });
     } catch (err) {
       console.error('[CanalesBlock] disconnect:', err);
       alert('No se pudo desconectar.');

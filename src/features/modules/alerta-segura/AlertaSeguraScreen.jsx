@@ -1,7 +1,8 @@
 import ModuleLayout from '../ModuleLayout';
 
 // Módulo: Alerta Segura
-// Endpoint backend: POST /api/alerta_segura  (api/alerta_segura.py)
+// El módulo se abre como externalUrl en alertasegura.luna.com.pe; este screen
+// solo se renderiza si llegan via deep-link.
 export default function AlertaSeguraScreen({ user, onOpenModules, onLogout }) {
   return (
     <ModuleLayout title="Notificaciones y alertas" onOpenModules={onOpenModules} onLogout={onLogout}>

@@ -30,17 +30,17 @@ export const API = {
   CHAT: '/api/chat',
   UPLOAD: '/api/upload',
   PARSE_FILE: '/api/parse_file',
-  ALERTA_SEGURA: '/api/alerta_segura',
   FACTURAS_PROCESAR: '/api/facturas_procesar',
   FACTURAS_CONCAR: '/api/facturas_concar',
   CENTROS_COSTO: '/api/centros_costo',
   PRODUCTOS: '/api/productos',
-  // Ventas Inteligentes
-  WA: '/api/wa',
-  CONVERSACIONES: '/api/conversaciones',
-  MENSAJES: '/api/mensajes',
-  CONVERSACIONES_MODO: '/api/conversaciones_modo',
-  SALES_CHAT: '/api/sales_chat',
+  // Ventas Inteligentes — endpoints consolidados en /api/ventas?resource=...
+  // (Vercel Hobby plan limita a 12 funciones serverless)
+  WA:                  '/api/ventas?resource=wa',
+  CONVERSACIONES:      '/api/ventas?resource=conversaciones',
+  MENSAJES:            '/api/ventas?resource=mensajes',
+  CONVERSACIONES_MODO: '/api/ventas?resource=conversaciones_modo',
+  SALES_CHAT:          '/api/ventas?resource=sales_chat',
 };
 
 export async function getJson(url) {

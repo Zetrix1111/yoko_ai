@@ -26,7 +26,9 @@ export async function getSalesChatReply(args: SalesChatArgs): Promise<string> {
   if (!baseUrl) {
     throw new Error("Falta YOKO_BASE_URL en env.");
   }
-  const url = `${baseUrl.replace(/\/$/, "")}/api/sales_chat`;
+  // Endpoint consolidado en /api/ventas?resource=sales_chat (Vercel Hobby
+  // limita a 12 funciones serverless; ventas.py centraliza todos los endpoints).
+  const url = `${baseUrl.replace(/\/$/, "")}/api/ventas?resource=sales_chat`;
 
   const res = await axios.post(
     url,
