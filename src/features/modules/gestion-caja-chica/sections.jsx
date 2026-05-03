@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import {
   Plus, X, Check, XCircle, CreditCard, Search,
   TrendingUp, Wallet, Clock, ShieldCheck, ArrowUpRight,
-  Upload as UploadIcon,
+  Upload as UploadIcon, AlertCircle, CheckCircle2,
 } from 'lucide-react';
 import {
   STATS, SOLICITUDES, PAGOS, RENDICIONES,
@@ -11,6 +11,21 @@ import {
   AREAS, formatPEN, formatDate,
 } from './mockData';
 import { tenantConfig } from '../../../tenants';
+
+// Bridge a localStorage hasta que la persistencia en Airtable esté lista (paso 5).
+// Se reusa la MISMA key que ConfiguracionEmpresaScreen para guardar empresa
+// + proceso en un solo blob por tenant.
+const EMPRESA_STORAGE_KEY = `empresa_context_${tenantConfig.id}`;
+
+function loadProcesoCajaChica() {
+  try {
+    const raw = localStorage.getItem(EMPRESA_STORAGE_KEY);
+    const ctx = raw ? JSON.parse(raw) : {};
+    return ctx.proceso?.caja_chica || {};
+  } catch {
+    return {};
+  }
+}
 
 // ─────────────────────────────────────
 // Helpers UI
@@ -641,19 +656,53 @@ function ConfigCard({ title, titleBadge, description, summary, enabled, onToggle
 // 6 · CONFIGURACIÓN
 // ─────────────────────────────────────
 export function ConfiguracionSection() {
-  // ── Número de aprobadores ──
-  const [aprobadoresEnabled, setAprobadoresEnabled] = useState(true);
-  const [aprobadores, setAprobadores] = useState(2);
+  // Estado inicial leído desde localStorage (paso 5: bridge a Airtable).
+  // Defaults vacíos / off cuando el cliente entra por primera vez.
+  const proceso = loadProcesoCajaChica();
 
-  // ── Monto máximo ──
-  const [maxMontoEnabled, setMaxMontoEnabled] = useState(false);
-  const [maxMonto, setMaxMonto] = useState(5000);
+  const [aprobadoresEnabled,  setAprobadoresEnabled]  = useState(proceso.requiere_aprobacion ?? true);
+  const [aprobadores,         setAprobadores]         = useState(proceso.num_aprobadores ?? 2);
+  const [maxMontoEnabled,     setMaxMontoEnabled]     = useState(proceso.monto_maximo_activo ?? false);
+  const [maxMonto,            setMaxMonto]            = useState(proceso.monto_maximo ?? 0);
+  const [aprobRendicionEnabled, setAprobRendicionEnabled] = useState(proceso.aprobacion_rendicion ?? false);
+  const [aplicaCentroCosto,   setAplicaCentroCosto]   = useState(proceso.aplica_centro_costo ?? false);
+  const [aplicaTipoGasto,     setAplicaTipoGasto]     = useState(proceso.aplica_tipo_gasto ?? false);
+  const [seguimientoIA,       setSeguimientoIA]       = useState(proceso.seguimiento_ia ?? false);
 
-  // ── Aprobación de rendición (default OFF) ──
-  const [aprobRendicionEnabled, setAprobRendicionEnabled] = useState(false);
+  const [savedHint, setSavedHint] = useState(false);
+  const [saveError, setSaveError] = useState(null);
 
-  // ── Seguimiento con IA (default por tenant: cmejia=true, demo=false) ──
-  const [seguimientoIA, setSeguimientoIA] = useState(tenantConfig.seguimientoIA ?? false);
+  const handleSave = () => {
+    setSaveError(null);
+    try {
+      // Merge no destructivo: respetamos lo que haya guardado la pantalla
+      // de Configuración Empresa (name, ruc, razon_social, sistema_contable).
+      const raw = localStorage.getItem(EMPRESA_STORAGE_KEY);
+      const existing = raw ? JSON.parse(raw) : {};
+      const updated = {
+        ...existing,
+        proceso: {
+          ...(existing.proceso || {}),
+          caja_chica: {
+            requiere_aprobacion:  aprobadoresEnabled,
+            num_aprobadores:      aprobadores,
+            monto_maximo_activo:  maxMontoEnabled,
+            monto_maximo:         maxMonto,
+            aprobacion_rendicion: aprobRendicionEnabled,
+            aplica_centro_costo:  aplicaCentroCosto,
+            aplica_tipo_gasto:    aplicaTipoGasto,
+            seguimiento_ia:       seguimientoIA,
+          },
+        },
+      };
+      localStorage.setItem(EMPRESA_STORAGE_KEY, JSON.stringify(updated));
+      setSavedHint(true);
+      setTimeout(() => setSavedHint(false), 2500);
+    } catch (err) {
+      console.error('[GestionCaja] save proceso:', err);
+      setSaveError('No se pudo guardar localmente.');
+    }
+  };
 
   return (
     <>
@@ -661,6 +710,12 @@ export function ConfiguracionSection() {
         title="Configuración"
         subtitle="Activa o desactiva las reglas de negocio que aplican a los procesos."
       />
+
+      <div className="gcc-warning-banner">
+        <AlertCircle size={16} />
+        Estos datos se guardan localmente en este navegador. La sincronización
+        con Airtable se habilitará próximamente.
+      </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         <ConfigCard
@@ -715,6 +770,22 @@ export function ConfiguracionSection() {
         />
 
         <ConfigCard
+          title="Centros de costo"
+          description="Si está activo, las solicitudes y rendiciones requieren asignar un centro de costo (sincronizado desde la tabla 'obras'). Si está desactivado, ese campo se omite."
+          summary={aplicaCentroCosto ? 'Obligatorio' : 'No aplica'}
+          enabled={aplicaCentroCosto}
+          onToggle={setAplicaCentroCosto}
+        />
+
+        <ConfigCard
+          title="Tipo de gasto"
+          description="Si está activo, las solicitudes deben categorizarse por tipo de gasto. Si está desactivado, ese campo se omite."
+          summary={aplicaTipoGasto ? 'Obligatorio' : 'No aplica'}
+          enabled={aplicaTipoGasto}
+          onToggle={setAplicaTipoGasto}
+        />
+
+        <ConfigCard
           title="Seguimiento con IA"
           titleBadge="Consume tokens"
           description="Análisis automático de solicitudes y rendiciones con IA: detecta inconsistencias, recordatorios y sugerencias contables. El consumo de tokens se factura según el uso."
@@ -722,6 +793,26 @@ export function ConfiguracionSection() {
           enabled={seguimientoIA}
           onToggle={setSeguimientoIA}
         />
+
+        <div className="gcc-config-actions">
+          <button
+            type="button"
+            className="gcc-btn-primary"
+            onClick={handleSave}
+          >
+            Guardar configuración
+          </button>
+          {savedHint && (
+            <span className="gcc-saved-hint">
+              <CheckCircle2 size={14} /> Guardado
+            </span>
+          )}
+          {saveError && (
+            <span className="gcc-save-error">
+              <AlertCircle size={14} /> {saveError}
+            </span>
+          )}
+        </div>
       </div>
     </>
   );

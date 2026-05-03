@@ -439,6 +439,10 @@ def load_full_config() -> dict:
 
     empresa = {
         "id": static.get("id"),
+        # name/razon_social/ruc/sistema_contable salieron del config.json en el
+        # paso 5; el frontend los inyecta vía body.empresa_context. Defaults
+        # vacíos aquí mantienen compat con cualquier código que lea el shape.
+        "name": static.get("name", ""),
         "razon_social": static.get("razonSocial", ""),
         "ruc": static.get("ruc", ""),
         "sistema_contable": static.get("sistemaContable", "concar"),

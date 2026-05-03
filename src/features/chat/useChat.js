@@ -3,6 +3,20 @@ import { useNavigate } from 'react-router-dom';
 import { postJson, postForm, API } from '../../shared/api';
 import { tenantConfig } from '../../tenants';
 
+// Bridge a localStorage hasta que la persistencia en Airtable esté lista (paso 5).
+// Inyectamos lo que el cliente editó en Configuración Empresa / Gestión Caja Chica
+// en cada request al backend para que el system prompt tenga el contexto correcto.
+const EMPRESA_STORAGE_KEY = `empresa_context_${tenantConfig.id}`;
+
+function loadStoredContext() {
+  try {
+    const raw = localStorage.getItem(EMPRESA_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
 export function useChat(user) {
   const navigate = useNavigate();
   const agentName = tenantConfig.agent.name;
@@ -145,9 +159,19 @@ export function useChat(user) {
           content: m.text
         }));
 
+      const stored = loadStoredContext();
       const payload = {
         user: user || {},
-        messages: apiMessages
+        messages: apiMessages,
+        empresa_context: {
+          name:             stored.name             || '',
+          razon_social:     stored.razon_social     || '',
+          ruc:              stored.ruc              || '',
+          sistema_contable: stored.sistema_contable || '',
+        },
+        proceso_context: {
+          caja_chica: stored.proceso?.caja_chica || {},
+        },
       };
 
       const data = await postJson(API.CHAT, payload);

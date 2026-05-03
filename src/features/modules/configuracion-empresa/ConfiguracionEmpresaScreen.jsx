@@ -178,15 +178,30 @@ function CampoRedes({ campo, label, helpText, activo, valor, onActivoChange, onV
   );
 }
 
-export default function ConfiguracionEmpresaScreen({ user, onOpenModules, onLogout }) {
-  // Datos de la empresa (default desde el tenant config)
-  const [ruc, setRuc] = useState(tenantConfig.ruc || '');
-  const [razonSocial, setRazonSocial] = useState(tenantConfig.razonSocial || '');
+// Bridge a localStorage hasta que la persistencia en Airtable esté lista (paso 5).
+// Key prefijada por tenant para soportar múltiples empresas en un mismo browser.
+const EMPRESA_STORAGE_KEY = `empresa_context_${tenantConfig.id}`;
 
-  // Sistema contable — default CONCAR
-  const [sistemaContable, setSistemaContable] = useState('concar');
+function loadEmpresaContext() {
+  try {
+    const raw = localStorage.getItem(EMPRESA_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+export default function ConfiguracionEmpresaScreen({ user, onOpenModules, onLogout }) {
+  // Datos de la empresa — leídos desde localStorage (paso 5).
+  // En el primer login (sin nada guardado) los inputs aparecen vacíos.
+  const initialCtx = loadEmpresaContext();
+  const [name, setName] = useState(initialCtx.name || '');
+  const [ruc, setRuc] = useState(initialCtx.ruc || '');
+  const [razonSocial, setRazonSocial] = useState(initialCtx.razon_social || '');
+  const [sistemaContable, setSistemaContable] = useState(initialCtx.sistema_contable || 'concar');
 
   const [savedHint, setSavedHint] = useState(false);
+  const [empresaSaveError, setEmpresaSaveError] = useState(null);
 
   // ── Información extendida (info_extendida del config) ──
   const [infoExtendida, setInfoExtendida] = useState(DEFAULT_INFO_EXTENDIDA);
@@ -285,14 +300,27 @@ export default function ConfiguracionEmpresaScreen({ user, onOpenModules, onLogo
     setCentrosError(null);
   };
 
-  const flashSaved = () => {
-    setSavedHint(true);
-    setTimeout(() => setSavedHint(false), 2000);
-  };
-
-  const handleSistemaChange = (id) => {
-    setSistemaContable(id);
-    flashSaved();
+  // Persiste los datos básicos en localStorage (paso 5: bridge a Airtable).
+  // Hace merge no destructivo con el bloque proceso (que escribe la pantalla
+  // de Gestión Caja Chica con la misma key).
+  const handleSaveEmpresa = () => {
+    setEmpresaSaveError(null);
+    try {
+      const existing = loadEmpresaContext();
+      const updated = {
+        ...existing,
+        name:             name.trim(),
+        razon_social:     razonSocial.trim(),
+        ruc:              ruc.trim(),
+        sistema_contable: sistemaContable,
+      };
+      localStorage.setItem(EMPRESA_STORAGE_KEY, JSON.stringify(updated));
+      setSavedHint(true);
+      setTimeout(() => setSavedHint(false), 2500);
+    } catch (err) {
+      console.error('[ConfigEmpresa] save empresa:', err);
+      setEmpresaSaveError('No se pudo guardar localmente.');
+    }
   };
 
   // RUC peruano: solo dígitos, máximo 11
@@ -311,6 +339,12 @@ export default function ConfiguracionEmpresaScreen({ user, onOpenModules, onLogo
         <div className="ce-header">
           <h1>Configuración de empresa</h1>
           <p>Ajustes generales que aplican a todos los procesos de tu empresa.</p>
+        </div>
+
+        <div className="ce-warning-banner">
+          <AlertCircle size={16} />
+          Estos datos se guardan localmente en este navegador. La sincronización
+          con Airtable se habilitará próximamente.
         </div>
 
         {/* ── Datos de la empresa ── */}
@@ -340,6 +374,17 @@ export default function ConfiguracionEmpresaScreen({ user, onOpenModules, onLogo
                 maxLength={11}
               />
               <span className="ce-field-hint">11 dígitos · sin espacios ni guiones</span>
+            </div>
+            <div className="ce-field">
+              <label htmlFor="nombre-comercial">Nombre comercial</label>
+              <input
+                id="nombre-comercial"
+                className="ce-input"
+                placeholder="Ej: C. Mejía"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+              <span className="ce-field-hint">Cómo se conoce a la empresa coloquialmente</span>
             </div>
             <div className="ce-field full">
               <label htmlFor="razon-social">Razón social</label>
@@ -378,7 +423,7 @@ export default function ConfiguracionEmpresaScreen({ user, onOpenModules, onLogo
                     name="sistema-contable"
                     value={s.id}
                     checked={selected}
-                    onChange={() => handleSistemaChange(s.id)}
+                    onChange={() => setSistemaContable(s.id)}
                   />
                   <div className="ce-radio-content">
                     <div className="ce-radio-name">{s.name}</div>
@@ -394,12 +439,25 @@ export default function ConfiguracionEmpresaScreen({ user, onOpenModules, onLogo
             })}
           </div>
 
-          {savedHint && (
-            <div className="ce-saved-hint">
-              <CheckCircle2 size={14} />
-              Cambios guardados
-            </div>
-          )}
+          <div className="ce-section-actions">
+            <button
+              type="button"
+              className="ce-btn-primary"
+              onClick={handleSaveEmpresa}
+            >
+              Guardar datos de la empresa
+            </button>
+            {savedHint && (
+              <span className="ce-saved-hint inline">
+                <CheckCircle2 size={14} /> Guardado
+              </span>
+            )}
+            {empresaSaveError && (
+              <span className="ce-save-error">
+                <AlertCircle size={14} /> {empresaSaveError}
+              </span>
+            )}
+          </div>
         </div>
 
         {/* ── Información extendida (info_extendida) ── */}

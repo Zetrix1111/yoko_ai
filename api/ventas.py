@@ -468,10 +468,12 @@ def _sales_chat_post(self):
 
         config = {
             "empresa": {
-                "id":             empresa_id,
-                "razon_social":   (body.get("razon_social") or "").strip() or empresa_full.get("razon_social"),
-                "ruc":            (body.get("ruc") or "").strip() or empresa_full.get("ruc"),
-                "info_extendida": empresa_full.get("info_extendida", {}),
+                "id":               empresa_id,
+                "name":             (body.get("name") or "").strip() or empresa_full.get("name"),
+                "razon_social":     (body.get("razon_social") or "").strip() or empresa_full.get("razon_social"),
+                "ruc":              (body.get("ruc") or "").strip() or empresa_full.get("ruc"),
+                "sistema_contable": (body.get("sistema_contable") or "").strip() or empresa_full.get("sistema_contable"),
+                "info_extendida":   empresa_full.get("info_extendida", {}),
             },
             "ventas": full_config.get("ventas", {}),
         }
