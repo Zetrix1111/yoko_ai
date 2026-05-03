@@ -15,6 +15,8 @@ del proceso son False.
 api/_lib/tool_registry.py.
 """
 
+from datetime import date
+
 # Mapeo id de módulo → nombre legible para el LLM.
 # Si un id no está acá, se usa un fallback titlecased.
 MODULE_NAMES = {
@@ -33,6 +35,64 @@ REDES_LABELS = {
     "whatsapp":  "WhatsApp",
     "youtube":   "YouTube",
     "otro":      "Otro",
+}
+
+# ─────────────────────────────────────────────────────────────────────────
+# Constantes para el bloque ventas
+# ─────────────────────────────────────────────────────────────────────────
+
+ESTILO_INSTRUCCIONES = {
+    "formal_profesional": "Tratá al cliente de **usted**. Vocabulario profesional y corporativo, sin modismos.",
+    "cercano_amigable":   "Tratá al cliente de **tú**. Tono conversacional y cálido.",
+    "tecnico_consultivo": "Tratá al cliente de **usted**. Vocabulario técnico cuando aplique, pero explicá los términos si detectás que el cliente no es del rubro.",
+    "casual_directo":     "Tratá al cliente de **tú**. Mensajes muy cortos y directos, sin rodeos.",
+}
+
+TIPO_CLIENTE_INSTRUCCIONES = {
+    "b2b":   "Vendés principalmente a empresas. Al cerrar, pedí RUC y razón social.",
+    "b2c":   "Vendés a consumidores finales. Al cerrar, pedí DNI.",
+    "mixto": "Atendés tanto empresas como personas. Al cerrar, preguntá si necesita factura (empresa, pedí RUC) o boleta (persona, pedí DNI).",
+}
+
+IGV_FRASES = {
+    "incluido":    "ya incluyen IGV",
+    "no_incluido": "NO incluyen IGV (se agrega al final)",
+    "referencial": "son referenciales — el precio final se confirma en cotización formal",
+}
+
+COMPROBANTES_FRASES = {
+    "boleta":  "solo boleta",
+    "factura": "solo factura",
+    "ambos":   "boleta o factura según el tipo de cliente",
+}
+
+METODOS_PAGO_LABELS = {
+    "efectivo":            "Efectivo",
+    "yape_plin":           "Yape / Plin",
+    "transferencia":       "Transferencia bancaria",
+    "tarjeta_pos":         "Tarjeta (POS presencial)",
+    "tarjeta_online":      "Tarjeta online",
+    "credito_empresarial": "Crédito empresarial (30/60/90 días)",
+    "contra_entrega":      "Contra-entrega",
+}
+
+CRITERIOS_DERIVACION_LABELS = {
+    "cotizacion_formal":     "Pide cotización formal o factura proforma",
+    "descuento_negociacion": "Pide descuento especial o negociación",
+    "modificar_pedido":      "Quiere modificar o cancelar un pedido en curso",
+    "queja_reclamo":         "Expresa queja, reclamo o tono molesto",
+    "fuera_catalogo":        "Pide algo que no figura en el catálogo",
+    "menciona_competencia":  "Menciona competencia o compara precios",
+    "intencion_compra":      "Confirma intención clara de compra",
+    "conversacion_larga":    "La conversación supera 10 mensajes sin avanzar",
+}
+
+INFO_ADICIONAL_PREFIJOS = {
+    "faq":                "[FAQ]",
+    "promocion":          "[Promoción]",
+    "servicio_adicional": "[Servicio adicional]",
+    "info_importante":    "[Información importante]",
+    "politica":           "[Política]",
 }
 
 
@@ -110,6 +170,209 @@ def _build_sobre_empresa_block(info_extendida: dict | None) -> list[str]:
     if not lines:
         return []
     return ["", "# SOBRE LA EMPRESA", *lines]
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Bloques del prompt de ventas (config.ventas.*)
+# Cada helper devuelve list[str] con las líneas del bloque (incluyendo "" y header)
+# o [] si el bloque debe omitirse por completo.
+# ─────────────────────────────────────────────────────────────────────────
+
+def _build_estilo_block(ventas: dict) -> list[str]:
+    campo = ventas.get("estilo_vendedor")
+    if not _campo_activo(campo):
+        return []
+    instr = ESTILO_INSTRUCCIONES.get(campo["valor"])
+    if not instr:
+        return []
+    return ["", "# ESTILO DE COMUNICACIÓN", instr]
+
+
+def _build_identidad_vendedor_block(ventas: dict, razon_social: str) -> list[str]:
+    campo = ventas.get("nombre_vendedor")
+    if not _campo_activo(campo):
+        return []
+    nombre = str(campo["valor"]).strip()
+    if not nombre:
+        return []
+    return [
+        "",
+        "# IDENTIDAD DEL VENDEDOR",
+        f"Te llamás {nombre} y representás a {razon_social}. Presentate por nombre solo en el primer mensaje, no en cada respuesta.",
+    ]
+
+
+def _build_cliente_objetivo_block(ventas: dict) -> list[str]:
+    campo = ventas.get("tipo_cliente")
+    if not _campo_activo(campo):
+        return []
+    instr = TIPO_CLIENTE_INSTRUCCIONES.get(campo["valor"])
+    if not instr:
+        return []
+    return ["", "# CLIENTE OBJETIVO", instr]
+
+
+def _build_cobertura_block(ventas: dict) -> list[str]:
+    campo = ventas.get("zona_cobertura")
+    if not _campo_activo(campo):
+        return []
+    return [
+        "",
+        "# COBERTURA",
+        f"Atendemos en: {campo['valor']}.",
+        "Si el cliente está fuera de esta zona, decílo con claridad y derivá al asesor humano.",
+    ]
+
+
+def _build_tiempos_entrega_block(ventas: dict) -> list[str]:
+    campo = ventas.get("tiempo_entrega")
+    if not _campo_activo(campo):
+        return []
+    return [
+        "",
+        "# TIEMPOS DE ENTREGA / RESPUESTA",
+        str(campo["valor"]),
+        "No prometás plazos distintos a los indicados.",
+    ]
+
+
+def _build_metodos_pago_block(ventas: dict) -> list[str]:
+    campo = ventas.get("metodos_pago")
+    if not _campo_activo(campo):
+        return []
+    valores = campo.get("valor") or []
+    if not isinstance(valores, list):
+        return []
+    items = [METODOS_PAGO_LABELS[v] for v in valores if v in METODOS_PAGO_LABELS]
+    if not items:
+        return []
+    lines = ["", "# MÉTODOS DE PAGO ACEPTADOS"]
+    lines.extend(f"- {it}" for it in items)
+    lines.append(
+        "Cuando el cliente confirme la compra, mencioná estos métodos. "
+        "Las cuentas bancarias específicas las coordina el asesor humano."
+    )
+    return lines
+
+
+def _build_precios_block(ventas: dict) -> list[str]:
+    campo = ventas.get("politica_precios")
+    if not _campo_activo(campo):
+        return []
+    valor = campo.get("valor") or {}
+    if not isinstance(valor, dict):
+        return []
+    igv = valor.get("igv")
+    comprobantes = valor.get("comprobantes")
+    igv_frase = IGV_FRASES.get(igv)
+    comp_frase = COMPROBANTES_FRASES.get(comprobantes)
+    if not igv_frase and not comp_frase:
+        return []
+    lines = ["", "# PRECIOS Y COMPROBANTES"]
+    if igv_frase:
+        lines.append(f"Los precios del catálogo {igv_frase}.")
+    if comp_frase:
+        lines.append(f"Comprobantes que emitimos: {comp_frase}.")
+    lines.append("Al cierre, pedí los datos correspondientes (RUC + razón social para factura, DNI para boleta).")
+    return lines
+
+
+def _build_derivacion_block(ventas: dict) -> list[str]:
+    asesor = ventas.get("asesor_humano")
+    criterios = ventas.get("criterios_derivacion")
+
+    asesor_on = _campo_activo(asesor)
+    asesor_valor = (asesor or {}).get("valor") or {}
+    asesor_nombre = (asesor_valor.get("nombre") or "").strip() if isinstance(asesor_valor, dict) else ""
+    asesor_telefono = (asesor_valor.get("telefono") or "").strip() if isinstance(asesor_valor, dict) else ""
+    asesor_renderable = asesor_on and (asesor_nombre or asesor_telefono)
+
+    criterios_on = _campo_activo(criterios)
+    criterios_valor = (criterios or {}).get("valor") or []
+    criterios_render = [
+        CRITERIOS_DERIVACION_LABELS[c]
+        for c in (criterios_valor if isinstance(criterios_valor, list) else [])
+        if c in CRITERIOS_DERIVACION_LABELS
+    ]
+    criterios_renderable = criterios_on and bool(criterios_render)
+
+    if not asesor_renderable and not criterios_renderable:
+        return []
+
+    lines = ["", "# DERIVACIÓN A HUMANO"]
+    if asesor_renderable:
+        partes = []
+        if asesor_nombre:
+            partes.append(asesor_nombre)
+        if asesor_telefono:
+            partes.append(f"({asesor_telefono})")
+        head = " ".join(partes) if partes else "el asesor humano"
+        lines.append(f"El asesor humano disponible es {head}. Mencionalo por nombre cuando derivés.")
+
+    if criterios_renderable:
+        lines.append("Derivá al asesor humano cuando se dé cualquiera de estos casos:")
+        lines.extend(f"  - {c}" for c in criterios_render)
+
+    cierre_nombre = asesor_nombre if asesor_renderable and asesor_nombre else "un asesor humano"
+    lines.append(f'Mensaje de derivación sugerido: "Te paso con {cierre_nombre} para que te ayude con esto."')
+    return lines
+
+
+def _build_horario_ia_block(ventas: dict, info_extendida: dict | None) -> list[str]:
+    campo = ventas.get("horario_ia")
+    if not campo or not campo.get("activo"):
+        return []
+    if campo.get("valor") != "solo_horario_atencion":
+        return []
+    horario = "horario de oficina"
+    if isinstance(info_extendida, dict):
+        ha = info_extendida.get("horario_atencion")
+        if _campo_activo(ha):
+            horario = ha["valor"]
+    return [
+        "",
+        "# HORARIO DE LA IA",
+        f"Solo respondés en el horario de atención de la empresa: {horario}.",
+        'Fuera de ese horario, respondé: "Hola, recibimos tu mensaje. Te respondemos en horario de atención."',
+    ]
+
+
+def _build_info_adicional_block(ventas: dict) -> list[str]:
+    campo = ventas.get("info_adicional")
+    if not _campo_activo(campo):
+        return []
+    entradas = campo.get("valor") or []
+    if not isinstance(entradas, list):
+        return []
+
+    hoy = date.today().isoformat()
+    items: list[str] = []
+    for e in entradas:
+        if not isinstance(e, dict):
+            continue
+        cat = e.get("categoria")
+        titulo = (e.get("titulo") or "").strip()
+        respuesta = (e.get("respuesta") or "").strip()
+        if not cat or not titulo or not respuesta:
+            continue
+        prefijo = INFO_ADICIONAL_PREFIJOS.get(cat)
+        if not prefijo:
+            continue
+        # Filtrar promociones vencidas
+        vfin = e.get("vigencia_fin")
+        if isinstance(vfin, str) and vfin and vfin < hoy:
+            continue
+        items.append(f"{prefijo} {titulo} → {respuesta}")
+
+    if not items:
+        return []
+    return [
+        "",
+        "# INFORMACIÓN ADICIONAL",
+        "Conocimiento que podés usar para responder. Aplicá la entrada cuando el contexto coincida con el título.",
+        "",
+        *items,
+    ]
 
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -229,6 +492,8 @@ def _build_sales_prompt(config: dict, ctx: dict) -> str:
     de productos y reglas de tono comercial.
     """
     empresa = (config or {}).get("empresa", {}) or {}
+    ventas = (config or {}).get("ventas", {}) or {}
+    info_extendida = empresa.get("info_extendida") or {}
     razon_social = empresa.get("razon_social") or empresa.get("id") or "la empresa"
     ruc = empresa.get("ruc") or ""
 
@@ -262,6 +527,21 @@ def _build_sales_prompt(config: dict, ctx: dict) -> str:
             lines.append(_format_producto_inline(p))
     else:
         lines.append("(No hay productos cargados aún en el catálogo.)")
+
+    # ── Bloques opcionales (config.ventas.* + empresa.info_extendida) ──
+    # Cada helper devuelve [] si está apagado / vacío. Si todos están apagados,
+    # el prompt queda byte-idéntico al original.
+    lines.extend(_build_sobre_empresa_block(info_extendida))
+    lines.extend(_build_estilo_block(ventas))
+    lines.extend(_build_identidad_vendedor_block(ventas, razon_social))
+    lines.extend(_build_cliente_objetivo_block(ventas))
+    lines.extend(_build_cobertura_block(ventas))
+    lines.extend(_build_tiempos_entrega_block(ventas))
+    lines.extend(_build_metodos_pago_block(ventas))
+    lines.extend(_build_precios_block(ventas))
+    lines.extend(_build_derivacion_block(ventas))
+    lines.extend(_build_horario_ia_block(ventas, info_extendida))
+    lines.extend(_build_info_adicional_block(ventas))
 
     lines.extend([
         "",

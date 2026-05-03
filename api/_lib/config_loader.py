@@ -253,6 +253,88 @@ def _merge_info_extendida(provided: dict | None) -> dict:
     return merged
 
 
+# ─────────────────────────────────────────────────────────────────────────
+# Ventas — defaults, deep merge y carga dinámica
+# ─────────────────────────────────────────────────────────────────────────
+
+# Enums permitidos para validación. Lo importan tanto el endpoint POST
+# (api/ventas.py?resource=config) como tests de regression.
+VENTAS_ENUMS = {
+    "estilo_vendedor":      {"formal_profesional", "cercano_amigable", "tecnico_consultivo", "casual_directo"},
+    "tipo_cliente":          {"b2b", "b2c", "mixto"},
+    "metodos_pago":          {"efectivo", "yape_plin", "transferencia", "tarjeta_pos", "tarjeta_online", "credito_empresarial", "contra_entrega"},
+    "politica_precios.igv":  {"incluido", "no_incluido", "referencial"},
+    "politica_precios.comprobantes": {"boleta", "factura", "ambos"},
+    "criterios_derivacion":  {"cotizacion_formal", "descuento_negociacion", "modificar_pedido", "queja_reclamo", "fuera_catalogo", "menciona_competencia", "intencion_compra", "conversacion_larga"},
+    "horario_ia":            {"24_7", "solo_horario_atencion"},
+    "info_adicional.categoria": {"faq", "promocion", "servicio_adicional", "info_importante", "politica"},
+}
+
+INFO_ADICIONAL_MAX = 20
+
+
+def _default_ventas_config() -> dict:
+    """Shape default del bloque ventas. Todos los toggles arrancan en false."""
+    return {
+        "estilo_vendedor":      {"activo": False, "valor": "formal_profesional"},
+        "nombre_vendedor":      {"activo": False, "valor": ""},
+        "tipo_cliente":         {"activo": False, "valor": "mixto"},
+        "zona_cobertura":       {"activo": False, "valor": ""},
+        "tiempo_entrega":       {"activo": False, "valor": ""},
+        "metodos_pago":         {"activo": False, "valor": []},
+        "politica_precios":     {"activo": False, "valor": {"igv": "incluido", "comprobantes": "ambos"}},
+        "asesor_humano":        {"activo": False, "valor": {"nombre": "", "telefono": ""}},
+        "criterios_derivacion": {"activo": False, "valor": []},
+        "horario_ia":           {"activo": False, "valor": "24_7"},
+        "info_adicional":       {"activo": False, "valor": []},
+    }
+
+
+def _merge_ventas_config(provided: dict | None) -> dict:
+    """
+    Deep merge defaults ← provided. Los campos del shape sobrescriben sus
+    defaults con lo que venga; campos no definidos en el schema se ignoran.
+    El sub-dict 'valor' se reemplaza completo (no merge campo-a-campo dentro
+    del valor) para mantener el shape consistente.
+    """
+    merged = _default_ventas_config()
+    if not isinstance(provided, dict):
+        return merged
+    for key, default_field in merged.items():
+        incoming = provided.get(key)
+        if not isinstance(incoming, dict):
+            continue
+        if "activo" in incoming:
+            default_field["activo"] = bool(incoming["activo"])
+        if "valor" in incoming:
+            default_field["valor"] = incoming["valor"]
+    return merged
+
+
+def _load_ventas_dynamic(tenant_id: str) -> dict | None:
+    """
+    Lee el bloque ventas desde la tabla `Config_Ventas` (1 fila por tenant).
+    Schema esperado: empresa_id (single line text) + data (long text JSON).
+    Si la tabla aún no existe, devolvemos None sin error.
+    """
+    rows = _safe_list("Config_Ventas", f"{{empresa_id}}='{tenant_id}'")
+    if not rows:
+        return None
+    row = rows[0].get("fields", {})
+    raw = row.get("data") or row.get("ventas")
+    if not raw:
+        return None
+    try:
+        parsed = json.loads(raw) if isinstance(raw, str) else raw
+        return parsed if isinstance(parsed, dict) else None
+    except (json.JSONDecodeError, ValueError) as e:
+        print(
+            f"[config_loader] Config_Ventas.data tiene JSON inválido: {e}",
+            file=sys.stderr,
+        )
+        return None
+
+
 def _load_info_extendida_dynamic(tenant_id: str) -> dict | None:
     """
     Lee `info_extendida` desde Airtable si existe la tabla `Config_Empresa_Info`.
@@ -370,7 +452,16 @@ def load_full_config() -> dict:
         dynamic or {},
     )
 
+    # ventas: deep merge defaults ← static (config.json) ← dynamic (Airtable).
+    static_ventas = static.get("ventas")
+    ventas_block = _merge_ventas_config(static_ventas)
+    dynamic_ventas = _load_ventas_dynamic(_get_tenant_id())
+    if dynamic_ventas:
+        # mezclar lo dinámico encima de lo ya mergeado
+        ventas_block = _merge_ventas_config({**ventas_block, **dynamic_ventas})
+
     return {
         "empresa": empresa,
         "proceso": proceso,
+        "ventas":  ventas_block,
     }
