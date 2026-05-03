@@ -4,7 +4,7 @@
 //   - /api/*             → nunca se cachea (siempre pega al servidor)
 //
 // Bump CACHE_VERSION cuando quieras invalidar todo el caché a mano.
-const CACHE_VERSION = 'v3-debug';
+const CACHE_VERSION = 'v4';
 const CACHE_NAME    = `yoko-cache-${CACHE_VERSION}`;
 
 self.addEventListener('install', (event) => {

@@ -6,7 +6,10 @@ import {
   Upload as UploadIcon, Image as ImageIcon, Loader2, AlertCircle,
   Power, PowerOff, Send, Trash, Bot, User as UserIcon,
 } from 'lucide-react';
-import QRCode from 'react-qr-code';
+// react-qr-code es CJS y Vite a veces interopera mal el default,
+// devolviendo el namespace object en lugar del componente. Fallback robusto.
+import * as ReactQRCodeMod from 'react-qr-code';
+const QRCode = ReactQRCodeMod.default || ReactQRCodeMod;
 import {
   STATS, FUNNEL, ACTIVIDAD, CANALES, CLIENTES,
   CANAL_LABELS, ESTADO_LABELS, STOCK_LABELS, getStockStatus,
