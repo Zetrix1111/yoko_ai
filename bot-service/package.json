@@ -1,0 +1,28 @@
+{
+  "name": "yoko-bot-baileys",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Servicio puente entre WhatsApp Web (Baileys) y la IA de Yoko (Vercel). Multi-tenant.",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "dev": "tsx watch src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hapi/boom": "^10.0.1",
+    "@whiskeysockets/baileys": "^6.7.0",
+    "axios": "^1.7.0",
+    "dotenv": "^16.4.0",
+    "pino": "^8.21.0",
+    "qrcode-terminal": "^0.12.0",
+    "tsx": "^4.19.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.0",
+    "@types/qrcode-terminal": "^0.12.2",
+    "typescript": "^5.5.0"
+  }
+}

@@ -121,14 +121,15 @@ class handler(BaseHTTPRequestHandler):
     def _do_connect(self, empresa_id: str):
         """
         Señal al bot: 'el cliente quiere conectar este tenant'.
-        Upsert wa_sessions con status='disconnected' (el bot polea esa tabla;
-        cuando ve una row con status disconnected y no la tiene en memoria,
-        arranca un nuevo socket Baileys para ese tenant).
+        Upsert wa_sessions con status='qr' y qr_string vacío. El bot polea
+        wa_sessions; cuando ve status='qr' sin sesión en memoria arranca un
+        socket Baileys, genera el QR raw y actualiza qr_string.
+        Convención: 'qr' = "queremos sesión activa, generá/mostrá QR si hace falta".
         """
         existing = _find_session(empresa_id)
         fields = {
             "empresa_id": empresa_id,
-            "status":     "disconnected",
+            "status":     "qr",
             "qr_string":  "",
             "phone":      "",
         }
