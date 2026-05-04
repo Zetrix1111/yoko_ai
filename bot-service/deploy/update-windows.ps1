@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Actualiza bot-baileys al último commit del repo y reinicia el servicio.
 

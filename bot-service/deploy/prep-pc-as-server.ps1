@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Configura una PC personal Windows 10/11 para que se comporte como un mini-server
   24/7. Desactiva sleep, hibernate y (en laptops) la suspensión por cierre de tapa.

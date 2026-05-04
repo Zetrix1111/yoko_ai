@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Instala bot-baileys como servicio Windows usando NSSM.
 
