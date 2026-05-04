@@ -91,9 +91,29 @@ export class WaSession {
         const types = Object.keys(msg.message || {}).join(",") || "(no-message)";
         const text = extractText(msg);
         const txtPreview = (text || "(no-text)").slice(0, 40);
-        console.log(`[${this.empresaId}] DEBUG   msg from=${remote} fromMe=${fromMe} types=[${types}] text="${txtPreview}"`);
+        // messageStubType: cuando Baileys no puede desencriptar o el mensaje
+        // es un evento del sistema (cambio de avatar, mensaje borrado, etc.)
+        // pone aquí el código. Útil para diagnosticar fallas de @lid.
+        const stub = (msg as any).messageStubType
+          ? ` stub=${(msg as any).messageStubType}`
+          : "";
+        console.log(`[${this.empresaId}] DEBUG   msg from=${remote} fromMe=${fromMe} types=[${types}] text="${txtPreview}"${stub}`);
       }
       this.handleMessagesUpsert(m);
+    });
+
+    // messages.update: cuando un mensaje viene cifrado y Baileys logra
+    // desencriptarlo en un segundo intento, llega vía este evento. Sin
+    // listener aquí, las re-decryptions se pierden silenciosamente.
+    this.sock.ev.on("messages.update", (updates) => {
+      for (const u of updates) {
+        const msg = u.update;
+        if (msg?.message) {
+          console.log(`[${this.empresaId}] DEBUG messages.update con message → re-procesando`);
+          // Re-procesar como si fuera nuevo
+          this.handleMessagesUpsert({ messages: [{ key: u.key, message: msg.message, pushName: (msg as any).pushName } as any], type: "notify" } as any);
+        }
+      }
     });
   }
 
