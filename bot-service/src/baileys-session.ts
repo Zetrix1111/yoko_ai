@@ -74,7 +74,18 @@ export class WaSession {
 
     this.sock.ev.on("creds.update", saveCreds);
     this.sock.ev.on("connection.update", (u) => this.handleConnectionUpdate(u));
-    this.sock.ev.on("messages.upsert", (m) => this.handleMessagesUpsert(m));
+    this.sock.ev.on("messages.upsert", (m) => {
+      console.log(`[${this.empresaId}] DEBUG messages.upsert type=${m.type} count=${m.messages?.length || 0}`);
+      for (const msg of m.messages || []) {
+        const remote = msg.key?.remoteJid;
+        const fromMe = msg.key?.fromMe;
+        const types = Object.keys(msg.message || {}).join(",") || "(no-message)";
+        const text = extractText(msg);
+        const txtPreview = (text || "(no-text)").slice(0, 40);
+        console.log(`[${this.empresaId}] DEBUG   msg from=${remote} fromMe=${fromMe} types=[${types}] text="${txtPreview}"`);
+      }
+      this.handleMessagesUpsert(m);
+    });
   }
 
   async shutdown(): Promise<void> {
@@ -202,16 +213,30 @@ export class WaSession {
     if (msg.key?.fromMe) return;  // mensajes propios desde el teléfono del cliente
     const remoteJid: string = msg.key?.remoteJid || "";
     if (!remoteJid) return;
-    if (remoteJid.endsWith("@g.us")) return;          // grupos fuera de scope v1
-    if (!remoteJid.endsWith("@s.whatsapp.net")) return; // solo 1:1
+    if (remoteJid.endsWith("@g.us")) return;  // grupos fuera de scope v1
 
-    const text: string =
-      msg.message?.conversation ||
-      msg.message?.extendedTextMessage?.text ||
-      "";
-    if (!text) return;  // audio/imagen/sticker fuera de scope v1
+    // Aceptamos chats 1:1 con cualquiera de los dos formatos:
+    //   • @s.whatsapp.net → JID clásico, el local part es el número de teléfono
+    //   • @lid            → Linked Identity (WhatsApp 2024+, privacy-aware).
+    //                       El local part NO es un número de teléfono, es un
+    //                       ID interno opaco. Igual lo guardamos para poder
+    //                       responder al mismo JID después.
+    const isWA  = remoteJid.endsWith("@s.whatsapp.net");
+    const isLID = remoteJid.endsWith("@lid");
+    if (!isWA && !isLID) return;
 
-    const phone = "+" + remoteJid.split("@")[0];
+    // Extraemos texto desde varios tipos de mensaje. Si no hay texto plano
+    // pero llegó un audio/imagen/sticker, devolvemos un placeholder explícito
+    // en vez de descartar. Sin esto, los clientes que mandan audio o foto
+    // quedan invisibles en el dashboard y la conversación parece muerta.
+    const text = extractText(msg);
+    if (!text) return;
+
+    // Para @s.whatsapp.net guardamos formato bonito "+51999...". Para @lid
+    // guardamos el JID completo ("268114...@lid") porque NO es un número real.
+    const phone = isWA
+      ? "+" + remoteJid.split("@")[0]
+      : remoteJid;
     const nombre = msg.pushName || phone;
 
     console.log(`[${this.empresaId}] ← ${nombre} (${phone}): "${text}"`);
@@ -285,8 +310,66 @@ function sanitize(s: string): string {
   return s.replace(/[^a-zA-Z0-9_-]/g, "_");
 }
 
+/**
+ * Extrae texto utilizable de un mensaje de Baileys cubriendo los tipos más
+ * comunes que mandan los clientes en WhatsApp:
+ *
+ *  • conversation        → texto plano simple
+ *  • extendedTextMessage → texto con quote/formato/preview de link
+ *  • imageMessage        → caption de la imagen
+ *  • videoMessage        → caption del video
+ *  • documentMessage     → caption (o el filename si no hay caption)
+ *  • audioMessage / pttMessage → placeholder explícito ("[El cliente envió audio]")
+ *  • stickerMessage      → placeholder ("[El cliente envió un sticker]")
+ *  • locationMessage     → placeholder ("[El cliente envió ubicación]")
+ *
+ * Para tipos sin contenido textual relevante (reactionMessage, protocolMessage,
+ * pollUpdateMessage), devolvemos "" para que el caller los descarte.
+ *
+ * El placeholder hace que la conversación sea visible en el dashboard incluso
+ * cuando llegan medios — el operador puede pasar a modo HUMAN y responder.
+ */
+function extractText(msg: any): string {
+  const m = msg?.message;
+  if (!m) return "";
+
+  // Algunos clientes envían el mensaje envuelto (forwarded, ephemeral).
+  const inner =
+    m.ephemeralMessage?.message ||
+    m.viewOnceMessage?.message ||
+    m.viewOnceMessageV2?.message ||
+    m.documentWithCaptionMessage?.message ||
+    m;
+
+  if (inner.conversation) return String(inner.conversation);
+  if (inner.extendedTextMessage?.text) return String(inner.extendedTextMessage.text);
+
+  // Imagen/video/documento con caption
+  const cap =
+    inner.imageMessage?.caption ||
+    inner.videoMessage?.caption ||
+    inner.documentMessage?.caption;
+  if (cap) return String(cap);
+
+  // Documento sin caption: usar el filename para que el operador sepa qué llegó
+  if (inner.documentMessage?.fileName) {
+    return `[Documento: ${inner.documentMessage.fileName}]`;
+  }
+  if (inner.imageMessage)    return "[El cliente envió una imagen]";
+  if (inner.videoMessage)    return "[El cliente envió un video]";
+  if (inner.audioMessage || inner.pttMessage) return "[El cliente envió un audio]";
+  if (inner.stickerMessage)  return "[El cliente envió un sticker]";
+  if (inner.locationMessage || inner.liveLocationMessage) return "[El cliente envió una ubicación]";
+  if (inner.contactMessage || inner.contactsArrayMessage) return "[El cliente envió un contacto]";
+
+  // Reacciones, protocolos internos, polls → ignorar
+  return "";
+}
+
 function phoneToJid(phone: string): string {
-  // "+51 987 654 321" → "51987654321@s.whatsapp.net"
+  // Si ya viene como JID completo (ej. "268114...@lid"), lo usamos tal cual.
+  if (phone.includes("@")) return phone;
+  // Si es un teléfono "+51 987 654 321" → "51987654321@s.whatsapp.net"
   const digits = phone.replace(/\D/g, "");
   return `${digits}@s.whatsapp.net`;
 }
