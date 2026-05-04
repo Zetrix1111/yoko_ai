@@ -201,11 +201,17 @@ Write-Ok "Configuración aplicada"
 Write-Step "Arrancando servicio"
 & $nssmExe start $ServiceName
 Start-Sleep -Seconds 3
-$status = & $nssmExe status $ServiceName
+# NSSM en algunas locales (es_PE/es_ES) imprime el status en UTF-16 LE,
+# que PowerShell convierte a una string con espacios entre cada char
+# ("S E R V I C E _ R U N N I N G"). Normalizamos quitando whitespace
+# y nulls antes de comparar. Get-Service da una respuesta más limpia
+# y locale-independent, así que la usamos.
+$svcInfo = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
+$status  = if ($svcInfo) { $svcInfo.Status.ToString() } else { 'Unknown' }
 Write-Ok "Status: $status"
 
-if ($status -ne "SERVICE_RUNNING") {
-    Write-Warn "El servicio no quedó en SERVICE_RUNNING. Revisá:"
+if ($status -ne "Running") {
+    Write-Warn "El servicio no quedó en Running. Revisá:"
     Write-Warn "  Get-Content '$errLog' -Tail 50"
 }
 

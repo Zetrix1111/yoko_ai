@@ -92,7 +92,10 @@ if ($ForceNpmInstall -or $lockHashBefore -ne $lockHashAfter) {
 Write-Step "Iniciando $ServiceName"
 & $nssmExe start $ServiceName
 Start-Sleep -Seconds 3
-$status = & $nssmExe status $ServiceName
+# Get-Service da output limpio y locale-independent — NSSM en es_PE
+# imprime UTF-16 LE que se interpreta como "S E R V I C E _ R U N N I N G".
+$svcInfo = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
+$status  = if ($svcInfo) { $svcInfo.Status.ToString() } else { 'Unknown' }
 Write-Ok "Status: $status"
 
 # ── 6. Logs recientes ────────────────────────────────────────────────────
@@ -102,7 +105,7 @@ if (Test-Path $outLog) {
     Get-Content $outLog -Tail 20
 }
 
-if ($status -ne "SERVICE_RUNNING") {
+if ($status -ne "Running") {
     $errLog = Join-Path $logsDir "bot.err.log"
     Write-Warn "Servicio NO está corriendo. Logs de error:"
     if (Test-Path $errLog) { Get-Content $errLog -Tail 30 }
