@@ -61,14 +61,14 @@ El script:
 
 1. Actualiza apt e instala `git`, `build-essential`, `curl`, etc.
 2. Instala Node.js 20 desde NodeSource si no está.
-3. Clona el repo a `/opt/yoko-bot/yoko_ai/`.
+3. Clona el repo a `/opt/yoko-bot/yoko_chat/`.
 4. Corre `npm install` en `bot-service/`.
 5. **Se detiene** porque falta el `.env` (esperado).
 
 ### 5. Llenar el `.env` con tus secretos (~2 min)
 
 ```bash
-nano /opt/yoko-bot/yoko_ai/bot-service/.env
+nano /opt/yoko-bot/yoko_chat/bot-service/.env
 ```
 
 Reemplazá los placeholders:
@@ -140,7 +140,7 @@ Si llegaste hasta acá: **listo, deploy completo**. Tu PC ya no es necesaria.
 Cuando pusheés cambios al repo:
 
 ```bash
-ssh root@<IP> '/opt/yoko-bot/yoko_ai/bot-service/deploy/update-linux.sh'
+ssh root@<IP> '/opt/yoko-bot/yoko_chat/bot-service/deploy/update-linux.sh'
 ```
 
 Hace `git pull` + `npm install` (si lockfile cambió) + restart. Total: ~30 segundos.
@@ -175,7 +175,7 @@ La carpeta `auth/cmejia/` es lo único persistente que no podés regenerar (sin 
 
 ```powershell
 # Desde tu PC, copia todo el folder:
-scp -r root@<IP>:/opt/yoko-bot/yoko_ai/bot-service/auth $env:USERPROFILE\Desktop\auth-backup-$(Get-Date -Format yyyyMMdd)
+scp -r root@<IP>:/opt/yoko-bot/yoko_chat/bot-service/auth $env:USERPROFILE\Desktop\auth-backup-$(Get-Date -Format yyyyMMdd)
 ```
 
 Si en el futuro migrás a otro VPS, podés copiar este backup adentro del nuevo y mantener la sesión activa sin re-escanear.
@@ -201,7 +201,7 @@ Cloud Console → tu server → Backups → Enable. Cuesta €0.90/mes extra. Te
 
 ```bash
 apt-get install -y python3 python3-pip
-cd /opt/yoko-bot/yoko_ai/bot-service && npm install
+cd /opt/yoko-bot/yoko_chat/bot-service && npm install
 ```
 
 ### El servicio no arranca
@@ -212,7 +212,7 @@ journalctl -u yoko-bot --since "10 min ago" --no-pager
 ```
 
 Causas comunes:
-- **"Falta AIRTABLE_TOKEN..."**: el `.env` no tiene los valores. Revisá con `cat /opt/yoko-bot/yoko_ai/bot-service/.env`.
+- **"Falta AIRTABLE_TOKEN..."**: el `.env` no tiene los valores. Revisá con `cat /opt/yoko-bot/yoko_chat/bot-service/.env`.
 - **"ECONNREFUSED 443"**: muy raro en Hetzner pero puede pasar con proxies; descartar primero con `curl https://api.airtable.com`.
 - **"Cannot find module 'tsx'"**: `npm install` falló. Re-correrlo a mano.
 

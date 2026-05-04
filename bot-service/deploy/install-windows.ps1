@@ -92,7 +92,10 @@ Write-Ok "$(git --version)"
 # ── 2. Estructura de carpetas ────────────────────────────────────────────
 Write-Step "Preparando $InstallDir"
 $logsDir   = Join-Path $InstallDir "logs"
-$repoDir   = Join-Path $InstallDir "yoko_ai"
+# Cloneamos en una carpeta llamada "yoko_chat" (mismo nombre que en la PC del
+# desarrollador), aunque el repo GitHub se llame "yoko_ai". Mantiene un mental
+# model consistente entre dev local y server.
+$repoDir   = Join-Path $InstallDir "yoko_chat"
 $botDir    = Join-Path $repoDir   "bot-service"
 $envFile   = Join-Path $botDir    ".env"
 $nssmExe   = Join-Path $InstallDir "nssm.exe"

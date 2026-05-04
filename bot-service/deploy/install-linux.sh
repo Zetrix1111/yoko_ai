@@ -9,7 +9,7 @@
 # Uso:
 #   curl -fsSL https://raw.githubusercontent.com/Zetrix1111/yoko_ai/main/bot-service/deploy/install-linux.sh | bash
 # o, si ya tenés el repo:
-#   /opt/yoko-bot/yoko_ai/bot-service/deploy/install-linux.sh
+#   /opt/yoko-bot/yoko_chat/bot-service/deploy/install-linux.sh
 #
 set -euo pipefail
 
@@ -18,7 +18,10 @@ REPO_URL="${REPO_URL:-https://github.com/Zetrix1111/yoko_ai.git}"
 SERVICE_NAME="${SERVICE_NAME:-yoko-bot}"
 NODE_MAJOR="${NODE_MAJOR:-20}"
 
-REPO_DIR="${INSTALL_DIR}/yoko_ai"
+# Cloneamos en una carpeta llamada "yoko_chat" (mismo nombre que en la PC del
+# desarrollador), aunque el repo GitHub se llame "yoko_ai". Mantiene un mental
+# model consistente entre dev local y server.
+REPO_DIR="${INSTALL_DIR}/yoko_chat"
 BOT_DIR="${REPO_DIR}/bot-service"
 ENV_FILE="${BOT_DIR}/.env"
 ENV_EXAMPLE="${BOT_DIR}/.env.example"

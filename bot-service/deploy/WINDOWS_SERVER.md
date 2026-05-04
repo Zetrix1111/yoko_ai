@@ -25,7 +25,7 @@ Hay un **paso previo** importante: correr `prep-pc-as-server.ps1` antes del inst
 
 ```powershell
 # PowerShell como Administrator
-cd C:\temp\yoko_ai\bot-service\deploy
+cd C:\temp\yoko_chat\bot-service\deploy
 .\prep-pc-as-server.ps1     # solo PC personal, NO Windows Server
 .\install-windows.ps1
 ```
@@ -66,17 +66,19 @@ Abrí **PowerShell como Administrator** en el server.
 
 ```powershell
 # 1. Cloná solo este folder o el repo entero (más simple)
-git clone https://github.com/Zetrix1111/yoko_ai.git C:\temp\yoko_ai
+# Cloneamos como "yoko_chat" (mismo nombre que tu local) aunque el repo
+# GitHub se llame "yoko_ai":
+git clone https://github.com/Zetrix1111/yoko_ai.git C:\temp\yoko_chat
 
 # 2. Corré el script de instalación
-cd C:\temp\yoko_ai\bot-service\deploy
+cd C:\temp\yoko_chat\bot-service\deploy
 .\install-windows.ps1
 ```
 
 El script va a:
 
 1. Verificar Node, Git y NSSM.
-2. Clonar el repo a `C:\yoko-bot\yoko_ai\` (si no está ya).
+2. Clonar el repo a `C:\yoko-bot\yoko_chat\` (si no está ya).
 3. `npm install` en `bot-service/`.
 4. **Pausarse** y abrirte `notepad` con el `.env` para que llenés los secretos:
    ```
@@ -147,7 +149,7 @@ Si ya tenés el bot corriendo en tu PC y querés migrarlo:
 Si no querés re-escanear:
 
 1. **Detené el bot en tu PC** (`Ctrl+C`). NO lo vuelvas a arrancar.
-2. **Copiá la carpeta auth completa** desde tu PC al server. Por RDP: arrastrá `C:\yoko_chat\bot-service\auth\cmejia\` y soltala en `C:\yoko-bot\yoko_ai\bot-service\auth\` del server.
+2. **Copiá la carpeta auth completa** desde tu PC al server. Por RDP: arrastrá `C:\yoko_chat\bot-service\auth\cmejia\` y soltala en `C:\yoko-bot\yoko_chat\bot-service\auth\` del server.
 3. Corré `install-windows.ps1` en el server.
 
 ⚠ A veces Baileys detecta el cambio de máquina y termina pidiendo nuevo QR igual. Si pasa, fallback a Opción A.
@@ -161,7 +163,7 @@ Si no querés re-escanear:
 Cuando hayas pusheado cambios al repo que querés deployar:
 
 ```powershell
-cd C:\temp\yoko_ai\bot-service\deploy   # o donde haya quedado el script
+cd C:\temp\yoko_chat\bot-service\deploy   # o donde haya quedado el script
 .\update-windows.ps1
 ```
 
@@ -216,7 +218,7 @@ Mirá `C:\yoko-bot\logs\bot.err.log`. Causas comunes:
 - **`ECONNREFUSED` al hacer fetch a WhatsApp**: firewall corporativo bloqueando outbound. Pedile a TI que permita HTTPS saliente a `*.whatsapp.com`, `api.airtable.com`, `yokochat.vercel.app`.
 - **`Cannot find module 'tsx'`**: `npm install` falló. Corré:
   ```powershell
-  cd C:\yoko-bot\yoko_ai\bot-service
+  cd C:\yoko-bot\yoko_chat\bot-service
   npm install
   ```
 
@@ -248,7 +250,7 @@ NSSM acepta varios servicios apuntando al mismo binario con configs distintas. P
 
 Si en algún momento perdés acceso al server del trabajo:
 
-1. **Backup manual**: copiá `C:\yoko-bot\yoko_ai\bot-service\auth\` a un drive externo o a tu PC.
+1. **Backup manual**: copiá `C:\yoko-bot\yoko_chat\bot-service\auth\` a un drive externo o a tu PC.
 2. **Migrar a un VPS** (Hetzner CX22 € 4.51/mes recomendado): instalá Node 20 + Git, cloná el repo, copiá la carpeta `auth/` adentro, llenás el `.env`, registrás como servicio systemd. Sin perder sesiones de WhatsApp.
 
 El plan completo de migración a VPS está fuera del alcance de este README, pero el patrón es idéntico al de Windows: la carpeta `auth/` es el único estado persistente que no podés regenerar.

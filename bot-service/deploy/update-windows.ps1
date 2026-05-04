@@ -48,7 +48,7 @@ if (-not $prin.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator))
     exit 1
 }
 
-$repoDir = Join-Path $InstallDir "yoko_ai"
+$repoDir = Join-Path $InstallDir "yoko_chat"
 $botDir  = Join-Path $repoDir   "bot-service"
 $logsDir = Join-Path $InstallDir "logs"
 $nssmExe = Join-Path $InstallDir "nssm.exe"

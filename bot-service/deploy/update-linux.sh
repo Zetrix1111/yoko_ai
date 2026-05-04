@@ -3,7 +3,7 @@
 # update-linux.sh — Actualiza bot-baileys al último commit y reinicia el servicio.
 #
 # Uso:
-#   sudo /opt/yoko-bot/yoko_ai/bot-service/deploy/update-linux.sh
+#   sudo /opt/yoko-bot/yoko_chat/bot-service/deploy/update-linux.sh
 #
 # O si ya estás dentro de la carpeta:
 #   sudo ./update-linux.sh
@@ -16,7 +16,7 @@ set -euo pipefail
 INSTALL_DIR="${INSTALL_DIR:-/opt/yoko-bot}"
 SERVICE_NAME="${SERVICE_NAME:-yoko-bot}"
 
-REPO_DIR="${INSTALL_DIR}/yoko_ai"
+REPO_DIR="${INSTALL_DIR}/yoko_chat"
 BOT_DIR="${REPO_DIR}/bot-service"
 LOCK_FILE="${BOT_DIR}/package-lock.json"
 
