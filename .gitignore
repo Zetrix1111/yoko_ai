@@ -24,3 +24,15 @@ dist-ssr
 *.sw?
 
 .vercel
+
+# Python bytecode (api/ serverless functions)
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Environment files
+.env
+.env.local
+.env.*.local
