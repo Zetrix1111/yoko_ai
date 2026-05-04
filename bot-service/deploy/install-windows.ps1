@@ -11,8 +11,13 @@
     5. Registra el servicio Windows con NSSM si no existe.
     6. Lo arranca.
 
-  Diseñado para correrse en un Windows Server por RDP, en una sesión
-  PowerShell con privilegios de Administrador.
+  Funciona tanto en Windows Server (RDP corporativo) como en Windows
+  10/11 personal. NSSM corre el servicio como LocalSystem, así que
+  arranca al boot incluso sin que un usuario inicie sesión.
+
+  Si esto es una PC personal, conviene correr ANTES `prep-pc-as-server.ps1`
+  para desactivar sleep/hibernate y evitar que el bot se caiga cuando no
+  estés frente a la PC.
 
 .PARAMETER InstallDir
   Carpeta raíz donde vive todo (repo + logs + nssm.exe).
@@ -207,4 +212,8 @@ Write-Host "    & '$nssmExe' stop     $ServiceName"
 Write-Host ""
 Write-Host "  Para actualizar a la última versión del repo:"
 Write-Host "    .\update-windows.ps1"
+Write-Host ""
+Write-Host "  Si esto es una PC personal (no un Windows Server)," -ForegroundColor Yellow
+Write-Host "  corré también para desactivar sleep/hibernate:"  -ForegroundColor Yellow
+Write-Host "    .\prep-pc-as-server.ps1"                       -ForegroundColor Yellow
 Write-Host "════════════════════════════════════════════════════════════════"

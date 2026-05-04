@@ -1,8 +1,44 @@
-# Deploy de bot-baileys en Windows Server
+# Deploy de bot-baileys en Windows (Server o PC personal)
 
-Esta guía es para correr `bot-baileys` como un **servicio Windows** que arranca solo al boot, se reinicia si crashea, y queda corriendo aunque cierres la sesión RDP. Útil cuando ya no querés depender de tu PC personal.
+Esta guía es para correr `bot-baileys` como un **servicio Windows** que arranca solo al boot, se reinicia si crashea, y queda corriendo aunque nadie tenga sesión iniciada. Sirve igual para Windows Server corporativo o para Windows 10/11 en una PC personal usada como mini-server transitorio.
 
-> Para desarrollo local en tu propia PC, mirá `bot-service/README.md`. Esto es solo para el server de producción.
+> Para desarrollo local en tu propia PC sin servicializarlo, mirá `bot-service/README.md`.
+
+---
+
+## ¿PC personal o Windows Server? ¿Qué cambia?
+
+El **código y los scripts son los mismos**. Lo que cambia es la preparación del OS:
+
+| Aspecto                  | Windows Server                      | PC personal (Win 10/11)             |
+|--------------------------|-------------------------------------|-------------------------------------|
+| Acceso típico            | RDP corporativo                     | Frente al teclado / Remote Desktop  |
+| Sleep / Hibernate        | OFF por default                     | ON por default → **hay que apagarlo** |
+| Cierre de tapa (laptop)  | N/A                                 | Suspende por default → **hay que cambiarlo** |
+| Reinicios programados    | Windows Update opcional             | Windows Update obligatorio          |
+| 24/7 confiable           | Sí, por diseño                      | Depende de luz/internet del hogar   |
+| Costo                    | Pagado por la empresa               | $0                                  |
+
+### Si vas a usar tu PC personal como server
+
+Hay un **paso previo** importante: correr `prep-pc-as-server.ps1` antes del install. Eso desactiva sleep, hibernate y (si es laptop) la suspensión por cierre de tapa.
+
+```powershell
+# PowerShell como Administrator
+cd C:\temp\yoko_ai\bot-service\deploy
+.\prep-pc-as-server.ps1     # solo PC personal, NO Windows Server
+.\install-windows.ps1
+```
+
+Si la PC es **laptop**: dejala enchufada permanentemente. Cierre de tapa con el script ya configurado a "no hacer nada".
+
+### Si vas a usar un Windows Server (corporativo o VPS)
+
+Saltate el `prep-pc-as-server.ps1` (no hace falta — los servers ya vienen sin sleep) y andá directo al install.
+
+### Migración futura a Hetzner cuando tengas tu primer cliente
+
+Cuando llegue tracción y un VPS dedicado tenga sentido (US$5/mes), seguir la guía `LINUX_VPS.md`. Para no perder la sesión Baileys (no re-escanear QR), copiar la carpeta `auth/cmejia/` desde la PC al VPS antes del primer arranque del servicio. Tiempo total de migración: ~30-45 min.
 
 ---
 
