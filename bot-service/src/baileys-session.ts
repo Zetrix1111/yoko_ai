@@ -68,8 +68,17 @@ export class WaSession {
       auth: state,
       logger,
       browser: Browsers.macOS("Desktop"),  // ← sin esto: code 440
-      markOnlineOnConnect: false,
+      // markOnlineOnConnect: true es CRÍTICO. Si está en false, los mensajes
+      // entrantes llegan con msg.message = null (no se desencriptan). El bot
+      // tiene que aparecer "online" para que WhatsApp negocie correctamente
+      // las claves Signal con cada contacto que le escribe.
+      markOnlineOnConnect: true,
       syncFullHistory: false,
+      // getMessage: callback que Baileys usa cuando WhatsApp pide
+      // retransmisión de un mensaje saliente. Sin esto las fallas de
+      // entrega temporales se vuelven permanentes. Devolvemos undefined
+      // porque no tenemos un store local — Baileys re-pide al server.
+      getMessage: async () => undefined,
     });
 
     this.sock.ev.on("creds.update", saveCreds);
