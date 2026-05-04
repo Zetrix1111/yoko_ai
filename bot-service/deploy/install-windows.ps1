@@ -164,13 +164,22 @@ if (-not (Test-Path $tsxCli)) {
     exit 1
 }
 
-$existing = & $nssmExe status $ServiceName 2>&1
-if ($LASTEXITCODE -eq 0) {
-    Write-Ok "Servicio ya existe (status: $existing). Aplicando configuración por si cambió algo."
-    & $nssmExe stop $ServiceName | Out-Null
-    Start-Sleep -Seconds 2
+# Get-Service maneja "no existe" devolviendo $null limpiamente.
+# Usar `nssm status` directo se interrumpe con $ErrorActionPreference=Stop
+# porque NSSM imprime a stderr "Can't open service!" cuando no existe.
+$existingService = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
+if ($existingService) {
+    Write-Ok "Servicio ya existe (status: $($existingService.Status)). Aplicando configuración por si cambió algo."
+    if ($existingService.Status -eq 'Running') {
+        & $nssmExe stop $ServiceName | Out-Null
+        Start-Sleep -Seconds 2
+    }
 } else {
     & $nssmExe install $ServiceName $nodeExe $tsxCli $entryTs
+    if ($LASTEXITCODE -ne 0) {
+        Write-Err "nssm install fallo (exit $LASTEXITCODE). Necesita PowerShell elevado (Run as Administrator)."
+        exit 1
+    }
     Write-Ok "Servicio instalado"
 }
 
