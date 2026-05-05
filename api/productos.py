@@ -39,16 +39,12 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 
-from _lib import airtable_client                                    # noqa: E402
+from _lib import airtable_client, auth                              # noqa: E402
 from _lib.airtable_client import AirtableError                      # noqa: E402
+from _lib.auth import AuthError                                     # noqa: E402
 
 
 _TABLA = "productos"
-_FALLBACK_TENANT = "cmejia"
-
-
-def _tenant_id() -> str:
-    return os.environ.get("TENANT_ID") or _FALLBACK_TENANT
 
 
 def _normalize_record(rec: dict) -> dict:
@@ -106,15 +102,23 @@ class handler(BaseHTTPRequestHandler):
     # ── GET: listar todos / obtener uno ──────────────────────────────────
     def do_GET(self):
         try:
+            try:
+                auth_payload = auth.require_auth(self.headers)
+            except AuthError as e:
+                return self._json(e.status, {"error": str(e)})
+            empresa_id = auth_payload["empresa_id"]
+
             qs = parse_qs(urlparse(self.path).query)
             rec_id = (qs.get("id") or [None])[0]
 
             if rec_id:
                 rec = airtable_client.get_record(_TABLA, rec_id)
+                # Cross-tenant guard.
+                if (rec.get("fields", {}) or {}).get("empresa_id") != empresa_id:
+                    return self._json(404, {"error": "Producto no encontrado."})
                 return self._json(200, {"producto": _normalize_record(rec)})
 
-            tenant = _tenant_id()
-            formula = f"{{empresa_id}}='{tenant}'"
+            formula = f"{{empresa_id}}='{empresa_id}'"
             records = airtable_client.list_records(_TABLA, filter_formula=formula, max_records=100)
             productos = [_normalize_record(r) for r in records]
             return self._json(200, {"productos": productos})
@@ -129,12 +133,19 @@ class handler(BaseHTTPRequestHandler):
     # ── POST: crear ──────────────────────────────────────────────────────
     def do_POST(self):
         try:
+            try:
+                auth_payload = auth.require_auth(self.headers)
+            except AuthError as e:
+                return self._json(e.status, {"error": str(e)})
+            empresa_id = auth_payload["empresa_id"]
+
             payload = self._read_body()
             if not payload.get("nombre"):
                 return self._json(400, {"error": "El campo 'nombre' es requerido."})
 
             fields = _to_airtable_fields(payload)
-            fields["empresa_id"] = _tenant_id()
+            # `empresa_id` viene del JWT — ignoramos cualquier valor del body.
+            fields["empresa_id"] = empresa_id
             # Default activo si no se especifica
             fields.setdefault("activo", True)
 
@@ -153,15 +164,33 @@ class handler(BaseHTTPRequestHandler):
     # ── PATCH: actualizar ────────────────────────────────────────────────
     def do_PATCH(self):
         try:
+            try:
+                auth_payload = auth.require_auth(self.headers)
+            except AuthError as e:
+                return self._json(e.status, {"error": str(e)})
+            empresa_id = auth_payload["empresa_id"]
+
             qs = parse_qs(urlparse(self.path).query)
             rec_id = (qs.get("id") or [None])[0]
             if not rec_id:
                 return self._json(400, {"error": "Falta query param 'id'."})
 
+            # Cross-tenant guard: validar que el producto pertenece al tenant.
+            try:
+                existing = airtable_client.get_record(_TABLA, rec_id)
+            except AirtableError as e:
+                if e.status == 404:
+                    return self._json(404, {"error": "Producto no encontrado."})
+                raise
+            if (existing.get("fields", {}) or {}).get("empresa_id") != empresa_id:
+                return self._json(404, {"error": "Producto no encontrado."})
+
             payload = self._read_body()
             fields = _to_airtable_fields(payload)
             if not fields:
                 return self._json(400, {"error": "Body sin campos válidos para actualizar."})
+            # NUNCA permitir cambiar empresa_id desde el body.
+            fields.pop("empresa_id", None)
 
             rec = airtable_client.update_record(_TABLA, rec_id, fields)
             return self._json(200, {"producto": _normalize_record(rec)})
@@ -178,10 +207,26 @@ class handler(BaseHTTPRequestHandler):
     # ── DELETE: eliminar ─────────────────────────────────────────────────
     def do_DELETE(self):
         try:
+            try:
+                auth_payload = auth.require_auth(self.headers)
+            except AuthError as e:
+                return self._json(e.status, {"error": str(e)})
+            empresa_id = auth_payload["empresa_id"]
+
             qs = parse_qs(urlparse(self.path).query)
             rec_id = (qs.get("id") or [None])[0]
             if not rec_id:
                 return self._json(400, {"error": "Falta query param 'id'."})
+
+            # Cross-tenant guard.
+            try:
+                existing = airtable_client.get_record(_TABLA, rec_id)
+            except AirtableError as e:
+                if e.status == 404:
+                    return self._json(404, {"error": "Producto no encontrado."})
+                raise
+            if (existing.get("fields", {}) or {}).get("empresa_id") != empresa_id:
+                return self._json(404, {"error": "Producto no encontrado."})
 
             airtable_client.delete_record(_TABLA, rec_id)
             return self._json(200, {"ok": True, "id": rec_id})

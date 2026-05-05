@@ -13,7 +13,12 @@ Uso:
 Requiere en .env.local (o exportadas en el shell):
     OPENAI_API_KEY
     AIRTABLE_TOKEN, AIRTABLE_BASE_ID
-    TENANT_ID    (opcional, cae a 'cmejia')
+
+NOTE: este script quedó desactualizado tras Fase 4 (multi-tenant por JWT) —
+`load_full_config` ahora requiere empresa_id explícito y `prompt_builder` se
+movió a `api/_yoko/_lib/prompt.py`. Conservado como referencia histórica;
+para validar el pipeline real, usar el endpoint `/api/chat` vía curl con un
+JWT válido.
 """
 
 import json

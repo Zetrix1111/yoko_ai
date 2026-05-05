@@ -38,6 +38,9 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 
+from _lib import auth                 # noqa: E402
+from _lib.auth import AuthError       # noqa: E402
+
 
 # ─────────────────────────────────────────────────────────────────────────
 # Prompt de extracción para OpenAI
@@ -193,6 +196,11 @@ def _text_to_campos(raw_text: str, api_key: str) -> tuple[dict, str]:
 class handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
+        try:
+            auth.require_auth(self.headers)
+        except AuthError as e:
+            return self._json(e.status, {"error": str(e)})
+
         api_key = os.environ.get("OPENAI_API_KEY")
         if not api_key:
             return self._json(500, {"error": "OPENAI_API_KEY no configurada."})

@@ -9,16 +9,30 @@ mock (proceso_id + sheet_url) — útil en preview / desarrollo.
 
 from http.server import BaseHTTPRequestHandler
 import os
+import sys
 import json
 import time
 import urllib.request
 import urllib.error
+
+_HERE = os.path.dirname(os.path.abspath(__file__))
+if _HERE not in sys.path:
+    sys.path.insert(0, _HERE)
+
+from _lib import auth                                              # noqa: E402
+from _lib.auth import AuthError                                    # noqa: E402
 
 
 class handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         try:
+            try:
+                auth_payload = auth.require_auth(self.headers)
+            except AuthError as e:
+                return self._json(e.status, {"error": str(e)})
+            empresa_id = auth_payload["empresa_id"]
+
             webhook_url    = os.environ.get("MAKE_WEBHOOK_FACTURAS_PROCESAR")
             content_length = int(self.headers.get("Content-Length", 0))
             content_type   = self.headers.get("Content-Type", "multipart/form-data")
@@ -32,7 +46,7 @@ class handler(BaseHTTPRequestHandler):
                     "mock": True,
                     "proceso_id": proceso_id,
                     "sheet_url": "https://docs.google.com/spreadsheets/d/MOCK_FACTURAS_VALIDACION/edit",
-                    "empresa_id": "cmejia",
+                    "empresa_id": empresa_id,
                 })
 
             # ── Modo real: forward multipart al webhook ──

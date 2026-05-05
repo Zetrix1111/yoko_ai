@@ -1,7 +1,8 @@
 """
 api/facturas_concar.py
 Proxy seguro al webhook de Make para GENERACIÓN del archivo CONCAR.
-Recibe { proceso_id, empresa_id, dni } como JSON.
+Recibe { proceso_id, dni } como JSON. `empresa_id` SIEMPRE viene del JWT;
+cualquier `empresa_id` del body se ignora por seguridad.
 
 Si MAKE_WEBHOOK_FACTURAS_CONCAR no está configurado, devuelve un
 download_url mock — útil en preview / desarrollo.
@@ -9,18 +10,36 @@ download_url mock — útil en preview / desarrollo.
 
 from http.server import BaseHTTPRequestHandler
 import os
+import sys
 import json
 import urllib.request
 import urllib.error
+
+_HERE = os.path.dirname(os.path.abspath(__file__))
+if _HERE not in sys.path:
+    sys.path.insert(0, _HERE)
+
+from _lib import auth                                              # noqa: E402
+from _lib.auth import AuthError                                    # noqa: E402
 
 
 class handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         try:
+            try:
+                auth_payload = auth.require_auth(self.headers)
+            except AuthError as e:
+                return self._json(e.status, {"error": str(e)})
+            empresa_id = auth_payload["empresa_id"]
+
             webhook_url = os.environ.get("MAKE_WEBHOOK_FACTURAS_CONCAR")
             length      = int(self.headers.get("Content-Length", 0))
             body        = json.loads(self.rfile.read(length)) if length else {}
+
+            # `empresa_id` SIEMPRE viene del JWT — sobrescribimos cualquier
+            # valor del body para impedir cross-tenant.
+            body["empresa_id"] = empresa_id
 
             # ── Modo mock ──
             if not webhook_url:

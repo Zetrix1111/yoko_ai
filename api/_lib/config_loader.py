@@ -1,17 +1,24 @@
 """
-Loader de configuración multi-tenant en 2 capas:
+Loader de configuración multi-tenant. Toda la config viene de Airtable;
+no hay archivos JSON por tenant en el filesystem.
 
-  • Estática  → src/tenants/<TENANT_ID>/config.json   (identidad, módulos, branding)
-  • Dinámica  → tablas Config_* en Airtable           (reglas de negocio editables)
+Tablas que lee:
+  • Config_Empresa.data    (basicos + info_extendida + proceso.caja_chica)
+  • Config_Ventas.data     (bloque ventas — 11 toggles del agente)
+  • Config_Procesos        (legacy — claves dinámicas por proceso)
+  • Aprobadores            (legacy — agrupados por proceso)
+  • Empleados              (filtrados por APROBADORES → listas de aprobador_1/2)
 
-`load_full_config()` combina ambas en el dict final que consumirá el
-`prompt_builder` y demás módulos del backend.
+Cache: TTL 60s POR EMPRESA. Cold start lo resetea (esperado en serverless).
+Los POST de /api/config llaman a `invalidate_cache(empresa_id)` para que
+la siguiente request del agente vea los cambios sin esperar el TTL.
 
-Cache: en memoria, TTL 300s. El cold start lo resetea (esperado en serverless).
+Multi-tenant: todas las funciones públicas reciben `empresa_id` como
+primer parámetro. El cache es un dict por empresa para no mezclar datos
+entre clientes.
 """
 
 import json
-import os
 import sys
 import time
 
@@ -20,62 +27,27 @@ from .airtable_client import AirtableError
 
 
 # ─────────────────────────────────────────────────────────────────────────
-# Resolución de rutas
-# ─────────────────────────────────────────────────────────────────────────
-_HERE = os.path.dirname(os.path.abspath(__file__))                # api/_lib
-_REPO_ROOT = os.path.abspath(os.path.join(_HERE, "..", ".."))     # repo root
-_TENANTS_DIR = os.path.join(_REPO_ROOT, "src", "tenants")
-
-_FALLBACK_TENANT = "cmejia"
-
-
-# ─────────────────────────────────────────────────────────────────────────
-# Cache de la config dinámica
+# Cache de la config dinámica — UN dict por empresa
 # ─────────────────────────────────────────────────────────────────────────
 # TTL bajo (60s) para que los cambios desde la UI se reflejen rápido sin
-# saturar Airtable. Los POST de /api/config llaman invalidate_cache()
-# explícitamente, así que el caso normal es instantáneo.
-_cache = {"data": None, "expires_at": 0.0}            # legacy (load_dynamic_config)
-_full_cache = {"data": None, "expires_at": 0.0}       # paso 6 (load_full_config)
+# saturar Airtable. Los POST de /api/config llaman invalidate_cache(empresa_id)
+# para que el caso normal sea instantáneo.
 _CACHE_TTL_SECONDS = 60
 
-
-def _get_tenant_id() -> str:
-    """Lee TENANT_ID del entorno; si falta, usa el fallback con warning."""
-    tenant_id = os.environ.get("TENANT_ID")
-    if not tenant_id:
-        print(
-            f"[config_loader] TENANT_ID no seteado. Usando fallback '{_FALLBACK_TENANT}'.",
-            file=sys.stderr,
-        )
-        return _FALLBACK_TENANT
-    return tenant_id
+# {empresa_id: {"data": dict|None, "expires_at": float}}
+_dynamic_cache: dict[str, dict] = {}
+_full_cache:    dict[str, dict] = {}
 
 
 # ─────────────────────────────────────────────────────────────────────────
-# Capa 1-2: estática (identidad / capacidades)
+# Branding/identidad — único para todos los tenants. Si en el futuro se
+# decide rebrand por cliente, mover a Airtable Config_Empresa.basicos.
 # ─────────────────────────────────────────────────────────────────────────
-def load_static_config() -> dict:
-    """
-    Lee y devuelve src/tenants/<TENANT_ID>/config.json.
-    Si el archivo del tenant no existe, cae al fallback.
-    """
-    tenant_id = _get_tenant_id()
-    path = os.path.join(_TENANTS_DIR, tenant_id, "config.json")
-
-    if not os.path.exists(path):
-        print(
-            f"[config_loader] No existe {path}. Usando fallback '{_FALLBACK_TENANT}'.",
-            file=sys.stderr,
-        )
-        path = os.path.join(_TENANTS_DIR, _FALLBACK_TENANT, "config.json")
-
-    with open(path, encoding="utf-8") as f:
-        return json.load(f)
+_AGENT_DEFAULTS = {"name": "Yoko"}
 
 
 # ─────────────────────────────────────────────────────────────────────────
-# Capa 4: dinámica (reglas de negocio en Airtable)
+# Capa dinámica (reglas de negocio en Airtable)
 # ─────────────────────────────────────────────────────────────────────────
 def _cast(valor, tipo: str | None):
     """
@@ -104,8 +76,8 @@ def _cast(valor, tipo: str | None):
 
 def _safe_list(table: str, filter_formula: str) -> list[dict]:
     """
-    Wrapper que intenta listar una tabla y, si falla (404 porque no existe
-    aún, o error de red), devuelve [] con un warning a stderr. El skeleton
+    Intenta listar una tabla y, si falla (404 porque no existe aún, o
+    error de red), devuelve [] con un warning a stderr. El skeleton
     debe poder correr aunque las tablas no estén creadas todavía.
     """
     try:
@@ -119,27 +91,30 @@ def _safe_list(table: str, filter_formula: str) -> list[dict]:
         return []
 
 
-def load_dynamic_config() -> dict:
+def load_dynamic_config(empresa_id: str) -> dict:
     """
-    Lee las tablas Config_* desde Airtable filtradas por empresa_id == TENANT_ID.
+    Lee las tablas Config_* desde Airtable filtradas por empresa_id.
 
     Devuelve un dict por proceso con la forma:
         {
           "caja_chica": {
             "<clave>": <valor casteado>,
-            ...
+            ...,
             "aprobadores": [{...fields}],
+            "lista_aprobador_1": [...],
+            "lista_aprobador_2": [...],
           }
         }
 
-    Cache TTL 300s. Llamadas siguientes dentro del TTL no tocan Airtable.
+    Cache TTL 60s POR EMPRESA. Llamadas siguientes dentro del TTL para
+    la misma empresa no tocan Airtable.
     """
     now = time.time()
-    if _cache["data"] is not None and _cache["expires_at"] > now:
-        return _cache["data"]
+    entry = _dynamic_cache.get(empresa_id)
+    if entry and entry.get("data") is not None and entry.get("expires_at", 0) > now:
+        return entry["data"]
 
-    tenant_id = _get_tenant_id()
-    formula = f"{{empresa_id}}='{tenant_id}'"
+    formula = f"{{empresa_id}}='{empresa_id}'"
 
     # 1) Config_Procesos: rows escalares (clave/valor/tipo) por proceso
     config_rows = _safe_list("Config_Procesos", formula)
@@ -166,11 +141,13 @@ def load_dynamic_config() -> dict:
     # Aseguramos que caja_chica exista aunque Config_Procesos esté vacío:
     procesos.setdefault("caja_chica", {})
 
-    # 3) Empleados con rol de aprobador (leídos de la tabla Empleados)
-    # Filtramos donde APROBADORES no esté vacío
-    empleados_rows = _safe_list("Empleados", "NOT({APROBADORES} = '')")
-    aprobador_1 = []
-    aprobador_2 = []
+    # 3) Empleados con rol de aprobador (filtrados por empresa_id + tener APROBADORES)
+    empleados_formula = (
+        f"AND({{empresa_id}}='{empresa_id}', NOT({{APROBADORES}} = ''))"
+    )
+    empleados_rows = _safe_list("Empleados", empleados_formula)
+    aprobador_1: list[dict] = []
+    aprobador_2: list[dict] = []
     for row in empleados_rows:
         f = row.get("fields", {})
         roles = f.get("APROBADORES")
@@ -178,12 +155,12 @@ def load_dynamic_config() -> dict:
             continue
         if isinstance(roles, str):
             roles = [roles]
-        
+
         info = {
-            "id": row.get("id"),
-            "nombre": f.get("NOMBRE CORTO", "Desconocido")
+            "id":     row.get("id"),
+            "nombre": f.get("NOMBRE CORTO", "Desconocido"),
         }
-        
+
         if "APROBADOR_1" in roles:
             aprobador_1.append(info)
         if "APROBADOR_2" in roles:
@@ -195,8 +172,10 @@ def load_dynamic_config() -> dict:
     for proceso_dict in procesos.values():
         proceso_dict.setdefault("aprobadores", [])
 
-    _cache["data"] = procesos
-    _cache["expires_at"] = now + _CACHE_TTL_SECONDS
+    _dynamic_cache[empresa_id] = {
+        "data":       procesos,
+        "expires_at": now + _CACHE_TTL_SECONDS,
+    }
     return procesos
 
 
@@ -205,8 +184,7 @@ def load_dynamic_config() -> dict:
 # ─────────────────────────────────────────────────────────────────────────
 
 # Schema fijo. Cada campo: {activo: bool, valor: <tipo>}. Los toggles arrancan
-# en false → el prompt no los menciona (compat backward total con tenants
-# existentes que no definen este bloque).
+# en false → el prompt no los menciona.
 _INFO_EXTENDIDA_SCHEMA = {
     "rubro":            "",
     "descripcion":      "",
@@ -248,8 +226,7 @@ def _merge_info_extendida(provided: dict | None) -> dict:
             continue
         incoming = provided[key]
         if not isinstance(incoming, dict):
-            continue  # malformado, dejamos default
-        # Merge campo por campo dentro de cada toggle
+            continue
         if "activo" in incoming:
             merged[key]["activo"] = bool(incoming["activo"])
         if "valor" in incoming:
@@ -261,8 +238,6 @@ def _merge_info_extendida(provided: dict | None) -> dict:
 # Ventas — defaults, deep merge y carga dinámica
 # ─────────────────────────────────────────────────────────────────────────
 
-# Enums permitidos para validación. Lo importan tanto el endpoint POST
-# (api/ventas.py?resource=config) como tests de regression.
 VENTAS_ENUMS = {
     "estilo_vendedor":      {"formal_profesional", "cercano_amigable", "tecnico_consultivo", "casual_directo"},
     "tipo_cliente":          {"b2b", "b2c", "mixto"},
@@ -298,8 +273,6 @@ def _merge_ventas_config(provided: dict | None) -> dict:
     """
     Deep merge defaults ← provided. Los campos del shape sobrescriben sus
     defaults con lo que venga; campos no definidos en el schema se ignoran.
-    El sub-dict 'valor' se reemplaza completo (no merge campo-a-campo dentro
-    del valor) para mantener el shape consistente.
     """
     merged = _default_ventas_config()
     if not isinstance(provided, dict):
@@ -315,38 +288,12 @@ def _merge_ventas_config(provided: dict | None) -> dict:
     return merged
 
 
-def _load_ventas_dynamic(tenant_id: str) -> dict | None:
+def _load_data_blob(table: str, empresa_id: str) -> dict:
     """
-    Lee el bloque ventas desde la tabla `Config_Ventas` (1 fila por tenant).
-    Schema esperado: empresa_id (single line text) + data (long text JSON).
-    Si la tabla aún no existe, devolvemos None sin error.
+    Lee el campo `data` (long text con JSON) de una tabla Config_*. Devuelve
+    {} si la fila no existe, la tabla aún no se creó, o el JSON es inválido.
     """
-    rows = _safe_list("Config_Ventas", f"{{empresa_id}}='{tenant_id}'")
-    if not rows:
-        return None
-    row = rows[0].get("fields", {})
-    raw = row.get("data") or row.get("ventas")
-    if not raw:
-        return None
-    try:
-        parsed = json.loads(raw) if isinstance(raw, str) else raw
-        return parsed if isinstance(parsed, dict) else None
-    except (json.JSONDecodeError, ValueError) as e:
-        print(
-            f"[config_loader] Config_Ventas.data tiene JSON inválido: {e}",
-            file=sys.stderr,
-        )
-        return None
-
-
-def _load_data_blob(table: str, tenant_id: str) -> dict:
-    """
-    Lee el campo `data` (long text con JSON) de una tabla Config_*. Devuelve {}
-    si la fila no existe, la tabla aún no se creó, o el JSON es inválido.
-    Patrón usado por las dos tablas consolidadas del paso 6:
-    Config_Empresa y Config_Ventas.
-    """
-    rows = _safe_list(table, f"{{empresa_id}}='{tenant_id}'")
+    rows = _safe_list(table, f"{{empresa_id}}='{empresa_id}'")
     if not rows:
         return {}
     raw = rows[0].get("fields", {}).get("data")
@@ -363,14 +310,14 @@ def _load_data_blob(table: str, tenant_id: str) -> dict:
         return {}
 
 
-def _load_config_empresa() -> dict:
+def _load_config_empresa(empresa_id: str) -> dict:
     """Lee `Config_Empresa.data` (basicos + info_extendida + proceso) del tenant."""
-    return _load_data_blob("Config_Empresa", _get_tenant_id())
+    return _load_data_blob("Config_Empresa", empresa_id)
 
 
-def _load_config_ventas() -> dict:
+def _load_config_ventas(empresa_id: str) -> dict:
     """Lee `Config_Ventas.data` (bloque ventas) del tenant."""
-    return _load_data_blob("Config_Ventas", _get_tenant_id())
+    return _load_data_blob("Config_Ventas", empresa_id)
 
 
 def _deep_merge(base: dict, override: dict | None) -> dict:
@@ -394,16 +341,14 @@ def _deep_merge(base: dict, override: dict | None) -> dict:
 # Cache management
 # ─────────────────────────────────────────────────────────────────────────
 
-def invalidate_cache() -> None:
+def invalidate_cache(empresa_id: str) -> None:
     """
-    Resetea ambos caches (legacy + full). Llamado desde los endpoints POST
-    de /api/config para que el siguiente request del agente vea los cambios
-    sin esperar el TTL.
+    Resetea ambos caches (dinámico + full) PARA UNA EMPRESA. Llamado desde
+    los endpoints POST de /api/config para que el siguiente request del
+    agente vea los cambios sin esperar el TTL.
     """
-    _cache["data"] = None
-    _cache["expires_at"] = 0.0
-    _full_cache["data"] = None
-    _full_cache["expires_at"] = 0.0
+    _dynamic_cache.pop(empresa_id, None)
+    _full_cache.pop(empresa_id, None)
 
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -413,16 +358,10 @@ def _merge_proceso(static_proceso: dict, dynamic_proceso: dict) -> dict:
     """
     Combina los procesos del config estático (defaults por tenant) con
     los del dinámico (Airtable). El dinámico sobreescribe clave a clave.
-
-    Cada `proceso` (ej. 'caja_chica') es un dict de claves individuales
-    (flags, números, listas). Hacemos shallow merge: las claves del
-    dinámico ganan sobre las del estático.
     """
     combined: dict[str, dict] = {}
-    # Defaults estáticos
     for proc_name, proc_data in (static_proceso or {}).items():
         combined[proc_name] = dict(proc_data) if isinstance(proc_data, dict) else {}
-    # Dinámico sobreescribe / agrega
     for proc_name, proc_data in (dynamic_proceso or {}).items():
         if proc_name in combined and isinstance(proc_data, dict):
             combined[proc_name].update(proc_data)
@@ -431,18 +370,19 @@ def _merge_proceso(static_proceso: dict, dynamic_proceso: dict) -> dict:
     return combined
 
 
-def load_full_config() -> dict:
+def load_full_config(empresa_id: str) -> dict:
     """
-    Devuelve la config completa combinando:
+    Devuelve la config completa para una empresa leyendo SOLO desde Airtable
+    (sin filesystem). Combina:
 
-      1. JSON estático del tenant: solo `id`, `modules`, `agent` (paso 5).
-      2. `Config_Empresa.data` en Airtable: `basicos` (name/razon_social/ruc/
-         sistema_contable), `info_extendida`, `proceso.caja_chica`.
-      3. `Config_Ventas.data` en Airtable: bloque ventas completo (paso 3).
-      4. Aprobadores derivados de la tabla `Empleados` (load_dynamic_config).
+      1. `Config_Empresa.data`: `basicos`, `info_extendida`, `proceso.caja_chica`.
+      2. `Config_Ventas.data`: bloque ventas completo.
+      3. Aprobadores derivados de la tabla `Empleados` (load_dynamic_config).
+      4. `agent` viene de `_AGENT_DEFAULTS` (siempre "Yoko").
+      5. `modules` queda vacío acá; el handler lo inyecta desde el JWT.
 
-    Cache 60s a nivel del resultado completo. Los POST de /api/config llaman
-    a `invalidate_cache()` para que el siguiente request del agente vea los
+    Cache 60s POR EMPRESA. Los POST de /api/config llaman a
+    `invalidate_cache(empresa_id)` para que la siguiente request vea los
     cambios sin esperar el TTL.
 
     Forma del dict devuelto:
@@ -462,22 +402,23 @@ def load_full_config() -> dict:
         }
     """
     now = time.time()
-    if _full_cache["data"] is not None and _full_cache["expires_at"] > now:
-        return _full_cache["data"]
+    entry = _full_cache.get(empresa_id)
+    if entry and entry.get("data") is not None and entry.get("expires_at", 0) > now:
+        return entry["data"]
 
-    static = load_static_config()
-    dynamic = load_dynamic_config()       # legacy Config_Procesos + Empleados→aprobadores
+    dynamic = load_dynamic_config(empresa_id)
 
-    cfg_empresa = _load_config_empresa()   # Airtable Config_Empresa.data
-    cfg_ventas = _load_config_ventas()     # Airtable Config_Ventas.data
+    cfg_empresa = _load_config_empresa(empresa_id)
+    cfg_ventas = _load_config_ventas(empresa_id)
 
     basicos = cfg_empresa.get("basicos", {}) if isinstance(cfg_empresa, dict) else {}
 
     # info_extendida: defaults ← Config_Empresa.data.info_extendida
     info_extendida = _merge_info_extendida(cfg_empresa.get("info_extendida"))
 
-    # proceso: defaults legacy (Empleados aprobadores) ← Config_Empresa.data.proceso
-    proceso = _merge_proceso(static.get("proceso", {}) or {}, dynamic or {})
+    # proceso: defaults vacíos ← legacy Config_Procesos + Empleados →
+    # ← Config_Empresa.data.proceso (gana sobre todo).
+    proceso = _merge_proceso({}, dynamic or {})
     cfg_empresa_proceso = cfg_empresa.get("proceso") or {}
     if isinstance(cfg_empresa_proceso, dict):
         for proc_name, proc_data in cfg_empresa_proceso.items():
@@ -488,14 +429,16 @@ def load_full_config() -> dict:
     # ventas: defaults ← Config_Ventas.data
     ventas_block = _merge_ventas_config(cfg_ventas)
 
+    # empresa.id y empresa.modules los inyecta el handler desde el JWT
+    # antes de pasar el config al prompt builder. Acá quedan vacíos.
     empresa = {
-        "id":               static.get("id"),
+        "id":               empresa_id,
         "name":             basicos.get("name", "") if isinstance(basicos, dict) else "",
         "razon_social":     basicos.get("razon_social", "") if isinstance(basicos, dict) else "",
         "ruc":              basicos.get("ruc", "") if isinstance(basicos, dict) else "",
         "sistema_contable": basicos.get("sistema_contable", "concar") if isinstance(basicos, dict) else "concar",
-        "agent":            static.get("agent", {}),
-        "modules":          static.get("modules", []),
+        "agent":            dict(_AGENT_DEFAULTS),
+        "modules":          [],
         "info_extendida":   info_extendida,
     }
 
@@ -505,6 +448,8 @@ def load_full_config() -> dict:
         "ventas":  ventas_block,
     }
 
-    _full_cache["data"] = result
-    _full_cache["expires_at"] = now + _CACHE_TTL_SECONDS
+    _full_cache[empresa_id] = {
+        "data":       result,
+        "expires_at": now + _CACHE_TTL_SECONDS,
+    }
     return result

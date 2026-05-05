@@ -2,17 +2,40 @@ import { useState, useEffect, useCallback } from 'react';
 import { postJson, API } from '../../shared/api';
 
 const STORAGE_KEY = 'yoko_auth';
-const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 días
+const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 días, matching JWT exp del backend
 
 function now() { return Date.now(); }
+
+/**
+ * Forma del estado `user` que devuelve este hook (y que consumen App, useChat,
+ * MessageBubble, etc.):
+ *
+ *   {
+ *     token:     '<JWT>',
+ *     id:        '<airtable record_id>',
+ *     email:     'foo@bar.com',
+ *     nombre:    'Foo',
+ *     dni?:      '12345678',     // si el email matchea fila en Empleados
+ *     cargo?:    'Residente',    // idem
+ *     celular?:  '999...',       // idem
+ *     empresa:   { id, razon_social, modulos: [...] },
+ *     expiresAt: <unix ms>,
+ *   }
+ *
+ * `dni`, `cargo`, `celular` se aplanan al top level (no van bajo user.user)
+ * para que useChat.js siga mandando user.dni / user.nombre / user.cargo
+ * al backend del chat sin cambios. La separación entre identidad personal
+ * (top level) y empresa (sub-objeto) deja claro qué es del usuario y qué
+ * del tenant.
+ */
 
 function loadStoredAuth() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    // Sesión vencida → ignorar y limpiar
-    if (!parsed?.expiresAt || parsed.expiresAt < now()) {
+    // Sesión vencida o sin token → ignorar y limpiar.
+    if (!parsed?.token || !parsed?.expiresAt || parsed.expiresAt < now()) {
       localStorage.removeItem(STORAGE_KEY);
       return null;
     }
@@ -23,12 +46,32 @@ function loadStoredAuth() {
   }
 }
 
-function saveAuth(user) {
-  // Refrescamos `expiresAt` a now + 30 días en cada guardado,
-  // de modo que cada vez que el user abra la app, extiende la sesión.
-  const payload = { ...user, expiresAt: now() + SESSION_TTL_MS };
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-  return payload;
+function persist(authState) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(authState));
+}
+
+/**
+ * Aplana el response del backend (`{token, user, empresa}`) en la forma que
+ * usan los consumidores del frontend. `dni` / `cargo` / `celular` solo
+ * aparecen si el login los devolvió (existen en Empleados).
+ */
+function buildAuthState({ token, user, empresa }) {
+  const state = {
+    token,
+    id:        user?.id || '',
+    email:     user?.email || '',
+    nombre:    user?.nombre || '',
+    empresa: {
+      id:           empresa?.id || '',
+      razon_social: empresa?.razon_social || '',
+      modulos:      Array.isArray(empresa?.modulos) ? empresa.modulos : [],
+    },
+    expiresAt: now() + SESSION_TTL_MS,
+  };
+  if (user?.dni)     state.dni     = user.dni;
+  if (user?.cargo)   state.cargo   = user.cargo;
+  if (user?.celular) state.celular = user.celular;
+  return state;
 }
 
 export function useAuth() {
@@ -36,60 +79,61 @@ export function useAuth() {
   const [error, setError] = useState('');
   const [isAuthenticating, setIsAuthenticating] = useState(false);
 
-  // Refresca TTL cada vez que la app se monta con un user activo.
-  useEffect(() => {
-    if (user) {
-      const refreshed = saveAuth(user);
-      // Solo actualiza el estado si cambió (evita loop infinito)
-      if (refreshed.expiresAt !== user.expiresAt) {
-        setUser(refreshed);
-      }
-    } else {
-      localStorage.removeItem(STORAGE_KEY);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  const logout = useCallback(() => {
+    localStorage.removeItem(STORAGE_KEY);
+    setUser(null);
   }, []);
 
-  // Mantén localStorage sincronizado con cambios manuales de user.
+  // Auto-logout cuando algún apiFetch reciba 401. apiFetch dispara
+  // 'yoko:auth-expired'. Lo escuchamos a nivel global.
   useEffect(() => {
-    if (user) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
-    }
-  }, [user]);
+    const handleExpired = () => logout();
+    window.addEventListener('yoko:auth-expired', handleExpired);
+    return () => window.removeEventListener('yoko:auth-expired', handleExpired);
+  }, [logout]);
 
-  const login = useCallback(async (dni) => {
-    if (dni.length !== 8) {
-      setError('Ingresa tu DNI de 8 dígitos.');
+  const login = useCallback(async (email, password) => {
+    const cleanEmail = (email || '').trim().toLowerCase();
+    if (!cleanEmail.includes('@')) {
+      setError('Email inválido.');
       return false;
     }
+    if (!password) {
+      setError('Ingresa tu contraseña.');
+      return false;
+    }
+
     setIsAuthenticating(true);
     setError('');
     try {
-      const data = await postJson(API.LOGIN, { dni });
-      if (data.authorized) {
-        const fresh = saveAuth({
-          dni,
-          nombre: data.nombre || '',
-          cargo: data.cargo || '',
-          record_id: data.record_id || '',
-          sessionId: `${dni}-${now()}`,
-        });
-        setUser(fresh);
-        return true;
+      const data = await postJson(API.LOGIN, { email: cleanEmail, password });
+
+      if (!data?.token || !data?.user || !data?.empresa) {
+        setError('Respuesta inesperada del servidor.');
+        return false;
       }
-      setError('DNI no autorizado. Contacta al administrador.');
-      return false;
-    } catch {
-      setError('Error al verificar. Intenta de nuevo.');
+
+      const authState = buildAuthState(data);
+      persist(authState);
+      setUser(authState);
+      return true;
+    } catch (err) {
+      // postJson tira `Error('HTTP <code>')` para no-OK responses. Para no
+      // distinguir entre "credenciales malas" y "servidor caído" desde el
+      // mensaje al user, usamos genéricos y solo para 5xx mostramos un texto
+      // distinto. Mejorable cuando el backend devuelva el JSON de error.
+      const msg = String(err?.message || '');
+      if (msg.includes('HTTP 401') || msg.includes('HTTP 403')) {
+        setError('Email o contraseña incorrectos.');
+      } else if (msg.includes('HTTP 5')) {
+        setError('Servidor no disponible. Intenta de nuevo en un momento.');
+      } else {
+        setError('Error al iniciar sesión. Intenta de nuevo.');
+      }
       return false;
     } finally {
       setIsAuthenticating(false);
     }
-  }, []);
-
-  const logout = useCallback(() => {
-    localStorage.removeItem(STORAGE_KEY);
-    setUser(null);
   }, []);
 
   const clearError = useCallback(() => setError(''), []);

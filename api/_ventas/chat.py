@@ -60,11 +60,13 @@ def sales_chat_post(req) -> None:
 
         productos = productos_result.get("productos", [])
 
-        # Cargar config completa (empresa.info_extendida + ventas.*).
-        # Si Airtable falla, seguimos con un dict mínimo: el agente responde
-        # igual, solo sin los bloques opcionales. NO devolvemos 502.
+        # Cargar config de la empresa que vino en el body. Este endpoint NO
+        # valida JWT (es server-to-server desde el bot de WhatsApp; el bot
+        # lee `empresa_id` de su propio .env por sesión Baileys). Si Airtable
+        # falla, seguimos con un dict mínimo: el agente responde igual,
+        # solo sin los bloques opcionales. NO devolvemos 502.
         try:
-            full_config = config_loader.load_full_config()
+            full_config = config_loader.load_full_config(empresa_id)
         except AirtableError as e:
             print(f"[ventas/sales_chat] Config dinámica no disponible: {e}", file=sys.stderr)
             full_config = {"empresa": {}, "ventas": {}}

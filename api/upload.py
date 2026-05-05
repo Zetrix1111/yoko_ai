@@ -7,15 +7,28 @@ al webhook de Make — la URL nunca se expone al cliente.
 
 from http.server import BaseHTTPRequestHandler
 import os
+import sys
 import urllib.request
 import urllib.error
 import json
+
+_HERE = os.path.dirname(os.path.abspath(__file__))
+if _HERE not in sys.path:
+    sys.path.insert(0, _HERE)
+
+from _lib import auth                 # noqa: E402
+from _lib.auth import AuthError       # noqa: E402
 
 
 class handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         try:
+            try:
+                auth.require_auth(self.headers)
+            except AuthError as e:
+                return self._json(e.status, {"error": str(e)})
+
             webhook_url  = os.environ.get("MAKE_WEBHOOK_UPLOAD")
             if not webhook_url:
                 return self._json(500, {"error": "Configuración del servidor incompleta."})

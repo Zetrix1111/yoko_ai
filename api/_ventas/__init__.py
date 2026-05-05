@@ -1,14 +1,6 @@
 """Helpers compartidos entre los handlers de ventas."""
 
-import os
 from datetime import datetime, timezone
-
-_FALLBACK_TENANT = "cmejia"
-
-
-def tenant_id() -> str:
-    """Tenant activo según TENANT_ID env, con fallback a 'cmejia'."""
-    return os.environ.get("TENANT_ID") or _FALLBACK_TENANT
 
 
 def now_iso() -> str:

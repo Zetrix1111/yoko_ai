@@ -4,7 +4,7 @@ import {
   Plus, Trash2, Sparkles,
 } from 'lucide-react';
 import ModuleLayout from '../ModuleLayout';
-import { API, getJson } from '../../../shared/api';
+import { API, getJsonAuth } from '../../../shared/api';
 import { useEmpresaConfig } from '../../../shared/useEmpresaConfig';
 import './ConfiguracionEmpresa.css';
 
@@ -267,7 +267,7 @@ export default function ConfiguracionEmpresaScreen({ user, onOpenModules, onLogo
     setCentrosLoading(true);
     setCentrosError(null);
 
-    getJson(API.CENTROS_COSTO)
+    getJsonAuth(API.CENTROS_COSTO)
       .then((data) => {
         if (cancelled) return;
         setCentros(Array.isArray(data?.centros) ? data.centros : []);

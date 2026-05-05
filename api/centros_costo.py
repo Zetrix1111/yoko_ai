@@ -15,15 +15,26 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 
-from _lib import airtable_client
+from _lib import airtable_client, auth
 from _lib.airtable_client import AirtableError
+from _lib.auth import AuthError
 
 
 class handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         try:
-            records = airtable_client.list_records("obras", max_records=100)
+            try:
+                auth_payload = auth.require_auth(self.headers)
+            except AuthError as e:
+                return self._json(e.status, {"error": str(e)})
+            empresa_id = auth_payload["empresa_id"]
+
+            # Tabla `obras` ya está particionada por empresa_id en Fase 0.
+            formula = f"{{empresa_id}}='{empresa_id}'"
+            records = airtable_client.list_records(
+                "obras", filter_formula=formula, max_records=100,
+            )
 
             centros = []
             for r in records:

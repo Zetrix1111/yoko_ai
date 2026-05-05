@@ -7,7 +7,9 @@ Uso (desde la raíz del repo):
 Requiere las env vars (de tu .env.local o de tu shell):
     AIRTABLE_TOKEN
     AIRTABLE_BASE_ID
-    TENANT_ID            (opcional; cae a 'cmejia' con warning)
+
+Empresa a inspeccionar: pasarla como arg (default 'cmejia').
+    python scripts/test_config.py [empresa_id]
 
 Si las tablas Config_* todavía no existen en Airtable, el loader
 imprime warnings y sigue, devolviendo listas/dicts vacíos para

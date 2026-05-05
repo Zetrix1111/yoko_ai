@@ -7,7 +7,6 @@ import LoginScreen from './features/auth/LoginScreen';
 import ChatScreen from './features/chat/ChatScreen';
 import ModulesSidebar from './features/modules/ModulesSidebar';
 import { MODULES } from './features/modules/modulesConfig';
-import { isModuleEnabled } from './tenants';
 
 import AlertaSeguraScreen from './features/modules/alerta-segura/AlertaSeguraScreen';
 import ConfiguracionEmpresaScreen from './features/modules/configuracion-empresa/ConfiguracionEmpresaScreen';
@@ -32,10 +31,12 @@ function AuthenticatedApp({ user, onLogout }) {
 
   const common = { user, onOpenModules: openModules, onLogout };
 
-  // Solo registramos rutas de los módulos que el tenant tiene habilitados.
+  // Solo registramos rutas de los módulos que la empresa del usuario logueado
+  // tiene habilitados (user.empresa.modulos viene del JWT/login response).
   // Si un user va a /modulos/X y X no está habilitado, cae al "*" → ChatScreen.
+  const enabledModulos = new Set(user?.empresa?.modulos || []);
   const enabledRoutes = MODULES
-    .filter((m) => isModuleEnabled(m.id))
+    .filter((m) => enabledModulos.has(m.id))
     .map((m) => ({ path: m.path, Comp: MODULE_COMPONENTS[m.id], id: m.id }))
     .filter((r) => r.Comp);
 
@@ -49,7 +50,11 @@ function AuthenticatedApp({ user, onLogout }) {
           ))}
           <Route path="*" element={<ChatScreen {...common} />} />
         </Routes>
-        <ModulesSidebar show={showMobileModules} onClose={closeModules} />
+        <ModulesSidebar
+          show={showMobileModules}
+          onClose={closeModules}
+          enabledModulos={enabledModulos}
+        />
       </div>
     </div>
   );

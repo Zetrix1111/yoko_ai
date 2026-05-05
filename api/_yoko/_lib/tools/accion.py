@@ -43,9 +43,23 @@ _TABLA_ITEMS_RENDIC  = "ItemsRendicion"
 # ─────────────────────────────────────────────────────────────────────────
 
 def _tenant_id(context: dict) -> str:
-    config = context.get("config") or {}
-    tid = (config.get("empresa") or {}).get("id")
-    return tid or os.environ.get("TENANT_ID", "cmejia")
+    """
+    Devuelve el `empresa_id` del contexto. Multi-tenant (Fase 3): lo
+    inyecta el handler tras validar el JWT. Sin fallback al env porque
+    eso permitiría cross-tenant leak si por alguna razón el contexto
+    llega vacío.
+
+    Si vino bajo `context["empresa_id"]` (camino preferido) lo usamos.
+    Si no, intentamos `context["config"]["empresa"]["id"]` (compat con
+    rutas que solo construyeron el config). Si tampoco hay → error.
+    """
+    eid = context.get("empresa_id")
+    if not eid:
+        config = context.get("config") or {}
+        eid = (config.get("empresa") or {}).get("id")
+    if not eid:
+        raise ValidationError("empresa_id ausente en el contexto.")
+    return eid
 
 
 def _user_dni(context: dict) -> str:

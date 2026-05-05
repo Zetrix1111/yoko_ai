@@ -13,9 +13,8 @@ import {
   CANAL_LABELS, ESTADO_LABELS, STOCK_LABELS, getStockStatus,
   formatPEN, formatNum, formatDate,
 } from './mockData';
-import { API, getJson, postJson, patchJson, deleteJson } from '../../../shared/api';
+import { API, getJsonAuth, postJsonAuth, patchJsonAuth, deleteJsonAuth } from '../../../shared/api';
 import { useEmpresaConfig } from '../../../shared/useEmpresaConfig';
-import { tenantConfig } from '../../../tenants';
 
 // ─────────────────────────────────────
 // Helpers UI
@@ -537,7 +536,7 @@ export function ProductosSection() {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    getJson(API.PRODUCTOS)
+    getJsonAuth(API.PRODUCTOS)
       .then((data) => {
         if (cancelled) return;
         setProductos(Array.isArray(data?.productos) ? data.productos : []);
@@ -555,11 +554,11 @@ export function ProductosSection() {
     setSaving(true);
     try {
       if (data.id) {
-        const res = await patchJson(`${API.PRODUCTOS}?id=${encodeURIComponent(data.id)}`, data);
+        const res = await patchJsonAuth(`${API.PRODUCTOS}?id=${encodeURIComponent(data.id)}`, data);
         const updated = res.producto;
         setProductos(productos.map((p) => p.id === data.id ? updated : p));
       } else {
-        const res = await postJson(API.PRODUCTOS, data);
+        const res = await postJsonAuth(API.PRODUCTOS, data);
         const created = res.producto;
         setProductos([created, ...productos]);
       }
@@ -575,7 +574,7 @@ export function ProductosSection() {
   const handleDelete = async (id) => {
     if (!confirm('¿Eliminar este producto?')) return;
     try {
-      await deleteJson(`${API.PRODUCTOS}?id=${encodeURIComponent(id)}`);
+      await deleteJsonAuth(`${API.PRODUCTOS}?id=${encodeURIComponent(id)}`);
       setProductos(productos.filter((p) => p.id !== id));
     } catch (err) {
       console.error('[productos] delete', err);
@@ -664,7 +663,7 @@ export function RespuestasIASection() {
     let timer = null;
     const tick = async () => {
       try {
-        const data = await getJson(API.CONVERSACIONES);
+        const data = await getJsonAuth(API.CONVERSACIONES);
         if (cancelled) return;
         const list = Array.isArray(data?.conversaciones) ? data.conversaciones : [];
         setConversaciones(list);
@@ -694,7 +693,7 @@ export function RespuestasIASection() {
   const handleDelete = async (id) => {
     if (!window.confirm('¿Eliminar esta conversación y todos sus mensajes?')) return;
     try {
-      await deleteJson(`${API.CONVERSACIONES}&id=${encodeURIComponent(id)}`);
+      await deleteJsonAuth(`${API.CONVERSACIONES}&id=${encodeURIComponent(id)}`);
       setConversaciones((curr) => curr.filter((c) => c.id !== id));
       if (selectedId === id) setSelectedId(null);
     } catch (err) {
@@ -705,7 +704,7 @@ export function RespuestasIASection() {
 
   const handleModoChange = async (convId, nuevoModo) => {
     try {
-      await postJson(API.CONVERSACIONES_MODO, { conversacion_id: convId, modo: nuevoModo });
+      await postJsonAuth(API.CONVERSACIONES_MODO, { conversacion_id: convId, modo: nuevoModo });
       setConversaciones((curr) => curr.map((c) => c.id === convId ? { ...c, modo: nuevoModo } : c));
     } catch (err) {
       console.error('[RespuestasIA] modo:', err);
@@ -814,7 +813,7 @@ function ConversacionPanel({ conversacion, onModoChange, onDelete }) {
     let timer = null;
     const tick = async () => {
       try {
-        const data = await getJson(`${API.MENSAJES}&conversacion_id=${encodeURIComponent(conversacion.id)}`);
+        const data = await getJsonAuth(`${API.MENSAJES}&conversacion_id=${encodeURIComponent(conversacion.id)}`);
         if (cancelled) return;
         const list = Array.isArray(data?.mensajes) ? data.mensajes : [];
         setMensajes((prev) => {
@@ -853,7 +852,7 @@ function ConversacionPanel({ conversacion, onModoChange, onDelete }) {
     if (!txt) return;
     setSending(true);
     try {
-      await postJson(API.MENSAJES, {
+      await postJsonAuth(API.MENSAJES, {
         conversacion_id: conversacion.id,
         role: 'human',
         content: txt,
@@ -995,10 +994,10 @@ function WhatsAppBlock() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState(null);
-  const empresaId = tenantConfig.id || 'cmejia';
 
   // Polling de /api/wa: cada 2s si no está conectado, cada 15s si lo está
-  // (para detectar desconexiones externas).
+  // (para detectar desconexiones externas). El backend resuelve `empresa_id`
+  // del JWT — no se manda por query/body desde el frontend.
   useEffect(() => {
     let cancelled = false;
     let timer = null;
@@ -1006,12 +1005,11 @@ function WhatsAppBlock() {
     const tick = async () => {
       let nextDelay = 2000;
       try {
-        const data = await getJson(`${API.WA}&empresa_id=${encodeURIComponent(empresaId)}`);
+        const data = await getJsonAuth(API.WA);
         if (cancelled) return;
         const newSession = data?.session || null;
         setSession(newSession);
         setError(null);
-        // Decidimos el delay con la data que ACABAMOS de leer (sin tocar state)
         nextDelay = newSession?.status === 'connected' ? 15000 : 2000;
       } catch (err) {
         if (cancelled) return;
@@ -1030,12 +1028,12 @@ function WhatsAppBlock() {
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [empresaId]);
+  }, []);
 
   const handleConnect = async () => {
     setActionLoading(true);
     try {
-      await postJson(`${API.WA}&action=connect`, { empresa_id: empresaId });
+      await postJsonAuth(`${API.WA}&action=connect`, {});
     } catch (err) {
       console.error('[CanalesBlock] connect:', err);
       alert('No se pudo iniciar la conexión.');
@@ -1048,7 +1046,7 @@ function WhatsAppBlock() {
     if (!window.confirm('¿Desconectar WhatsApp? El bot dejará de recibir y enviar mensajes.')) return;
     setActionLoading(true);
     try {
-      await postJson(`${API.WA}&action=disconnect`, { empresa_id: empresaId });
+      await postJsonAuth(`${API.WA}&action=disconnect`, {});
     } catch (err) {
       console.error('[CanalesBlock] disconnect:', err);
       alert('No se pudo desconectar.');

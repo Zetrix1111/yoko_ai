@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { NavLink, Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { X, ChevronRight, ExternalLink } from 'lucide-react';
 import { MODULES } from './modulesConfig';
-import { isModuleEnabled } from '../../tenants';
 import QuickLinksRail from '../quick-links/QuickLinksRail';
 
 // ─────────────────────────────────────
@@ -95,14 +94,19 @@ function ProcessAccordion({ module, currentPath, currentSection, isExpanded, onT
 // Main sidebar
 // ─────────────────────────────────────
 
-export default function ModulesSidebar({ show, onClose }) {
+export default function ModulesSidebar({ show, onClose, enabledModulos }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const currentSection = searchParams.get('section') || 'inicio';
 
-  // Solo mostramos los módulos que el tenant tiene habilitados.
-  const enabledModules = MODULES.filter((m) => isModuleEnabled(m.id));
+  // Solo mostramos los módulos que la empresa del usuario tiene habilitados.
+  // `enabledModulos` viene como Set desde App.jsx (calculado de user.empresa.modulos).
+  // Fallback defensivo: si no llega la prop, no mostramos ningún módulo.
+  const enabled = enabledModulos instanceof Set
+    ? enabledModulos
+    : new Set(Array.isArray(enabledModulos) ? enabledModulos : []);
+  const enabledModules = MODULES.filter((m) => enabled.has(m.id));
 
   // Cuál acordeón está expandido. Auto-expande el del módulo donde está el user.
   const [expandedId, setExpandedId] = useState(() => {

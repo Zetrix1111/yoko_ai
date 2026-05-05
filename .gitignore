@@ -32,6 +32,9 @@ __pycache__/
 *.pyd
 .Python
 
+# Setuptools build artifacts
+*.egg-info/
+
 # Environment files
 .env
 .env.local

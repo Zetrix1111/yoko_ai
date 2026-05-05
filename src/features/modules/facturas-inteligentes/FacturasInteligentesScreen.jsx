@@ -4,8 +4,7 @@ import {
   ExternalLink, AlertCircle, Loader2, RotateCcw,
 } from 'lucide-react';
 import ModuleLayout from '../ModuleLayout';
-import { tenantConfig } from '../../../tenants';
-import { postJson, API } from '../../../shared/api';
+import { API, postJsonAuth, postFormAuth } from '../../../shared/api';
 import './FacturasInteligentes.css';
 
 // Estados del proceso (mapean al stepper visual)
@@ -387,17 +386,15 @@ export default function FacturasInteligentesScreen({ user, onOpenModules, onLogo
       formData.append('mes', mes);
       formData.append('mes_label', monthLabelFromValue(mes));
       formData.append('dni', user?.dni || '');
-      formData.append('empresa_id', tenantConfig.id);
+      // empresa_id NO se manda — el backend lo resuelve del JWT.
       files.forEach((f) => formData.append('files', f, f.name));
 
-      const res = await fetch(API.FACTURAS_PROCESAR, { method: 'POST', body: formData });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
+      const data = await postFormAuth(API.FACTURAS_PROCESAR, formData);
 
       setProceso({
         proceso_id: data.proceso_id || `proc-${Date.now()}`,
         sheet_url:  data.sheet_url  || '#',
-        empresa_id: data.empresa_id || tenantConfig.id,
+        empresa_id: data.empresa_id || '',
       });
       setStage(STAGES.VALIDATING);
     } catch (e) {
@@ -414,9 +411,9 @@ export default function FacturasInteligentesScreen({ user, onOpenModules, onLogo
     setIsLoading(true);
     setStage(STAGES.CONFIRMING);
     try {
-      const data = await postJson(API.FACTURAS_CONCAR, {
+      // empresa_id NO se manda — el backend lo resuelve del JWT.
+      const data = await postJsonAuth(API.FACTURAS_CONCAR, {
         proceso_id: proceso.proceso_id,
-        empresa_id: proceso.empresa_id,
         dni: user?.dni || '',
       });
       setDownloadUrl(data.download_url || data.url || '#');

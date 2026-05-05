@@ -1,12 +1,11 @@
-﻿"""
+"""
 api/ventas.py — dispatcher de Ventas Inteligentes.
 
 Único archivo que Vercel ve como serverless function. Toda la lógica
-vive en api/ventas/<resource>.py. Este archivo SOLO hace routing por
-?resource= y método HTTP, y expone los helpers que las funciones
-internas necesitan (`req._json`, `req._qs`, `req._read_body`).
+vive en api/_ventas/<resource>.py. Este archivo SOLO hace routing por
+?resource= y método HTTP, valida JWT y pasa `empresa_id` a las funciones.
 
-Recursos soportados:
+Recursos soportados (todos requieren JWT salvo `sales_chat`):
   GET    ?resource=wa                   → estado WhatsApp
   POST   ?resource=wa&action=connect    → init pairing
   POST   ?resource=wa&action=disconnect → cerrar sesión
@@ -16,7 +15,11 @@ Recursos soportados:
   GET    ?resource=mensajes             → historial por conv
   POST   ?resource=mensajes             → insert (+ outbox si role=human)
   POST   ?resource=conversaciones_modo  → toggle AI/HUMAN
-  POST   ?resource=sales_chat           → cerebro del bot-baileys
+  POST   ?resource=sales_chat           → cerebro del bot-baileys (S2S)
+
+`sales_chat` es la única excepción que NO valida JWT: lo invoca el bot
+de WhatsApp server-to-server, sin token. Toma `empresa_id` del body
+porque el bot lo conoce desde su propio .env por sesión Baileys.
 """
 
 import json
@@ -31,12 +34,14 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 
-from _ventas import wa, conversaciones, chat as ventas_chat  # noqa: E402
+from _lib import auth                                                # noqa: E402
+from _lib.auth import AuthError                                      # noqa: E402
+from _ventas import wa, conversaciones, chat as ventas_chat          # noqa: E402
 
 
-# Mapa: (resource, método) → función a invocar.
-# Las funciones reciben el handler (este `req`) y usan req._json/req._qs/req._read_body.
-_DISPATCH = {
+# Mapa: (resource, método) → función que recibe (req, empresa_id).
+# Estas funciones requieren JWT — el dispatcher valida y les pasa empresa_id.
+_DISPATCH_AUTH = {
     ("wa",                  "GET"):    wa.wa_get,
     ("wa",                  "POST"):   wa.wa_post,
 
@@ -47,8 +52,11 @@ _DISPATCH = {
     ("mensajes",            "POST"):   conversaciones.mensajes_post,
 
     ("conversaciones_modo", "POST"):   conversaciones.modo_post,
+}
 
-    ("sales_chat",          "POST"):   ventas_chat.sales_chat_post,
+# Recursos S2S (NO validan JWT). Reciben (req,) — empresa_id viene del body.
+_DISPATCH_PUBLIC = {
+    ("sales_chat", "POST"): ventas_chat.sales_chat_post,
 }
 
 
@@ -61,11 +69,30 @@ class handler(BaseHTTPRequestHandler):
     def _dispatch(self, method: str) -> None:
         qs = parse_qs(urlparse(self.path).query)
         resource = (qs.get("resource") or [""])[0]
-        fn = _DISPATCH.get((resource, method))
-        if fn is None:
+        key = (resource, method)
+
+        # Recursos S2S: sin JWT.
+        public_fn = _DISPATCH_PUBLIC.get(key)
+        if public_fn is not None:
+            try:
+                return public_fn(self)
+            except Exception as e:
+                print(f"[ventas/{resource}] Error inesperado: {type(e).__name__}: {e}", file=sys.stderr)
+                return self._json(500, {"error": "Error interno del servidor."})
+
+        # Resto: validar JWT antes de despachar.
+        auth_fn = _DISPATCH_AUTH.get(key)
+        if auth_fn is None:
             return self._json(400, {"error": f"resource '{resource}' no soporta {method}."})
+
         try:
-            return fn(self)
+            auth_payload = auth.require_auth(self.headers)
+        except AuthError as e:
+            return self._json(e.status, {"error": str(e)})
+        empresa_id = auth_payload["empresa_id"]
+
+        try:
+            return auth_fn(self, empresa_id)
         except Exception as e:
             print(f"[ventas/{resource}] Error inesperado: {type(e).__name__}: {e}", file=sys.stderr)
             return self._json(500, {"error": "Error interno del servidor."})

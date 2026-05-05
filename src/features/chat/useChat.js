@@ -1,11 +1,9 @@
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { postJson, postForm, API } from '../../shared/api';
-import { tenantConfig } from '../../tenants';
+import { API, postJsonAuth, postFormAuth } from '../../shared/api';
 
 export function useChat(user) {
   const navigate = useNavigate();
-  const agentName = tenantConfig.agent.name;
   const greeting = user?.nombre
     ? `¡Hola, ${user.nombre}! Soy tu asistente inteligente. Puedo ayudarte a ejecutar procesos como rendiciones, caja chica y pagos. ¿Qué deseas hacer hoy?`
     : `¡Hola! Soy tu asistente inteligente. Puedo ayudarte a ejecutar procesos como rendiciones, caja chica y pagos. ¿Qué deseas hacer hoy?`;
@@ -72,12 +70,9 @@ export function useChat(user) {
           formData.append('fileName', file.name);
 
           try {
-            const res = await fetch(API.PARSE_FILE, { method: 'POST', body: formData });
-            if (res.ok) {
-              const parsed = await res.json();
-              if (parsed.campos) {
-                todosLosCampos.push(parsed.campos);
-              }
+            const parsed = await postFormAuth(API.PARSE_FILE, formData);
+            if (parsed && parsed.campos) {
+              todosLosCampos.push(parsed.campos);
             }
           } catch (parseErr) {
             console.warn('parse_file falló para', file.name, parseErr);
@@ -150,7 +145,7 @@ export function useChat(user) {
         messages: apiMessages,
       };
 
-      const data = await postJson(API.CHAT, payload);
+      const data = await postJsonAuth(API.CHAT, payload);
       
       let yokoText = '';
       if (typeof data === 'string') {

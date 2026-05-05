@@ -28,11 +28,11 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 
-from _lib import airtable_client, config_loader              # noqa: E402
+from _lib import airtable_client, auth, config_loader        # noqa: E402
 from _lib.airtable_client import AirtableError               # noqa: E402
+from _lib.auth import AuthError                              # noqa: E402
 
 
-_FALLBACK_TENANT = "cmejia"
 _MAX_DATA_BYTES = 100_000
 
 ALLOWED_TIPOS = {"empresa", "ventas"}
@@ -42,23 +42,24 @@ TABLE_BY_TIPO = {
 }
 
 
-def _tenant_id() -> str:
-    return os.environ.get("TENANT_ID") or _FALLBACK_TENANT
-
-
 class handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         try:
+            try:
+                auth_payload = auth.require_auth(self.headers)
+            except AuthError as e:
+                return self._json(e.status, {"error": str(e)})
+            empresa_id = auth_payload["empresa_id"]
+
             tipo = self._get_tipo()
             if tipo is None:
                 return  # _get_tipo ya respondió 400
 
-            tenant_id = _tenant_id()
             try:
                 rows = airtable_client.list_records(
                     TABLE_BY_TIPO[tipo],
-                    filter_formula=f"{{empresa_id}} = '{tenant_id}'",
+                    filter_formula=f"{{empresa_id}} = '{empresa_id}'",
                     max_records=1,
                 )
             except AirtableError as e:
@@ -82,6 +83,12 @@ class handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         try:
+            try:
+                auth_payload = auth.require_auth(self.headers)
+            except AuthError as e:
+                return self._json(e.status, {"error": str(e)})
+            empresa_id = auth_payload["empresa_id"]
+
             tipo = self._get_tipo()
             if tipo is None:
                 return
@@ -103,12 +110,11 @@ class handler(BaseHTTPRequestHandler):
             if len(serialized.encode("utf-8")) > _MAX_DATA_BYTES:
                 return self._json(400, {"error": "data excede 100KB."})
 
-            tenant_id = _tenant_id()
             try:
                 airtable_client.upsert_by_field(
                     TABLE_BY_TIPO[tipo],
                     match_field="empresa_id",
-                    match_value=tenant_id,
+                    match_value=empresa_id,
                     fields={"data": serialized},
                 )
             except AirtableError as e:
@@ -118,8 +124,9 @@ class handler(BaseHTTPRequestHandler):
                              f"'{TABLE_BY_TIPO[tipo]}' exista en Airtable."
                 })
 
-            # Cache invalidation: la próxima request del agente lee fresh.
-            config_loader.invalidate_cache()
+            # Cache invalidation: la próxima request del agente lee fresh,
+            # solo para esta empresa (no afecta a otros tenants).
+            config_loader.invalidate_cache(empresa_id)
 
             return self._json(200, {"ok": True})
 

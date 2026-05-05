@@ -1,50 +1,75 @@
 import { useState } from 'react';
-import { tenantConfig, appLogo } from '../../tenants';
+import { APP_NAME, APP_LOGO } from '../../shared/branding';
 
 export default function LoginScreen({ onLogin, error, isAuthenticating, clearError }) {
-  const [dni, setDni] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
 
-  const handleDniChange = (e) => {
-    const value = e.target.value.replace(/\D/g, '').slice(0, 8);
-    setDni(value);
+  const handleEmailChange = (e) => {
+    setEmail(e.target.value);
+    if (error) clearError();
+  };
+
+  const handlePasswordChange = (e) => {
+    setPassword(e.target.value);
     if (error) clearError();
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onLogin(dni);
+    onLogin(email.trim().toLowerCase(), password);
   };
+
+  const canSubmit = email.includes('@') && password.length > 0 && !isAuthenticating;
 
   return (
     <div className="app-container login-container">
       <div className="login-card glass-panel animate-fade-in">
         <div className="login-logo-wrapper yoko-avatar">
-          <img src={appLogo} alt={`${tenantConfig.agent.name} Logo`} className="logo-image" />
+          <img src={APP_LOGO} alt={`${APP_NAME} Logo`} className="logo-image" />
         </div>
-        <h1 className="login-title">{tenantConfig.agent.name}</h1>
+        <h1 className="login-title">{APP_NAME}</h1>
         <p className="login-subtitle">Automatización de procesos con IA</p>
-        <form onSubmit={handleSubmit} className="login-form">
+
+        <form onSubmit={handleSubmit} className="login-form" noValidate>
+          <label htmlFor="login-email" className="sr-only">Email</label>
           <input
-            type="text"
-            inputMode="numeric"
-            value={dni}
-            onChange={handleDniChange}
-            placeholder="Ingresa tu DNI"
+            id="login-email"
+            type="email"
+            inputMode="email"
+            autoComplete="username"
+            value={email}
+            onChange={handleEmailChange}
+            placeholder="tu@correo.com"
             className="login-input"
-            maxLength={8}
+            required
             autoFocus
           />
-          {error && <p className="login-error">{error}</p>}
+
+          <label htmlFor="login-password" className="sr-only">Contraseña</label>
+          <input
+            id="login-password"
+            type="password"
+            autoComplete="current-password"
+            value={password}
+            onChange={handlePasswordChange}
+            placeholder="Contraseña"
+            className="login-input"
+            required
+          />
+
+          {error && <p className="login-error" role="alert">{error}</p>}
+
           <button
             type="submit"
             className="login-btn"
-            disabled={isAuthenticating || dni.length !== 8}
+            disabled={!canSubmit}
           >
             {isAuthenticating ? (
               <span className="login-loading">
                 <span /><span /><span />
               </span>
-            ) : 'Ingresar'}
+            ) : 'Iniciar sesión'}
           </button>
         </form>
       </div>

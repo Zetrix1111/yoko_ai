@@ -1,7 +1,6 @@
 import { useState, useRef } from 'react';
 import { Send, Paperclip, X, Mic, Square, Loader2 } from 'lucide-react';
 import { useSpeechToText } from './useSpeechToText';
-import { tenantConfig } from '../../tenants';
 
 export default function ChatInput({ onSend, disabled, files, setFiles }) {
   const [text, setText] = useState('');

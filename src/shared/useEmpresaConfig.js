@@ -11,7 +11,7 @@
 // update local de `data` para que la UI vea los cambios sin esperar reload.
 
 import { useCallback, useEffect, useState } from 'react';
-import { API, getJson, postJson } from './api';
+import { API, getJsonAuth, postJsonAuth } from './api';
 
 export function useEmpresaConfig(tipo) {
   const [data, setData] = useState(null);
@@ -23,7 +23,7 @@ export function useEmpresaConfig(tipo) {
     setLoading(true);
     setError(null);
     try {
-      const resp = await getJson(`${API.CONFIG}?tipo=${tipo}`);
+      const resp = await getJsonAuth(`${API.CONFIG}?tipo=${tipo}`);
       setData(resp?.data ?? null);
     } catch (e) {
       console.error(`[useEmpresaConfig:${tipo}] reload:`, e);
@@ -39,7 +39,7 @@ export function useEmpresaConfig(tipo) {
     setSaving(true);
     setError(null);
     try {
-      await postJson(`${API.CONFIG}?tipo=${tipo}`, { data: newData });
+      await postJsonAuth(`${API.CONFIG}?tipo=${tipo}`, { data: newData });
       // Optimistic update: la próxima request al chat ya verá esto en
       // Airtable porque /api/config invalidó el cache.
       setData(newData);

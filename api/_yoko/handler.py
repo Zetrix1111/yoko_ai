@@ -19,8 +19,9 @@ import json
 import os
 import sys
 
-from _lib import config_loader, openai_client, session
+from _lib import auth, config_loader, openai_client, session
 from _lib.airtable_client import AirtableError
+from _lib.auth import AuthError
 from _yoko._lib import prompt as yoko_prompt
 from _yoko._lib import tool_registry
 
@@ -31,7 +32,7 @@ except ImportError:
     OpenAIAPIError = Exception  # type: ignore[assignment, misc]
 
 
-_REQUIRED_ENV = ("OPENAI_API_KEY", "AIRTABLE_TOKEN", "AIRTABLE_BASE_ID", "TENANT_ID")
+_REQUIRED_ENV = ("OPENAI_API_KEY", "AIRTABLE_TOKEN", "AIRTABLE_BASE_ID")
 
 
 def handle_post(req) -> None:
@@ -51,21 +52,36 @@ def handle_post(req) -> None:
             print(f"[chat] Faltan env vars: {missing}", file=sys.stderr)
             return req._json(500, {"error": "Configuración del servidor incompleta."})
 
-        # 3) Extraer y validar al usuario
+        # 3) Validar JWT — empresa_id viene del token, NO del body.
+        try:
+            auth_payload = auth.require_auth(req.headers)
+        except AuthError as e:
+            return req._json(e.status, {"error": str(e)})
+        empresa_id = auth_payload["empresa_id"]
+
+        # 4) Extraer y validar al usuario
         try:
             user = session.extract_user(body)
         except ValueError as e:
             print(f"[chat] User inválido: {e}", file=sys.stderr)
             return req._json(400, {"error": "Datos del usuario inválidos."})
 
-        # 4) Cargar configuración
+        # 5) Cargar configuración de la empresa del JWT.
+        # `config_loader` ya no lee `src/tenants/<id>/config.json` (Fase 4):
+        # solo lee Airtable. `empresa.modules` viene vacío del loader; lo
+        # inyectamos acá desde el JWT, que es la fuente autoritativa de
+        # qué módulos tiene habilitados la empresa.
         try:
-            config = config_loader.load_full_config()
+            config = config_loader.load_full_config(empresa_id)
         except AirtableError as e:
             print(f"[chat] AirtableError al cargar config: {e}", file=sys.stderr)
             return req._json(502, {"error": "Error al consultar la base de datos."})
 
-        # 5) Armar system prompt + tools list
+        modulos = auth_payload.get("modulos") or []
+        if isinstance(modulos, list):
+            config["empresa"]["modules"] = modulos
+
+        # 6) Armar system prompt + tools list
         try:
             system = yoko_prompt.build_system_prompt(config, user)
             tools = yoko_prompt.build_tools_list(config)
@@ -73,13 +89,15 @@ def handle_post(req) -> None:
             print(f"[chat] Error armando prompt/tools: {type(e).__name__}: {e}", file=sys.stderr)
             return req._json(500, {"error": "Error interno del servidor."})
 
-        # 6) Loop de chat con OpenAI usando el executor de Yoko (no el de ventas)
+        # 7) Loop de chat con OpenAI usando el executor de Yoko (no el de ventas).
+        # `empresa_id` viaja en el context para que las tools que escriben en
+        # Airtable (acción) lo usen como filtro/poblamiento, sin leer env vars.
         try:
             result = openai_client.run_chat(
                 system_prompt=system,
                 messages=body.get("messages", []) or [],
                 tools=tools,
-                context={"user": user, "config": config},
+                context={"user": user, "config": config, "empresa_id": empresa_id},
                 executor=tool_registry.execute_tool,
             )
         except OpenAIAPIError as e:

@@ -1,15 +1,17 @@
 ﻿"""
 ventas/wa.py — handlers para resource=wa (sesión WhatsApp).
 
-GET  /api/ventas?resource=wa[&empresa_id=...]
+`empresa_id` viene del JWT validado por el dispatcher (api/ventas.py),
+NO del query/body — eso impediría que un usuario de cmejia conecte la
+sesión WA de demo.
+
+GET  /api/ventas?resource=wa
    → estado actual de la sesión Baileys del tenant.
 
 POST /api/ventas?resource=wa&action=connect
-   body: {"empresa_id"?: "..."}
    → upsert wa_sessions con status='qr' (señal al bot para iniciar pairing).
 
 POST /api/ventas?resource=wa&action=disconnect
-   body: {"empresa_id"?: "..."}
    → marca status='disconnected' (el bot detecta y cierra Baileys).
 """
 
@@ -18,7 +20,6 @@ import sys
 
 from _lib import airtable_client
 from _lib.airtable_client import AirtableError
-from _ventas import tenant_id
 
 
 _TABLA_WA = "wa_sessions"
@@ -47,10 +48,8 @@ def _normalize(rec: dict | None) -> dict | None:
     }
 
 
-def wa_get(req) -> None:
+def wa_get(req, empresa_id: str) -> None:
     try:
-        qs = req._qs()
-        empresa_id = qs.get("empresa_id") or tenant_id()
         rec = _find_session(empresa_id)
         if rec is None:
             return req._json(200, {"session": {
@@ -65,12 +64,16 @@ def wa_get(req) -> None:
         return req._json(502, {"error": "No se pudo consultar Airtable."})
 
 
-def wa_post(req) -> None:
+def wa_post(req, empresa_id: str) -> None:
     try:
         qs = req._qs()
         action = qs.get("action")
-        body = req._read_body()
-        empresa_id = (body.get("empresa_id") or "").strip() or tenant_id()
+        # Body solo se lee para detectar JSON inválido; ignoramos cualquier
+        # `empresa_id` que venga ahí — lo confiable es el del JWT.
+        try:
+            req._read_body()
+        except json.JSONDecodeError:
+            return req._json(400, {"error": "JSON inválido."})
 
         if action == "connect":
             existing = _find_session(empresa_id)
@@ -100,5 +103,3 @@ def wa_post(req) -> None:
     except AirtableError as e:
         print(f"[ventas/wa] AirtableError POST: {e}", file=sys.stderr)
         return req._json(502, {"error": "No se pudo escribir en Airtable."})
-    except json.JSONDecodeError:
-        return req._json(400, {"error": "JSON inválido."})
