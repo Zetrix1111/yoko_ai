@@ -8,7 +8,6 @@ import ChatScreen from './features/chat/ChatScreen';
 import ModulesSidebar from './features/modules/ModulesSidebar';
 import { MODULES } from './features/modules/modulesConfig';
 
-import AlertaSeguraScreen from './features/modules/alerta-segura/AlertaSeguraScreen';
 import ConfiguracionEmpresaScreen from './features/modules/configuracion-empresa/ConfiguracionEmpresaScreen';
 import FacturasInteligentesScreen from './features/modules/facturas-inteligentes/FacturasInteligentesScreen';
 import GestionCajaChicaScreen from './features/modules/gestion-caja-chica/GestionCajaChicaScreen';
@@ -17,7 +16,6 @@ import VentasInteligentesScreen from './features/modules/ventas-inteligentes/Ven
 // Mapeo: id de módulo → componente que renderiza su pantalla.
 // Para enchufar un módulo nuevo, solo agrega aquí su entrada.
 const MODULE_COMPONENTS = {
-  'alerta-segura':          AlertaSeguraScreen,
   'configuracion-empresa':  ConfiguracionEmpresaScreen,
   'facturas-inteligentes':  FacturasInteligentesScreen,
   'gestion-caja':           GestionCajaChicaScreen,

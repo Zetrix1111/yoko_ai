@@ -1,7 +1,7 @@
 // Enlaces rápidos a Excel compartidos en SharePoint (abren en nueva pestaña).
 // Para agregar uno nuevo: agrega un objeto aquí. Si `url` está vacío, el
 // botón aparece deshabilitado (sin click).
-import { TrendingUp, ClipboardList, FileText } from 'lucide-react';
+import { TrendingUp, ClipboardList, ShieldAlert } from 'lucide-react';
 
 export const QUICK_LINKS = [
   {
@@ -19,10 +19,10 @@ export const QUICK_LINKS = [
     color: '#2B7CD3', // azul
   },
   {
-    id: 'deo',
-    name: 'Deo',
-    url: '',
-    Icon: FileText,
+    id: 'alerta-segura',
+    name: 'Alerta segura',
+    url: 'https://alertasegura.luna.com.pe/alerta_segura_cmejia.html',
+    Icon: ShieldAlert,
     color: '#B45309', // ámbar
   },
 ];

@@ -10,7 +10,6 @@
 // externalUrl (opcional): si un módulo o submenú lo declara, en vez
 // de navegar internamente, abre esa URL en nueva pestaña.
 import {
-  ShieldAlert,
   FileText,
   CreditCard,
   PiggyBank,
@@ -27,6 +26,20 @@ import {
 } from 'lucide-react';
 
 export const MODULES = [
+  {
+    id: 'ventas-inteligentes',
+    path: '/modulos/ventas-inteligentes',
+    name: 'Ventas Inteligentes',
+    Icon: Sparkles,
+    iconClass: 'sales',
+    submenus: [
+      { id: 'inicio',         label: 'Dashboard',     Icon: LayoutDashboard },
+      { id: 'respuestas-ia',  label: 'Respuestas IA', Icon: MessageSquareText },
+      { id: 'clientes',       label: 'Clientes',      Icon: Users },
+      { id: 'productos',      label: 'Productos',     Icon: Package },
+      { id: 'configuracion',  label: 'Configuración', Icon: Settings },
+    ],
+  },
   {
     id: 'gestion-caja',
     path: '/modulos/gestion-caja',
@@ -47,20 +60,6 @@ export const MODULES = [
     ],
   },
   {
-    id: 'ventas-inteligentes',
-    path: '/modulos/ventas-inteligentes',
-    name: 'Ventas Inteligentes',
-    Icon: Sparkles,
-    iconClass: 'sales',
-    submenus: [
-      { id: 'inicio',         label: 'Dashboard',     Icon: LayoutDashboard },
-      { id: 'respuestas-ia',  label: 'Respuestas IA', Icon: MessageSquareText },
-      { id: 'clientes',       label: 'Clientes',      Icon: Users },
-      { id: 'productos',      label: 'Productos',     Icon: Package },
-      { id: 'configuracion',  label: 'Configuración', Icon: Settings },
-    ],
-  },
-  {
     id: 'facturas-inteligentes',
     path: '/modulos/facturas-inteligentes',
     name: 'Facturas Inteligentes (BETA)',
@@ -73,13 +72,5 @@ export const MODULES = [
     name: 'Configuración',
     Icon: Building2,
     iconClass: 'banking',
-  },
-  {
-    id: 'alerta-segura',
-    path: '/modulos/alerta-segura',
-    name: 'Notificaciones y alertas',
-    Icon: ShieldAlert,
-    iconClass: 'alert',
-    externalUrl: 'https://alertasegura.luna.com.pe/alerta_segura_cmejia.html',
   },
 ];
