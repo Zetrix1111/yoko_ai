@@ -1,4 +1,4 @@
-"""
+﻿"""
 Tool de navegación — categoría 'navegacion'.
 
 Importar este módulo registra la tool `navegar_ui` en `tool_registry.TOOLS`.
@@ -11,7 +11,7 @@ clave `_action` debe traducirse a una acción visual además de mostrar
 el mensaje del LLM.
 """
 
-from ..tool_registry import register
+from _yoko._lib.tool_registry import register
 
 
 # Mapeo sección → módulo dueño. Las 7 secciones del enum corresponden a

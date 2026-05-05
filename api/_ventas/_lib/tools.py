@@ -1,22 +1,21 @@
 """
-Tools de ventas — usadas SOLO por /api/sales_chat (el cerebro del bot-baileys).
+Tools de ventas — usadas SOLO por /api/sales_chat (cerebro del bot-baileys).
 
-NO se registran en `tool_registry.TOOLS` (el registry global de Yoko) para no
-contaminar las herramientas que ve el chat normal de Yoko (caja chica, etc).
-En su lugar, exponemos:
+Aisladas del registry global de Yoko (caja chica) para no contaminar la
+lista de tools que ve el chat normal. Exponemos:
 
   • Funciones puras `consultar_productos(args, context)`, `consultar_stock(...)`.
-  • `VENTAS_TOOLS_OPENAI`: lista en formato OpenAI para pasar a `tools=` en
+  • `TOOLS_OPENAI`: lista en formato OpenAI para pasar a `tools=` en
     `client.chat.completions.create`.
-  • `execute_ventas_tool(name, args, context)`: dispatcher.
+  • `execute(name, args, context)`: dispatcher.
 
 Todas las tablas (productos, conversaciones, mensajes, wa_sessions, outbox)
 viven en la base default `AIRTABLE_BASE_ID`. Multi-tenant via la columna
 `empresa_id`. Estas tools solo leen productos.
 """
 
-from .. import airtable_client
-from ..airtable_client import AirtableError
+from _lib import airtable_client
+from _lib.airtable_client import AirtableError
 
 
 _TABLA_PRODUCTOS = "productos"
@@ -208,7 +207,7 @@ def consultar_stock(args: dict, context: dict) -> dict:
 # Definiciones para OpenAI function calling
 # ─────────────────────────────────────────────────────────────────────────
 
-VENTAS_TOOLS_OPENAI = [
+TOOLS_OPENAI = [
     {
         "type": "function",
         "function": {
@@ -263,15 +262,15 @@ VENTAS_TOOLS_OPENAI = [
 
 
 # Dispatcher (lo usa /api/sales_chat para ejecutar la tool que el LLM eligió)
-_VENTAS_HANDLERS = {
+_HANDLERS = {
     "consultar_productos": consultar_productos,
     "consultar_stock":     consultar_stock,
 }
 
 
-def execute_ventas_tool(name: str, args: dict, context: dict) -> dict:
+def execute(name: str, args: dict, context: dict) -> dict:
     """Ejecuta una tool de ventas. Devuelve dict serializable a JSON."""
-    handler = _VENTAS_HANDLERS.get(name)
+    handler = _HANDLERS.get(name)
     if handler is None:
         return {"error": "interno", "detail": f"Tool de ventas '{name}' no existe."}
     try:

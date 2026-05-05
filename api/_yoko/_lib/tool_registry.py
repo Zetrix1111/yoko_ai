@@ -23,7 +23,7 @@ ser IMPORTADOS al menos una vez (el side-effect del decorador). El
 handler de chat hace `import api._lib.tools.consulta` (etc.) en su top.
 """
 
-from .validators import ValidationError
+from _lib.validators import ValidationError
 
 
 # Registro global. Poblado por @register en los módulos de tools/.

@@ -1,4 +1,4 @@
-"""
+﻿"""
 Tools de consulta (read-only) — categoría 'consulta'.
 
 Importar este módulo registra todas las tools en `tool_registry.TOOLS`
@@ -13,8 +13,8 @@ edita las constantes _TABLA_* abajo):
   • Pagos        → empresa_id, dni, fecha, monto, ...
 """
 
-from .. import airtable_client
-from ..tool_registry import register
+from _lib import airtable_client
+from _yoko._lib.tool_registry import register
 
 
 # ─────────────────────────────────────────────────────────────────────────

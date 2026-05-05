@@ -1,12 +1,13 @@
 """
 Cliente OpenAI con loop de tool calling para gpt-4.1-mini-2025-04-14.
+Agnóstico del agente: cada caller (Yoko o ventas) le pasa SU `executor`.
 
 `run_chat` orquesta la conversación:
   1. Arranca con [system_prompt, ...messages] como contexto.
   2. Llama al modelo con las tools.
-  3. Si el modelo pide ejecutar tools, las corre vía tool_registry,
-     reinyecta los resultados como mensajes de rol "tool" y vuelve a
-     llamar al modelo.
+  3. Si el modelo pide ejecutar tools, las corre vía el `executor`
+     pasado, reinyecta los resultados como mensajes de rol "tool" y
+     vuelve a llamar al modelo.
   4. Cuando el modelo responde sin tool_calls → termina y devuelve
      `{"text": <respuesta>, "action": <ultima _action capturada o None>}`.
 
@@ -23,8 +24,6 @@ import sys
 from typing import Callable
 
 from openai import OpenAI
-
-from . import tool_registry
 
 
 _MODEL = "gpt-4.1-mini-2025-04-14"
@@ -51,8 +50,8 @@ def run_chat(
     messages: list[dict],
     tools: list[dict],
     context: dict,
+    executor: ToolExecutor,
     max_iterations: int = 6,
-    executor: ToolExecutor | None = None,
 ) -> dict:
     """
     Ejecuta el loop de chat con tool calling. Devuelve dict con la
@@ -61,20 +60,20 @@ def run_chat(
     `messages` debe venir en el formato OpenAI:
         [{"role": "user"|"assistant", "content": "..."}]
 
-    `tools` viene de `prompt_builder.build_tools_list(config)` para Yoko,
-    o de `tools.ventas.VENTAS_TOOLS_OPENAI` para el agente de ventas.
-    Si está vacío, el modelo no puede llamar tools (chat plano).
+    `tools` es la lista en formato OpenAI. Para Yoko viene de
+    `yoko._lib.prompt.build_tools_list(config)`; para ventas, de
+    `ventas._lib.tools.TOOLS_OPENAI`. Si está vacío, el modelo no puede
+    llamar tools (chat plano).
 
     `context` se pasa tal cual al executor — típicamente
     `{"user": <dict>, "config": <dict>}` para Yoko, o
     `{"empresa_id": "..."}` para ventas.
 
-    `executor` es la función que ejecuta tools. Default: `tool_registry.execute_tool`
-    (registry global de Yoko). Para el agente de ventas pasar
-    `tools.ventas.execute_ventas_tool` para evitar contaminar el registry global.
+    `executor` es la función que ejecuta tools. Cada caller pasa la
+    suya: `yoko._lib.tool_registry.execute_tool` o
+    `ventas._lib.tools.execute`. Mantiene este módulo agnóstico del
+    agente que lo invoca.
     """
-    if executor is None:
-        executor = tool_registry.execute_tool
     full_messages: list[dict] = (
         [{"role": "system", "content": system_prompt}]
         + list(messages or [])

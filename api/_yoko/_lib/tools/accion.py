@@ -1,4 +1,4 @@
-"""
+﻿"""
 Tools de acción (write) — categoría 'accion'.
 
 Importar este módulo registra todas las tools en `tool_registry.TOOLS`
@@ -24,9 +24,9 @@ import os
 import sys
 from datetime import datetime
 
-from .. import airtable_client
-from ..tool_registry import register
-from ..validators import (
+from _lib import airtable_client
+from _yoko._lib.tool_registry import register
+from _lib.validators import (
     ValidationError,
     validar_monto_contra_tope,
     validar_plazo_rendicion,
