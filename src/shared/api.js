@@ -141,6 +141,7 @@ export async function postForm(url, formData) {
 export const API = {
   LOGIN: '/api/login',
   CHAT: '/api/chat',
+  TRANSCRIBE: '/api/transcribe',
   PARSE_FILE: '/api/parse_file',
   FACTURAS_PROCESAR: '/api/facturas_procesar',
   FACTURAS_CONCAR: '/api/facturas_concar',

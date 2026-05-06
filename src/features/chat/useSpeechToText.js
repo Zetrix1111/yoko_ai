@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
-import { postBytesAuth } from '../../shared/api';
+import { API, postBytesAuth } from '../../shared/api';
 
 // Hook: graba audio con MediaRecorder y lo manda a /api/transcribe (OpenAI).
 // Retorna el texto transcrito — NO envía mensaje. El usuario revisa y envía.
@@ -66,7 +66,7 @@ export function useSpeechToText() {
 
         setState('processing');
         try {
-          const data = await postBytesAuth('/api/transcribe', blob, mimeType);
+          const data = await postBytesAuth(API.TRANSCRIBE, blob, mimeType);
           setState('idle');
           resolve(((data && data.text) || '').trim());
         } catch (err) {
