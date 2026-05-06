@@ -23,7 +23,7 @@ import {
   Package,
   Users,
   MessageSquareText,
-  Brain,
+  Smartphone,
 } from 'lucide-react';
 
 export const MODULES = [
@@ -38,8 +38,8 @@ export const MODULES = [
       { id: 'respuestas-ia',    label: 'Respuestas IA',      Icon: MessageSquareText },
       { id: 'clientes',         label: 'Clientes',           Icon: Users },
       { id: 'productos',        label: 'Productos',          Icon: Package },
-      { id: 'config-agente',    label: 'Config Agente IA',   Icon: Brain },
-      { id: 'configuracion',    label: 'Configuración',      Icon: Settings },
+      { id: 'whatsapp',         label: 'WhatsApp',           Icon: Smartphone },
+      { id: 'config-agente',    label: 'Configuración',      Icon: Settings },
     ],
   },
   {

@@ -1852,23 +1852,25 @@ function ContextoAgenteBlock() {
   );
 }
 
-export function ConfiguracionSection() {
+export function WhatsAppSection() {
   return (
     <>
       <SectionHeader
-        title="Configuración"
-        subtitle="Conectá tu WhatsApp y configurá el contexto que tendrá el agente IA al responder a tus clientes."
+        title="WhatsApp"
+        subtitle="Vinculá tu cuenta de WhatsApp escaneando el QR y revisá su estado de conexión."
       />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         <SectionErrorBoundary>
           <CanalesBlock />
         </SectionErrorBoundary>
-
-        <SectionErrorBoundary>
-          <ContextoAgenteBlock />
-        </SectionErrorBoundary>
       </div>
     </>
   );
 }
+
+// Wrapper de compatibilidad: la sección "configuracion" del schema viejo
+// (?section=configuracion en URLs guardadas) muestra ahora solo el bloque
+// de WhatsApp. La configuración del agente IA vive en el nuevo wizard
+// (?section=config-agente).
+export const ConfiguracionSection = WhatsAppSection;

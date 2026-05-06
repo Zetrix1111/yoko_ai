@@ -235,37 +235,62 @@ def _merge_info_extendida(provided: dict | None) -> dict:
 
 
 # ─────────────────────────────────────────────────────────────────────────
-# Ventas — defaults, deep merge y carga dinámica
+# Ventas — defaults, deep merge y carga dinámica (schema v2: 24 campos en 9 capas)
 # ─────────────────────────────────────────────────────────────────────────
 
-VENTAS_ENUMS = {
-    "estilo_vendedor":      {"formal_profesional", "cercano_amigable", "tecnico_consultivo", "casual_directo"},
-    "tipo_cliente":          {"b2b", "b2c", "mixto"},
-    "metodos_pago":          {"efectivo", "yape_plin", "transferencia", "tarjeta_pos", "tarjeta_online", "credito_empresarial", "contra_entrega"},
-    "politica_precios.igv":  {"incluido", "no_incluido", "referencial"},
-    "politica_precios.comprobantes": {"boleta", "factura", "ambos"},
-    "criterios_derivacion":  {"cotizacion_formal", "descuento_negociacion", "modificar_pedido", "queja_reclamo", "fuera_catalogo", "menciona_competencia", "intencion_compra", "conversacion_larga"},
-    "horario_ia":            {"24_7", "solo_horario_atencion"},
-    "info_adicional.categoria": {"faq", "promocion", "servicio_adicional", "info_importante", "politica"},
-}
-
-INFO_ADICIONAL_MAX = 20
-
-
 def _default_ventas_config() -> dict:
-    """Shape default del bloque ventas. Todos los toggles arrancan en false."""
+    """
+    Shape default del bloque ventas (schema v2). Todos los toggles arrancan
+    en false; cuando activo:false, el prompt builder usa sus defaults
+    universales hardcodeados. Los campos legacy v1 (`estilo_vendedor`,
+    `info_adicional`) ya no figuran acá: si una row vieja en Airtable los
+    trae, `_merge_ventas_config` los descarta silenciosamente al cargar.
+    """
     return {
-        "estilo_vendedor":      {"activo": False, "valor": "formal_profesional"},
-        "nombre_vendedor":      {"activo": False, "valor": ""},
-        "tipo_cliente":         {"activo": False, "valor": "mixto"},
-        "zona_cobertura":       {"activo": False, "valor": ""},
-        "tiempo_entrega":       {"activo": False, "valor": ""},
-        "metodos_pago":         {"activo": False, "valor": []},
-        "politica_precios":     {"activo": False, "valor": {"igv": "incluido", "comprobantes": "ambos"}},
-        "asesor_humano":        {"activo": False, "valor": {"nombre": "", "telefono": ""}},
-        "criterios_derivacion": {"activo": False, "valor": []},
-        "horario_ia":           {"activo": False, "valor": "24_7"},
-        "info_adicional":       {"activo": False, "valor": []},
+        # CAPA 3 — Voz del vendedor
+        "nombre_vendedor":       {"activo": False, "valor": ""},
+        "tratamiento":           {"activo": False, "valor": "tu"},
+        "vocabulario":           {"activo": False, "valor": "neutro"},
+        "calidez":               {"activo": False, "valor": "cordial"},
+        "localizacion_cultural": {"activo": False, "valor": {"region": "neutro_latam", "modismos_permitidos": []}},
+        "formato_mensaje":       {"activo": False, "valor": {"longitud_preferida": "corto", "preguntas_por_turno": 1, "uso_listas": "solo_si_3_o_mas", "puntuacion_enfatica": False}},
+        "uso_emojis":            {"activo": False, "valor": "nunca"},
+
+        # CAPA 5 — Política comercial
+        "zona_cobertura":        {"activo": False, "valor": ""},
+        "tiempo_entrega":        {"activo": False, "valor": ""},
+        "metodos_pago":          {"activo": False, "valor": []},
+        "politica_precios":      {"activo": False, "valor": {"igv": "incluido", "comprobantes": "ambos"}},
+        "moneda":                {"activo": False, "valor": "PEN"},
+        "politica_envio":        {"activo": False, "valor": {"modelo": "fijo", "monto_envio_gratis_desde": None, "costo_fijo": None, "detalle_libre": ""}},
+        "politica_devoluciones": {"activo": False, "valor": {"acepta_devolucion": True, "plazo_dias": 7, "condiciones": ""}},
+        "garantia":              {"activo": False, "valor": ""},
+        "pedido_minimo":         {"activo": False, "valor": {"monto": 0, "comentario": ""}},
+        "descuento_volumen":     {"activo": False, "valor": {"umbral_aplica": 0, "instruccion": "derivar_humano"}},
+
+        # CAPA 6 — Cliente y arco conversacional
+        "tipo_cliente":               {"activo": False, "valor": "mixto"},
+        "discovery_preguntas":        {"activo": False, "valor": []},
+        "datos_cierre_obligatorios":  {"activo": False, "valor": ["nombre", "telefono"]},
+        "umbral_derivacion_humano":   {"activo": False, "valor": None},
+        "criterios_derivacion":       {"activo": False, "valor": []},
+        "asesor_humano":              {"activo": False, "valor": {"nombre": "", "telefono": ""}},
+        "horario_ia":                 {"activo": False, "valor": "24_7"},
+
+        # CAPA 7 — Conocimiento de marca
+        "propuesta_valor":     {"activo": False, "valor": ""},
+        "diferenciadores":     {"activo": False, "valor": []},
+        "prueba_social":       {"activo": False, "valor": []},
+        "autoridad_tecnica":   {"activo": False, "valor": []},
+        "faq":                 {"activo": False, "valor": []},
+        "promociones_activas": {"activo": False, "valor": []},
+
+        # CAPA 8 — Manejo de objeciones
+        "objeciones": {"activo": False, "valor": []},
+
+        # CAPA 9 — Límites y prohibiciones
+        "prohibiciones":           {"activo": False, "valor": []},
+        "alcance_responsabilidad": {"activo": False, "valor": ""},
     }
 
 

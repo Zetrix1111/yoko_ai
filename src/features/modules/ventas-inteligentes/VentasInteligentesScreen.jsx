@@ -1,8 +1,8 @@
 import { useSearchParams } from 'react-router-dom';
 import ModuleLayout from '../ModuleLayout';
 import {
-  InicioSection, ClientesSection, ProductosSection, ConfiguracionSection,
-  RespuestasIASection,
+  InicioSection, ClientesSection, ProductosSection, WhatsAppSection,
+  RespuestasIASection, ConfiguracionSection,
 } from './sections';
 import ConfigAgenteWizard from './config-agente/ConfigAgenteWizard';
 import './VentasInteligentes.css';
@@ -12,8 +12,10 @@ const SECTIONS = {
   'respuestas-ia':  RespuestasIASection,
   clientes:         ClientesSection,
   productos:        ProductosSection,
-  configuracion:    ConfiguracionSection,
+  whatsapp:         WhatsAppSection,
   'config-agente':  ConfigAgenteWizard,
+  // Alias: ?section=configuracion (URLs antiguas) cae al wrapper de WhatsApp.
+  configuracion:    ConfiguracionSection,
 };
 
 export default function VentasInteligentesScreen({ user, onOpenModules, onLogout }) {
