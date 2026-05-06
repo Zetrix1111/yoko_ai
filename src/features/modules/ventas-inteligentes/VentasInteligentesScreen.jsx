@@ -4,14 +4,16 @@ import {
   InicioSection, ClientesSection, ProductosSection, ConfiguracionSection,
   RespuestasIASection,
 } from './sections';
+import ConfigAgenteWizard from './config-agente/ConfigAgenteWizard';
 import './VentasInteligentes.css';
 
 const SECTIONS = {
-  inicio:          InicioSection,
-  'respuestas-ia': RespuestasIASection,
-  clientes:        ClientesSection,
-  productos:       ProductosSection,
-  configuracion:   ConfiguracionSection,
+  inicio:           InicioSection,
+  'respuestas-ia':  RespuestasIASection,
+  clientes:         ClientesSection,
+  productos:        ProductosSection,
+  configuracion:    ConfiguracionSection,
+  'config-agente':  ConfigAgenteWizard,
 };
 
 export default function VentasInteligentesScreen({ user, onOpenModules, onLogout }) {

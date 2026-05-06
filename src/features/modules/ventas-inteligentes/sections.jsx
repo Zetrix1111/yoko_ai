@@ -40,7 +40,7 @@ function ChannelBadge({ value }) {
   return <span className="vom-channel-badge">{CANAL_LABELS[value] || value}</span>;
 }
 
-function Toggle({ checked, onChange, ariaLabel }) {
+export function Toggle({ checked, onChange, ariaLabel }) {
   return (
     <button
       type="button"
@@ -57,7 +57,7 @@ function Toggle({ checked, onChange, ariaLabel }) {
 
 // Error Boundary local — captura crashes en sub-secciones para no dejar
 // la página en blanco. Muestra el mensaje del error para diagnóstico.
-class SectionErrorBoundary extends Component {
+export class SectionErrorBoundary extends Component {
   constructor(props) {
     super(props);
     this.state = { hasError: false, error: null };
@@ -1322,7 +1322,7 @@ const todayISO = () => new Date().toISOString().slice(0, 10);
 
 // ── Helpers de UI compartidos ────────────────────────────────────────────
 
-function CampoToggle({ campo, label, helpText, activo, onActivoChange, children }) {
+export function CampoToggle({ campo, label, helpText, activo, onActivoChange, children }) {
   return (
     <div className={`via-config-row ${activo ? '' : 'disabled'}`}>
       <div className="via-config-row-header">
