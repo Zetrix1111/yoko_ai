@@ -94,9 +94,8 @@ export async function deleteJsonAuth(url) {
 
 /**
  * POST de FormData con Bearer token. Para endpoints que reciben multipart
- * (parse_file, transcribe, upload, facturas_procesar). El browser pone el
- * Content-Type con boundary correcto si dejamos `body: FormData` sin
- * sobrescribir headers.
+ * (parse_file, facturas_procesar). El browser pone el Content-Type con
+ * boundary correcto si dejamos `body: FormData` sin sobrescribir headers.
  */
 export async function postFormAuth(url, formData) {
   return apiFetch(url, { method: 'POST', body: formData });
@@ -142,7 +141,6 @@ export async function postForm(url, formData) {
 export const API = {
   LOGIN: '/api/login',
   CHAT: '/api/chat',
-  UPLOAD: '/api/upload',
   PARSE_FILE: '/api/parse_file',
   FACTURAS_PROCESAR: '/api/facturas_procesar',
   FACTURAS_CONCAR: '/api/facturas_concar',
