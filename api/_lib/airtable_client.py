@@ -4,10 +4,8 @@ Cliente HTTP mínimo para Airtable usando solo urllib.
 No depende de paquetes externos (mismo patrón que api/login.py).
 Lee credenciales de las env vars AIRTABLE_TOKEN y AIRTABLE_BASE_ID.
 
-Todas las funciones públicas aceptan un parámetro opcional `base_id`.
-Si no se pasa, se usa AIRTABLE_BASE_ID del env (comportamiento normal).
-El parámetro queda disponible como foundation por si en el futuro se
-necesita acceder a otra base; hoy todas las tablas viven en una sola.
+Toda la app vive en una sola base (`app9s5KuEvlAlZJgl`); las funciones
+no aceptan `base_id` — siempre se resuelve desde el env.
 
 Forma de los registros devueltos: {"id": <recId>, "fields": {...}}.
 """
@@ -39,27 +37,17 @@ def _get_token() -> str:
     return token
 
 
-def _resolve_base_id(base_id: str | None) -> str:
-    """Si `base_id` viene None, usa AIRTABLE_BASE_ID del env (legacy)."""
-    if base_id:
-        return base_id
-    env_base = os.environ.get("AIRTABLE_BASE_ID")
-    if not env_base:
-        raise AirtableError(
-            "Falta AIRTABLE_BASE_ID en env y no se pasó base_id explícito."
-        )
-    return env_base
+def _get_base_id() -> str:
+    """Lee y valida AIRTABLE_BASE_ID."""
+    base = os.environ.get("AIRTABLE_BASE_ID")
+    if not base:
+        raise AirtableError("Falta AIRTABLE_BASE_ID en las variables de entorno.")
+    return base
 
 
-def _get_credentials() -> tuple[str, str]:
-    """Compat legacy: token + base_id default. Algunos endpoints viejos lo importan."""
-    return _get_token(), _resolve_base_id(None)
-
-
-def _table_url(table: str, base_id: str | None = None) -> str:
-    """Construye la URL base para una tabla en una base específica."""
-    base = _resolve_base_id(base_id)
-    return f"{_BASE_URL}/{base}/{urllib.parse.quote(table)}"
+def _table_url(table: str) -> str:
+    """Construye la URL base para una tabla en la base default."""
+    return f"{_BASE_URL}/{_get_base_id()}/{urllib.parse.quote(table)}"
 
 
 def _request(method: str, url: str, body: dict | None = None, timeout: int = 15) -> dict:
@@ -102,49 +90,46 @@ def list_records(
     table: str,
     filter_formula: str | None = None,
     max_records: int = 100,
-    base_id: str | None = None,
 ) -> list[dict]:
     """
     Lista registros de una tabla, opcionalmente filtrados por una fórmula
     Airtable. No pagina: devuelve hasta `max_records` registros (Airtable
     devuelve hasta 100 por página, así que valores >100 quedan capeados).
-
-    Si `base_id` viene None, se usa AIRTABLE_BASE_ID del env.
     """
     params: list[tuple[str, str]] = [("maxRecords", str(max_records))]
     if filter_formula:
         params.append(("filterByFormula", filter_formula))
     qs = urllib.parse.urlencode(params)
-    url = f"{_table_url(table, base_id=base_id)}?{qs}"
+    url = f"{_table_url(table)}?{qs}"
 
     data = _request("GET", url)
     return [_normalize(r) for r in data.get("records", [])]
 
 
-def get_record(table: str, record_id: str, base_id: str | None = None) -> dict:
+def get_record(table: str, record_id: str) -> dict:
     """Obtiene un registro específico por su recId."""
-    url = f"{_table_url(table, base_id=base_id)}/{urllib.parse.quote(record_id)}"
+    url = f"{_table_url(table)}/{urllib.parse.quote(record_id)}"
     data = _request("GET", url)
     return _normalize(data)
 
 
-def create_record(table: str, fields: dict, base_id: str | None = None) -> dict:
+def create_record(table: str, fields: dict) -> dict:
     """Crea un registro en la tabla y devuelve la versión normalizada."""
-    url = _table_url(table, base_id=base_id)
+    url = _table_url(table)
     data = _request("POST", url, body={"fields": fields})
     return _normalize(data)
 
 
-def update_record(table: str, record_id: str, fields: dict, base_id: str | None = None) -> dict:
+def update_record(table: str, record_id: str, fields: dict) -> dict:
     """Actualiza campos de un registro (PATCH no destruye los no enviados)."""
-    url = f"{_table_url(table, base_id=base_id)}/{urllib.parse.quote(record_id)}"
+    url = f"{_table_url(table)}/{urllib.parse.quote(record_id)}"
     data = _request("PATCH", url, body={"fields": fields})
     return _normalize(data)
 
 
-def delete_record(table: str, record_id: str, base_id: str | None = None) -> dict:
+def delete_record(table: str, record_id: str) -> dict:
     """Elimina un registro. Devuelve {'deleted': True, 'id': ...}."""
-    url = f"{_table_url(table, base_id=base_id)}/{urllib.parse.quote(record_id)}"
+    url = f"{_table_url(table)}/{urllib.parse.quote(record_id)}"
     return _request("DELETE", url)
 
 
@@ -153,7 +138,6 @@ def upsert_by_field(
     match_field: str,
     match_value: str,
     fields: dict,
-    base_id: str | None = None,
 ) -> dict:
     """
     Si existe una fila donde `match_field == match_value`, la actualiza (PATCH).
@@ -163,7 +147,7 @@ def upsert_by_field(
     (cmejia, demo, etc). NO usar con valores que puedan tener apóstrofes.
     """
     formula = f"{{{match_field}}} = '{match_value}'"
-    existing = list_records(table, filter_formula=formula, max_records=1, base_id=base_id)
+    existing = list_records(table, filter_formula=formula, max_records=1)
     if existing:
-        return update_record(table, existing[0]["id"], fields, base_id=base_id)
-    return create_record(table, {**fields, match_field: match_value}, base_id=base_id)
+        return update_record(table, existing[0]["id"], fields)
+    return create_record(table, {**fields, match_field: match_value})
