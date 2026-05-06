@@ -230,7 +230,7 @@ export default function ConfiguracionEmpresaScreen({ user, onOpenModules, onLogo
   const setValor = (campo, valor) =>
     setInfoExtendida((prev) => ({ ...prev, [campo]: { ...prev[campo], valor } }));
 
-  // Guardar info_extendida — preserva basicos y proceso.
+  // Guardar info_extendida — preserva basicos, proceso y centros_costo.
   const handleSaveInfoExtendida = async () => {
     setInfoSaving(true);
     setInfoSaveError(null);
@@ -239,6 +239,7 @@ export default function ConfiguracionEmpresaScreen({ user, onOpenModules, onLogo
         basicos: data?.basicos || { name, razon_social: razonSocial, ruc, sistema_contable: sistemaContable },
         info_extendida: infoExtendida,
         proceso: data?.proceso || {},
+        centros_costo: data?.centros_costo || { activo: centrosEnabled },
       };
       const ok = await saveConfig(payload);
       if (ok) {
@@ -253,12 +254,26 @@ export default function ConfiguracionEmpresaScreen({ user, onOpenModules, onLogo
   };
 
   // ── Centros de costo ──
+  // Estado del toggle persistido en Config_Empresa.data.centros_costo.activo.
+  // Tenants sin la key arrancan en `true` (default histórico).
   const [centrosEnabled, setCentrosEnabled] = useState(true);
+  const [centrosSaving, setCentrosSaving] = useState(false);
+  const [centrosSaveError, setCentrosSaveError] = useState(null);
   const [centros, setCentros] = useState([]);
   const [centrosLoading, setCentrosLoading] = useState(false);
   const [centrosError, setCentrosError] = useState(null);
   const [centrosFetched, setCentrosFetched] = useState(false);
   const [centrosExpanded, setCentrosExpanded] = useState(false);
+
+  // Hidratar el toggle desde el backend cuando llega la config. Es seguro
+  // setear state acá porque sucede solo cuando cambia el valor persistido.
+  useEffect(() => {
+    const persisted = data?.centros_costo?.activo;
+    if (typeof persisted === 'boolean') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setCentrosEnabled(persisted);
+    }
+  }, [data?.centros_costo?.activo]);
 
   useEffect(() => {
     if (!centrosEnabled || centrosFetched) return;
@@ -268,9 +283,9 @@ export default function ConfiguracionEmpresaScreen({ user, onOpenModules, onLogo
     setCentrosError(null);
 
     getJsonAuth(API.CENTROS_COSTO)
-      .then((data) => {
+      .then((res) => {
         if (cancelled) return;
-        setCentros(Array.isArray(data?.centros) ? data.centros : []);
+        setCentros(Array.isArray(res?.centros) ? res.centros : []);
       })
       .catch((err) => {
         if (cancelled) return;
@@ -291,8 +306,32 @@ export default function ConfiguracionEmpresaScreen({ user, onOpenModules, onLogo
     setCentrosError(null);
   };
 
+  // Persistir el toggle en Config_Empresa.data con optimistic update.
+  // Si el save falla, revierte y muestra error.
+  const handleToggleCentros = async (next) => {
+    setCentrosEnabled(next);          // optimistic
+    setCentrosSaveError(null);
+    setCentrosSaving(true);
+
+    const payload = {
+      basicos:        data?.basicos || {
+        name, razon_social: razonSocial, ruc, sistema_contable: sistemaContable,
+      },
+      info_extendida: data?.info_extendida || infoExtendida,
+      proceso:        data?.proceso || {},
+      centros_costo:  { activo: next },
+    };
+    const ok = await saveConfig(payload);
+    if (!ok) {
+      setCentrosEnabled(!next);       // revertir
+      setCentrosSaveError('No se pudo guardar el cambio.');
+    }
+    setCentrosSaving(false);
+  };
+
   // Persiste los datos básicos en Airtable (paso 6).
-  // IMPORTANTE: incluye info_extendida y proceso intactos para no pisarlos.
+  // IMPORTANTE: incluye info_extendida, proceso y centros_costo intactos
+  // para no pisarlos.
   const handleSaveEmpresa = async () => {
     setEmpresaSaveError(null);
     const payload = {
@@ -304,6 +343,7 @@ export default function ConfiguracionEmpresaScreen({ user, onOpenModules, onLogo
       },
       info_extendida: data?.info_extendida || infoExtendida,
       proceso:        data?.proceso || {},
+      centros_costo:  data?.centros_costo || { activo: centrosEnabled },
     };
     const ok = await saveConfig(payload);
     if (ok) {
@@ -588,19 +628,28 @@ export default function ConfiguracionEmpresaScreen({ user, onOpenModules, onLogo
             </div>
             <div className="ce-config-controls">
               <span className="ce-config-summary">
-                {centrosEnabled
-                  ? (centrosLoading
-                      ? 'Cargando…'
-                      : `${centros.length} centro${centros.length === 1 ? '' : 's'}`)
-                  : 'Desactivado'}
+                {centrosSaving
+                  ? 'Guardando…'
+                  : centrosEnabled
+                    ? (centrosLoading
+                        ? 'Cargando…'
+                        : `${centros.length} centro${centros.length === 1 ? '' : 's'}`)
+                    : 'Desactivado'}
               </span>
               <Toggle
                 checked={centrosEnabled}
-                onChange={setCentrosEnabled}
+                onChange={handleToggleCentros}
                 ariaLabel="Activar centros de costo"
               />
             </div>
           </div>
+
+          {centrosSaveError && (
+            <div className="ce-list-status error">
+              <AlertCircle size={16} />
+              <span>{centrosSaveError}</span>
+            </div>
+          )}
 
           {centrosEnabled && (
             <div className="ce-config-body">
