@@ -15,6 +15,11 @@ Recursos soportados (todos requieren JWT salvo `sales_chat`):
   GET    ?resource=mensajes             → historial por conv
   POST   ?resource=mensajes             → insert (+ outbox si role=human)
   POST   ?resource=conversaciones_modo  → toggle AI/HUMAN
+  GET    ?resource=productos            → lista catálogo del tenant
+  GET    ?resource=productos&id=…       → un producto
+  POST   ?resource=productos            → crear producto
+  PATCH  ?resource=productos&id=…       → actualizar producto
+  DELETE ?resource=productos&id=…       → eliminar producto
   GET    ?resource=prompt_preview       → system prompt del agente IA
   POST   ?resource=sales_chat           → cerebro del bot-baileys (S2S)
 
@@ -37,7 +42,7 @@ if _HERE not in sys.path:
 
 from _lib import auth                                                # noqa: E402
 from _lib.auth import AuthError                                      # noqa: E402
-from _ventas import wa, conversaciones, chat as ventas_chat, prompt_preview  # noqa: E402
+from _ventas import wa, conversaciones, chat as ventas_chat, prompt_preview, productos  # noqa: E402
 
 
 # Mapa: (resource, método) → función que recibe (req, empresa_id).
@@ -54,6 +59,11 @@ _DISPATCH_AUTH = {
 
     ("conversaciones_modo", "POST"):   conversaciones.modo_post,
 
+    ("productos",           "GET"):    productos.productos_get,
+    ("productos",           "POST"):   productos.productos_post,
+    ("productos",           "PATCH"):  productos.productos_patch,
+    ("productos",           "DELETE"): productos.productos_delete,
+
     ("prompt_preview",      "GET"):    prompt_preview.prompt_preview_get,
 }
 
@@ -67,6 +77,7 @@ class handler(BaseHTTPRequestHandler):
 
     def do_GET(self):    return self._dispatch("GET")
     def do_POST(self):   return self._dispatch("POST")
+    def do_PATCH(self):  return self._dispatch("PATCH")
     def do_DELETE(self): return self._dispatch("DELETE")
 
     def _dispatch(self, method: str) -> None:

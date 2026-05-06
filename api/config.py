@@ -1,20 +1,25 @@
 """
-api/config.py — endpoint genérico para Config_Empresa y Config_Ventas.
+api/config.py — endpoint genérico para Config_Empresa, Config_Ventas y
+master-data lookups (centros de costo).
 
-Consolida la persistencia del config editable en un solo handler. Las dos
-tablas tienen el mismo shape (`empresa_id` + `data` long-text JSON), así
-que un solo dispatcher por `?tipo=` evita duplicar código y nos mantiene
-debajo del cap de 12 funciones de Vercel.
+Consolida persistencia + lecturas read-only de tablas relacionadas con la
+configuración de empresa, en un solo handler. Un solo dispatcher por
+`?tipo=` evita duplicar funciones serverless en Vercel.
 
 URLs:
-  GET  /api/config?tipo=empresa  → {data: <objeto JSON o null>}
-  GET  /api/config?tipo=ventas   → {data: <objeto JSON o null>}
-  POST /api/config?tipo=empresa  → {ok: true}
-  POST /api/config?tipo=ventas   → {ok: true}
+  GET  /api/config?tipo=empresa        → {data: <objeto JSON o null>}
+  GET  /api/config?tipo=ventas         → {data: <objeto JSON o null>}
+  POST /api/config?tipo=empresa        → {ok: true}
+  POST /api/config?tipo=ventas         → {ok: true}
+  GET  /api/config?tipo=centros_costo  → {centros: [{id, obra, nombre, constituyen}]}
 
 Body del POST: `{"data": {...objeto JSON...}}`. Validación blanda — que sea
 serializable y no exceda 100KB. No hay JSON Schema; las pantallas del
 frontend son responsables de mandar la forma correcta.
+
+`centros_costo` es read-only (lee tabla `obras`, no es config blob). POST
+sobre ese tipo devuelve 405. El nombre `tipo=` se conserva por simetría
+con el dispatcher genérico, aunque semánticamente es un master-data lookup.
 """
 
 import json
@@ -35,7 +40,11 @@ from _lib.auth import AuthError                              # noqa: E402
 
 _MAX_DATA_BYTES = 100_000
 
-ALLOWED_TIPOS = {"empresa", "ventas"}
+ALLOWED_TIPOS = {"empresa", "ventas", "centros_costo"}
+
+# Solo los tipos "data blob" (fila por empresa con JSON en `data`).
+# `centros_costo` no entra acá: es un master-data lookup sobre la tabla `obras`
+# y se maneja en una rama aparte.
 TABLE_BY_TIPO = {
     "empresa": "Config_Empresa",
     "ventas":  "Config_Ventas",
@@ -55,6 +64,11 @@ class handler(BaseHTTPRequestHandler):
             tipo = self._get_tipo()
             if tipo is None:
                 return  # _get_tipo ya respondió 400
+
+            # Master-data lookup: lista de obras del tenant. NO sigue el patrón
+            # de "fila por empresa con JSON en data" — devuelve N records.
+            if tipo == "centros_costo":
+                return self._get_centros_costo(empresa_id)
 
             try:
                 rows = airtable_client.list_records(
@@ -92,6 +106,10 @@ class handler(BaseHTTPRequestHandler):
             tipo = self._get_tipo()
             if tipo is None:
                 return
+
+            # Master-data lookups son read-only.
+            if tipo == "centros_costo":
+                return self._json(405, {"error": "centros_costo es read-only."})
 
             length = int(self.headers.get("Content-Length") or 0)
             try:
@@ -133,6 +151,38 @@ class handler(BaseHTTPRequestHandler):
         except Exception as e:
             print(f"[config] Error POST: {type(e).__name__}: {e}", file=sys.stderr)
             return self._json(500, {"error": "Error interno del servidor."})
+
+    # ── Master-data lookups ──────────────────────────────────────────────
+
+    def _get_centros_costo(self, empresa_id: str):
+        """
+        Devuelve la lista de centros de costo del tenant desde la tabla `obras`.
+        No es un blob de config — es un master-data lookup. Se sirve por este
+        dispatcher para evitar gastar una función serverless aparte.
+        """
+        try:
+            records = airtable_client.list_records(
+                "obras",
+                filter_formula=f"{{empresa_id}}='{empresa_id}'",
+                max_records=100,
+            )
+        except AirtableError as e:
+            print(f"[config/centros_costo] AirtableError: {e}", file=sys.stderr)
+            return self._json(502, {"error": "No se pudo consultar Airtable."})
+
+        centros = []
+        for r in records:
+            f = r.get("fields", {})
+            obra = f.get("OBRA")
+            if not obra:
+                continue
+            centros.append({
+                "id":          f.get("ID") or r.get("id"),
+                "obra":        obra,
+                "nombre":      f.get("NOMBRE OBRA", ""),
+                "constituyen": f.get("CONSTITUYEN", ""),
+            })
+        return self._json(200, {"centros": centros})
 
     # ── Helpers ──────────────────────────────────────────────────────────
 

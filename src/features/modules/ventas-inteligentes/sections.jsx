@@ -553,7 +553,7 @@ export function ProductosSection() {
     setSaving(true);
     try {
       if (data.id) {
-        const res = await patchJsonAuth(`${API.PRODUCTOS}?id=${encodeURIComponent(data.id)}`, data);
+        const res = await patchJsonAuth(`${API.PRODUCTOS}&id=${encodeURIComponent(data.id)}`, data);
         const updated = res.producto;
         setProductos(productos.map((p) => p.id === data.id ? updated : p));
       } else {
@@ -573,7 +573,7 @@ export function ProductosSection() {
   const handleDelete = async (id) => {
     if (!confirm('¿Eliminar este producto?')) return;
     try {
-      await deleteJsonAuth(`${API.PRODUCTOS}?id=${encodeURIComponent(id)}`);
+      await deleteJsonAuth(`${API.PRODUCTOS}&id=${encodeURIComponent(id)}`);
       setProductos(productos.filter((p) => p.id !== id));
     } catch (err) {
       console.error('[productos] delete', err);

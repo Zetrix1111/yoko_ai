@@ -139,22 +139,25 @@ export async function postForm(url, formData) {
 }
 
 export const API = {
-  LOGIN: '/api/login',
-  CHAT: '/api/chat',
+  // Endpoints raíz (1 función serverless cada uno).
+  LOGIN:      '/api/login',
+  CHAT:       '/api/chat',
   TRANSCRIBE: '/api/transcribe',
   PARSE_FILE: '/api/parse_file',
-  FACTURAS_PROCESAR: '/api/facturas_procesar',
-  FACTURAS_CONCAR: '/api/facturas_concar',
-  CENTROS_COSTO: '/api/centros_costo',
-  CONFIG:         '/api/config',
-  PRODUCTOS: '/api/productos',
-  // Ventas Inteligentes — endpoints consolidados en /api/ventas?resource=...
+  CONFIG:     '/api/config',
+  // Master-data lookup servido por el dispatcher de config.
+  CENTROS_COSTO: '/api/config?tipo=centros_costo',
+  // Facturas Inteligentes — dispatcher consolidado /api/facturas?action=...
+  FACTURAS_PROCESAR: '/api/facturas?action=procesar',
+  FACTURAS_CONCAR:   '/api/facturas?action=concar',
+  // Ventas Inteligentes — dispatcher /api/ventas?resource=...
   // (Vercel Hobby plan limita a 12 funciones serverless)
-  WA:                  '/api/ventas?resource=wa',
-  CONVERSACIONES:      '/api/ventas?resource=conversaciones',
-  MENSAJES:            '/api/ventas?resource=mensajes',
-  CONVERSACIONES_MODO: '/api/ventas?resource=conversaciones_modo',
-  SALES_CHAT:          '/api/ventas?resource=sales_chat',
+  PRODUCTOS:            '/api/ventas?resource=productos',
+  WA:                   '/api/ventas?resource=wa',
+  CONVERSACIONES:       '/api/ventas?resource=conversaciones',
+  MENSAJES:             '/api/ventas?resource=mensajes',
+  CONVERSACIONES_MODO:  '/api/ventas?resource=conversaciones_modo',
+  SALES_CHAT:           '/api/ventas?resource=sales_chat',
   SALES_PROMPT_PREVIEW: '/api/ventas?resource=prompt_preview',
 };
 
