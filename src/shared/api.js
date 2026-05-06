@@ -156,6 +156,7 @@ export const API = {
   MENSAJES:            '/api/ventas?resource=mensajes',
   CONVERSACIONES_MODO: '/api/ventas?resource=conversaciones_modo',
   SALES_CHAT:          '/api/ventas?resource=sales_chat',
+  SALES_PROMPT_PREVIEW: '/api/ventas?resource=prompt_preview',
 };
 
 export async function getJson(url) {
