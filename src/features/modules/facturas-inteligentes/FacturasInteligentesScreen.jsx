@@ -4,7 +4,7 @@ import {
   AlertCircle, Loader2, RotateCcw,
 } from 'lucide-react';
 import ModuleLayout from '../ModuleLayout';
-import { API, postJsonAuth, postFormAuth } from '../../../shared/api';
+import { API, postFormAuth, getAuthToken } from '../../../shared/api';
 import FacturasTable from './components/FacturasTable';
 import useRecuperarSesion from './hooks/useRecuperarSesion';
 import './FacturasInteligentes.css';
@@ -336,14 +336,17 @@ function LoadingCard({ title, subtitle }) {
 // ─────────────────────────────────────
 // Stage 4 — Done
 // ─────────────────────────────────────
-function DoneCard({ proceso, downloadUrl, onReset }) {
+function DoneCard({ proceso, onDownloadAgain, onReset }) {
   return (
     <div className="fact-card">
       <div className="fact-banner fact-banner-success">
         <Check size={20} className="fact-banner-icon" />
         <div>
-          <div className="fact-banner-title">Archivo contable generado correctamente</div>
-          <div>Tu archivo CONCAR está listo para descargar.</div>
+          <div className="fact-banner-title">Archivo CONCAR descargado</div>
+          <div>
+            El archivo ya se descargó automáticamente. Si no lo encontrás,
+            podés volver a generarlo con el botón de abajo.
+          </div>
         </div>
       </div>
 
@@ -352,16 +355,14 @@ function DoneCard({ proceso, downloadUrl, onReset }) {
       <MetaPanel proceso={proceso} />
 
       <div className="fact-btn-row">
-        <a
+        <button
+          type="button"
           className="fact-btn fact-btn-primary"
-          href={downloadUrl || '#'}
-          target="_blank"
-          rel="noopener noreferrer"
-          download
+          onClick={onDownloadAgain}
         >
           <Download size={18} />
-          Descargar archivo CONCAR
-        </a>
+          Volver a descargar
+        </button>
         <button type="button" className="fact-btn fact-btn-ghost" onClick={onReset}>
           <RotateCcw size={16} />
           Procesar otro lote
@@ -382,7 +383,6 @@ export default function FacturasInteligentesScreen({ user, onOpenModules, onLogo
   const [proceso, setProceso] = useState(null);
   const [facturas, setFacturas] = useState([]);
   const [errores, setErrores] = useState([]);
-  const [downloadUrl, setDownloadUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -405,7 +405,6 @@ export default function FacturasInteligentesScreen({ user, onOpenModules, onLogo
     setProceso(null);
     setFacturas([]);
     setErrores([]);
-    setDownloadUrl('');
     setError('');
     setIsLoading(false);
   };
@@ -450,12 +449,38 @@ export default function FacturasInteligentesScreen({ user, onOpenModules, onLogo
     setIsLoading(true);
     setStage(STAGES.CONFIRMING);
     try {
+      // El endpoint ?action=concar devuelve un .xlsx binario (no JSON).
+      // No usamos postJsonAuth porque ese helper parsea como JSON.
       // empresa_id NO se manda — el backend lo resuelve del JWT.
-      const data = await postJsonAuth(API.FACTURAS_CONCAR, {
-        proceso_id: proceso.proceso_id,
-        dni: user?.dni || '',
+      const token = getAuthToken();
+      const res = await fetch(API.FACTURAS_CONCAR, {
+        method: 'POST',
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          proceso_id: proceso.proceso_id,
+          dni: user?.dni || '',
+        }),
       });
-      setDownloadUrl(data.download_url || data.url || '#');
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || `HTTP ${res.status}`);
+      }
+
+      // Disparar descarga del .xlsx via blob URL.
+      const blob = await res.blob();
+      const filename = `CONCAR_${proceso.proceso_id}.xlsx`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
       setStage(STAGES.DONE);
     } catch (e) {
       console.error('[facturas/concar]', e);
@@ -509,7 +534,7 @@ export default function FacturasInteligentesScreen({ user, onOpenModules, onLogo
         {stage === STAGES.DONE && (
           <DoneCard
             proceso={proceso}
-            downloadUrl={downloadUrl}
+            onDownloadAgain={handleConfirmar}
             onReset={reset}
           />
         )}

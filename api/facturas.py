@@ -22,6 +22,7 @@ import os
 import sys
 import time
 import uuid
+from datetime import datetime
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 
@@ -30,8 +31,9 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 
-from _lib import auth                                                # noqa: E402
+from _lib import auth, config_loader                                 # noqa: E402
 from _lib.auth import AuthError                                      # noqa: E402
+from _lib.airtable_client import AirtableError                       # noqa: E402
 from _lib.facturas_processor import process_multiple_files           # noqa: E402
 from _lib.db_manager import (                                        # noqa: E402
     init_db,
@@ -39,6 +41,11 @@ from _lib.db_manager import (                                        # noqa: E40
     get_proceso,
     update_factura,
     delete_factura,
+)
+from _lib.contabilidad import (                                      # noqa: E402
+    get_contabilidad_config,
+    factura_a_filas_excel,
+    CONCAR_EXCEL_HEADERS,
 )
 
 
@@ -239,9 +246,157 @@ def _eliminar_fila(req, empresa_id: str) -> None:
 
 
 def _concar(req, empresa_id: str) -> None:
-    """POST JSON — generación de archivo CONCAR. Pendiente de implementación."""
-    del empresa_id  # se usará cuando se implemente
-    return req._json(501, {"error": "Endpoint no implementado aún."})
+    """
+    POST JSON — genera el archivo Excel CONCAR para descarga.
+
+    Body: {proceso_id}
+
+    Lee las facturas validadas de SQLite, resuelve la config contable de
+    la empresa, genera 2-3 filas por factura (DEBE gasto / DEBE IGV / HABER
+    cxp) y construye un .xlsx con openpyxl: filas 1-3 con headers azules
+    (replicando la plantilla CONCAR del usuario), datos desde fila 4.
+
+    Response: binary stream `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`
+    con `Content-Disposition: attachment; filename="CONCAR_<proceso>.xlsx"`.
+    El frontend lo guarda como blob y dispara la descarga.
+    """
+    try:
+        length = int(req.headers.get("Content-Length", 0))
+        if length == 0:
+            return req._json(400, {"error": "Body vacío."})
+
+        try:
+            body = json.loads(req.rfile.read(length))
+        except json.JSONDecodeError:
+            return req._json(400, {"error": "JSON inválido."})
+
+        proceso_id = body.get("proceso_id")
+        if not proceso_id:
+            return req._json(400, {"error": "proceso_id requerido."})
+
+        # 1) Cargar proceso desde SQLite (cross-tenant guard via empresa_id).
+        proceso = get_proceso(proceso_id, empresa_id)
+        if not proceso:
+            return req._json(404, {"error": "Proceso no encontrado o expirado."})
+        facturas = proceso.get("facturas") or []
+        if not facturas:
+            return req._json(400, {"error": "El proceso no tiene facturas."})
+
+        # 2) Cargar config contable de la empresa (sistema_contable + overrides).
+        try:
+            full_config = config_loader.load_full_config(empresa_id)
+        except AirtableError as e:
+            print(f"[facturas/concar] AirtableError config: {e}", file=sys.stderr)
+            full_config = {"empresa": {}}
+        empresa_data = full_config.get("empresa") or {}
+        contab = get_contabilidad_config(empresa_data)
+
+        # 3) Generar todas las filas (cada factura → 2-3 filas).
+        fecha_hoy = datetime.now().strftime("%d/%m/%Y")
+        todas_las_filas: list = []
+        for factura in facturas:
+            todas_las_filas.extend(factura_a_filas_excel(factura, contab, fecha_hoy))
+
+        print(
+            f"[facturas/concar] {proceso_id}: {len(facturas)} facturas → "
+            f"{len(todas_las_filas)} filas en el Excel",
+            file=sys.stderr,
+        )
+
+        # 4) Generar .xlsx con openpyxl. Headers en filas 1-3, datos desde fila 4.
+        try:
+            xlsx_bytes = _generar_xlsx_concar(todas_las_filas)
+        except Exception as e:
+            print(f"[facturas/concar] Error generando xlsx: {e}", file=sys.stderr)
+            return req._json(500, {"error": "Error al generar el Excel."})
+
+        # 5) Stream binary download.
+        filename = f"CONCAR_{proceso_id}.xlsx"
+        req.send_response(200)
+        req.send_header(
+            "Content-Type",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        req.send_header("Content-Disposition", f'attachment; filename="{filename}"')
+        req.send_header("Content-Length", str(len(xlsx_bytes)))
+        req.end_headers()
+        req.wfile.write(xlsx_bytes)
+
+    except Exception as e:
+        print(f"[facturas/concar] Error: {type(e).__name__}: {e}", file=sys.stderr)
+        return req._json(500, {"error": "Error al generar el archivo CONCAR."})
+
+
+def _generar_xlsx_concar(filas: list) -> bytes:
+    """
+    Construye un .xlsx en memoria con:
+      - Fila 1: headers azules (cabecera de columna).
+      - Fila 2: descripciones de validación.
+      - Fila 3: tamaño/formato de cada columna.
+      - Fila 4 en adelante: las filas de datos generadas por
+        factura_a_filas_excel (keys = letras de columna).
+
+    Devuelve el contenido binario del .xlsx listo para servir.
+    """
+    import openpyxl
+    from openpyxl.styles import PatternFill, Font, Alignment
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "CONCAR"
+
+    # Fila 1: nombres de columna con cabecera azul + texto blanco bold.
+    fill_blue   = PatternFill(start_color="4F81BD", end_color="4F81BD", fill_type="solid")
+    fill_yellow = PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid")
+    font_white  = Font(color="FFFFFF", bold=True)
+    font_small  = Font(size=9, italic=True)
+    align_wrap  = Alignment(wrap_text=True, vertical="top")
+
+    for col, header in CONCAR_EXCEL_HEADERS["row1"].items():
+        cell = ws[f"{col}1"]
+        cell.value = header
+        cell.fill = fill_blue
+        cell.font = font_white
+        cell.alignment = align_wrap
+
+    # Fila 2: descripciones de validación (amarillo claro).
+    for col, desc in CONCAR_EXCEL_HEADERS["row2"].items():
+        cell = ws[f"{col}2"]
+        cell.value = desc
+        cell.fill = fill_yellow
+        cell.font = font_small
+        cell.alignment = align_wrap
+
+    # Fila 3: tamaño/formato (texto pequeño en gris).
+    for col, fmt in CONCAR_EXCEL_HEADERS["row3"].items():
+        cell = ws[f"{col}3"]
+        cell.value = fmt
+        cell.font = font_small
+        cell.alignment = align_wrap
+
+    # Filas 4+ : datos.
+    for row_idx, fila in enumerate(filas, start=4):
+        for col_letter, value in fila.items():
+            ws[f"{col_letter}{row_idx}"] = value
+
+    # Anchos razonables para las columnas más comunes.
+    anchos = {
+        "A":  6,  "B": 10, "C": 14, "D": 14, "E": 12,
+        "F": 40,  "G": 14, "H": 12, "I": 16, "J": 14,
+        "K": 14, "L": 18, "M": 16, "N": 12, "O": 14,
+        "P": 14, "Q": 14, "R": 12, "S": 18, "T": 14,
+        "U": 14, "W": 30, "AO": 12,
+    }
+    for col, width in anchos.items():
+        ws.column_dimensions[col].width = width
+
+    # Altura mayor para fila 1 y 2 (headers con texto largo).
+    ws.row_dimensions[1].height = 36
+    ws.row_dimensions[2].height = 60
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
 
 
 _ACTIONS = {
