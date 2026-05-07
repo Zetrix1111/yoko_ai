@@ -1,10 +1,12 @@
-import { useState, useRef, Fragment } from 'react';
+import { useCallback, useState, useRef, Fragment } from 'react';
 import {
   Upload, X, Check, Clock, FileText, Download,
-  ExternalLink, AlertCircle, Loader2, RotateCcw,
+  AlertCircle, Loader2, RotateCcw,
 } from 'lucide-react';
 import ModuleLayout from '../ModuleLayout';
 import { API, postJsonAuth, postFormAuth } from '../../../shared/api';
+import FacturasTable from './components/FacturasTable';
+import useRecuperarSesion from './hooks/useRecuperarSesion';
 import './FacturasInteligentes.css';
 
 // Estados del proceso (mapean al stepper visual)
@@ -248,36 +250,54 @@ function UploadCard({ tipo, setTipo, mes, setMes, files, setFiles, isLoading, on
 // ─────────────────────────────────────
 // Stage 2 — Validation
 // ─────────────────────────────────────
-function ValidationCard({ proceso, isLoading, onConfirm, onReset }) {
+function ValidationCard({ proceso, facturas, setFacturas, errores, isLoading, onConfirm, onReset }) {
+  const numExitosas = facturas?.length || 0;
+  const numFallidas = errores?.length || 0;
+
   return (
     <div className="fact-card">
       <div className="fact-banner fact-banner-success">
         <Check size={20} className="fact-banner-icon" />
         <div>
-          <div className="fact-banner-title">Facturas procesadas correctamente</div>
-          <div>Revisa, corrige y completa la información contable en la hoja de validación. Cuando esté lista, confirma para generar el archivo CONCAR.</div>
+          <div className="fact-banner-title">
+            {numExitosas} factura{numExitosas !== 1 ? 's' : ''} procesada{numExitosas !== 1 ? 's' : ''}
+          </div>
+          <div>
+            Revisa, corrige y completa la información en la tabla. Los cambios se
+            guardan automáticamente. Cuando esté lista, confirma para generar el
+            archivo CONCAR.
+          </div>
         </div>
       </div>
+
+      {numFallidas > 0 && (
+        <div className="fact-banner fact-banner-error">
+          <AlertCircle size={20} className="fact-banner-icon" />
+          <div>
+            <div className="fact-banner-title">
+              {numFallidas} archivo{numFallidas !== 1 ? 's' : ''} no se pudo procesar
+            </div>
+            <div>Revisá los nombres en la consola y subilos de nuevo si hace falta.</div>
+          </div>
+        </div>
+      )}
 
       <StatusList stage={STAGES.VALIDATING} />
 
       <MetaPanel proceso={proceso} />
 
+      <FacturasTable
+        proceso={proceso}
+        facturas={facturas}
+        setFacturas={setFacturas}
+      />
+
       <div className="fact-btn-row">
-        <a
-          className="fact-btn fact-btn-secondary"
-          href={proceso?.sheet_url || '#'}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <ExternalLink size={18} />
-          Abrir hoja de validación
-        </a>
         <button
           type="button"
           className="fact-btn fact-btn-primary"
           onClick={onConfirm}
-          disabled={isLoading}
+          disabled={isLoading || numExitosas === 0}
         >
           {isLoading ? <Loader2 size={18} className="spin" /> : <Check size={18} />}
           Confirmar y generar archivo
@@ -360,14 +380,31 @@ export default function FacturasInteligentesScreen({ user, onOpenModules, onLogo
   const [mes, setMes] = useState(currentMonthValue());
   const [files, setFiles] = useState([]);
   const [proceso, setProceso] = useState(null);
+  const [facturas, setFacturas] = useState([]);
+  const [errores, setErrores] = useState([]);
   const [downloadUrl, setDownloadUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // Recuperación de sesión: si hay backup en localStorage de un proceso
+  // anterior y backend lo confirma, propone al usuario continuar.
+  const handleRecover = useCallback((procesoRestaurado, facturasRestauradas) => {
+    setProceso(procesoRestaurado);
+    setFacturas(facturasRestauradas);
+    setStage(STAGES.VALIDATING);
+  }, []);
+  useRecuperarSesion(handleRecover);
+
   const reset = () => {
+    // Limpiar el backup de localStorage del proceso actual (si lo había).
+    if (proceso?.proceso_id) {
+      try { localStorage.removeItem(`facturas_${proceso.proceso_id}`); } catch { /* ignore */ }
+    }
     setStage(STAGES.UPLOAD);
     setFiles([]);
     setProceso(null);
+    setFacturas([]);
+    setErrores([]);
     setDownloadUrl('');
     setError('');
     setIsLoading(false);
@@ -393,9 +430,11 @@ export default function FacturasInteligentesScreen({ user, onOpenModules, onLogo
 
       setProceso({
         proceso_id: data.proceso_id || `proc-${Date.now()}`,
-        sheet_url:  data.sheet_url  || '#',
         empresa_id: data.empresa_id || '',
+        timestamp:  data.timestamp,
       });
+      setFacturas(data.facturas || []);
+      setErrores(data.errores || []);
       setStage(STAGES.VALIDATING);
     } catch (e) {
       console.error('[facturas/procesar]', e);
@@ -451,6 +490,9 @@ export default function FacturasInteligentesScreen({ user, onOpenModules, onLogo
         {stage === STAGES.VALIDATING && (
           <ValidationCard
             proceso={proceso}
+            facturas={facturas}
+            setFacturas={setFacturas}
+            errores={errores}
             isLoading={isLoading}
             onConfirm={handleConfirmar}
             onReset={reset}
