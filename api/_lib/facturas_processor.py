@@ -69,6 +69,17 @@ def process_single_file(
         ext = (filename.rsplit(".", 1)[-1].lower()) if "." in filename else ""
         prompt = _EXTRACTION_PROMPT_FACTURA
 
+        # XML por ahora no se procesa por OCR — los comprobantes electrónicos
+        # XML tienen estructura posicional bien definida (UBL 2.1 / SUNAT) y
+        # merecen un parser dedicado, no extracción visual. Iteración futura.
+        if ext == "xml":
+            print(
+                f"[facturas_processor] {filename}: XML no soportado por ahora "
+                f"(usa PDF o imagen)",
+                file=sys.stderr,
+            )
+            return None
+
         # ── PDF: tratamiento especial multi-página ──────────────────────
         if ext == "pdf":
             pages = _extract_pdf_pages(file_bytes)

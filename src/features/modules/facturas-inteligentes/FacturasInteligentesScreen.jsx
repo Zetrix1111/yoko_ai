@@ -202,13 +202,13 @@ function UploadCard({ tipo, setTipo, mes, setMes, files, setFiles, isLoading, on
         <div className="fact-dropzone-title">
           Arrastra archivos aquí o haz click para seleccionar
         </div>
-        <div className="fact-dropzone-hint">PDF, XML o imágenes — múltiples archivos permitidos</div>
+        <div className="fact-dropzone-hint">PDF o imágenes — múltiples archivos permitidos</div>
         <input
           ref={inputRef}
           type="file"
           multiple
           hidden
-          accept="application/pdf,application/xml,text/xml,image/*"
+          accept="application/pdf,image/*"
           onChange={onPick}
         />
       </div>
