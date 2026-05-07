@@ -26,7 +26,7 @@ if _PARENT not in sys.path:
 # parse_file.py (Fase 1). No duplicamos lógica de OCR ni el prompt.
 from parse_file import (                                              # noqa: E402
     _extract_via_vision,
-    _extract_from_pdf,
+    _extract_pdf_pages,
     _extract_from_excel,
     _extract_from_docx,
     _text_to_campos,
@@ -52,32 +52,72 @@ def process_single_file(
     filename: str,
     file_bytes: bytes,
     api_key: str,
-) -> Optional[Dict]:
+) -> Optional[List[Dict]]:
     """
-    Procesa un solo archivo y extrae datos de factura.
-    Devuelve dict con campos enriquecidos, o None si no pudo extraer nada
-    (formato no soportado, contenido ilegible, etc.). Errores que sí lanzan
-    excepción se propagan al caller (process_multiple_files los captura).
+    Procesa un solo archivo y extrae datos de factura(s).
+
+    Devuelve una LISTA de dicts (1 o más facturas):
+      - Imagen / Excel / Word / PDF de 1 página → 1 factura.
+      - PDF de N páginas con texto extraíble → N facturas (1 por página).
+      - PDF escaneado → 1 factura (Vision lee solo la 1ra página).
+      - None si no se pudo extraer nada útil.
+
+    Mensajes en stderr indican qué path se tomó para que se pueda inspeccionar
+    el behaviour desde los logs de Vercel.
     """
     try:
         ext = (filename.rsplit(".", 1)[-1].lower()) if "." in filename else ""
         prompt = _EXTRACTION_PROMPT_FACTURA
 
+        # ── PDF: tratamiento especial multi-página ──────────────────────
+        if ext == "pdf":
+            pages = _extract_pdf_pages(file_bytes)
+            paginas_con_texto = sum(1 for p in pages if len(p.strip()) > 30)
+            print(
+                f"[facturas_processor] {filename}: PDF con {len(pages)} página(s), "
+                f"{paginas_con_texto} con texto >30 chars",
+                file=sys.stderr,
+            )
+
+            if paginas_con_texto > 0:
+                # PDF text-nativo (lector PDF, NO Vision). Una factura por página.
+                facturas: List[Dict] = []
+                for i, page_text in enumerate(pages):
+                    if len(page_text.strip()) < 30:
+                        # Página sin contenido útil (separador, blank, etc.)
+                        continue
+                    try:
+                        campos_pagina, _raw = _text_to_campos(page_text, api_key, prompt)
+                        if campos_pagina:
+                            facturas.append(_enrich_factura_data(campos_pagina))
+                    except Exception as page_err:
+                        print(
+                            f"[facturas_processor] {filename} pág {i+1}: {page_err}",
+                            file=sys.stderr,
+                        )
+                        continue
+                print(
+                    f"[facturas_processor] {filename}: {len(facturas)} factura(s) "
+                    f"extraída(s) por lector PDF",
+                    file=sys.stderr,
+                )
+                return facturas if facturas else None
+
+            # PDF escaneado o sin texto → fallback a Vision.
+            print(
+                f"[facturas_processor] {filename}: PDF sin texto, usando Vision",
+                file=sys.stderr,
+            )
+            campos, _raw = _extract_via_vision(
+                file_bytes, "application/pdf", api_key, prompt
+            )
+            return [_enrich_factura_data(campos)] if campos else None
+
+        # ── Resto de formatos: 1 factura por archivo ────────────────────
         campos: Dict = {}
-        # ── Ruteo por extensión (mismo flujo que parse_file.py handler) ──
         if ext in ("jpg", "jpeg", "png", "gif", "webp", "bmp"):
             mime = f"image/{ext if ext != 'jpg' else 'jpeg'}"
             campos, _raw = _extract_via_vision(file_bytes, mime, api_key, prompt)
-
-        elif ext == "pdf":
-            text = _extract_from_pdf(file_bytes)
-            if len(text.strip()) > 100:
-                campos, _raw = _text_to_campos(text, api_key, prompt)
-            else:
-                # PDF escaneado: fallback a Vision sobre el PDF directo.
-                campos, _raw = _extract_via_vision(
-                    file_bytes, "application/pdf", api_key, prompt
-                )
 
         elif ext in ("xlsx", "xls"):
             text = _extract_from_excel(file_bytes)
@@ -97,8 +137,7 @@ def process_single_file(
                 file_bytes, "image/jpeg", api_key, prompt
             )
 
-        # Enriquecer (agrega tipo_doc_codigo, obra_area, estado, confianza float).
-        return _enrich_factura_data(campos)
+        return [_enrich_factura_data(campos)] if campos else None
 
     except Exception as e:
         print(f"[facturas_processor] Error procesando {filename}: {e}", file=sys.stderr)
@@ -180,10 +219,16 @@ def process_multiple_files(
             filename = future_to_filename[future]
             try:
                 result = future.result(timeout=TIMEOUT_PER_FILE)
-                if result:
-                    factura_completa = add_metadata(result, filename, tipo, mes)
-                    facturas_extraidas.append(factura_completa)
-                    print(f"[facturas_processor] OK {filename}", file=sys.stderr)
+                # `result` es una List[Dict] (1+ facturas por archivo).
+                # Un PDF multi-página puede generar N facturas a partir de un solo file.
+                if result and isinstance(result, list) and len(result) > 0:
+                    for factura_campos in result:
+                        factura_completa = add_metadata(factura_campos, filename, tipo, mes)
+                        facturas_extraidas.append(factura_completa)
+                    print(
+                        f"[facturas_processor] OK {filename}: {len(result)} factura(s)",
+                        file=sys.stderr,
+                    )
                 else:
                     archivos_fallidos.append(filename)
                     print(f"[facturas_processor] FAIL {filename} (sin datos)", file=sys.stderr)

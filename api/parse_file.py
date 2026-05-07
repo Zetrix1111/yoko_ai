@@ -260,7 +260,11 @@ def _extract_from_excel(file_bytes: bytes) -> str:
 
 
 def _extract_from_pdf(file_bytes: bytes) -> str:
-    """Extrae texto nativo de un PDF con pdfplumber."""
+    """
+    Extrae texto nativo de un PDF con pdfplumber, concatenando todas las
+    páginas con \\n. Para flujos que necesitan procesar página por página
+    (ej. PDF con múltiples facturas), usar `_extract_pdf_pages`.
+    """
     try:
         import pdfplumber
         with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
@@ -268,6 +272,27 @@ def _extract_from_pdf(file_bytes: bytes) -> str:
         return "\n".join(pages)
     except ImportError:
         return ""
+
+
+def _extract_pdf_pages(file_bytes: bytes) -> list[str]:
+    """
+    Como `_extract_from_pdf` pero devuelve una lista con el texto de cada
+    página por separado. Útil cuando un PDF contiene múltiples documentos
+    independientes (ej. lote de facturas) y queremos procesar cada página
+    como un documento aparte.
+
+    Devuelve [] si pdfplumber no está disponible o si el archivo no se
+    puede abrir.
+    """
+    try:
+        import pdfplumber
+        with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
+            return [page.extract_text() or "" for page in pdf.pages]
+    except ImportError:
+        return []
+    except Exception as e:
+        print(f"[parse_file] _extract_pdf_pages falló: {e}", file=sys.stderr)
+        return []
 
 
 def _extract_from_docx(file_bytes: bytes) -> str:
