@@ -155,14 +155,16 @@ export default function DropdownObras({ value, onChange }) {
       className="cell-select"
     >
       <option value="">Seleccionar obra...</option>
-      {obras.map((o) => {
-        const label = o.obra ? `${o.obra} - ${o.nombre}` : o.nombre;
-        return (
-          <option key={o.id} value={o.nombre}>
-            {label}
-          </option>
-        );
-      })}
+      {obras.map((o) => (
+        // El `value` que persiste es el ID (ej. "CC-53", "9000") — sirve
+        // como código de centro de costo para el siguiente paso (CONCAR).
+        // El label visible en la UI es el campo OBRA (ej. "SATIPO").
+        // El campo NOMBRE OBRA (la descripción larga) lo dejamos como
+        // tooltip para que el usuario pueda confirmar al pasar el mouse.
+        <option key={o.id} value={o.id} title={o.nombre || ''}>
+          {o.obra}
+        </option>
+      ))}
     </select>
   );
 }
