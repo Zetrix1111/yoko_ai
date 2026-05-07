@@ -39,3 +39,6 @@ __pycache__/
 .env
 .env.local
 .env.*.local
+
+# Claude Code local settings (per-developer permissions, not portable)
+.claude/
