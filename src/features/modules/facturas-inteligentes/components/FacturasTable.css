@@ -1,0 +1,181 @@
+.facturas-table-container {
+  margin: 24px 0;
+  background: var(--md-surface-container-low, #f5f5f5);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.facturas-table-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  color: var(--md-on-surface-variant, #666);
+}
+
+.facturas-table-empty p {
+  margin-top: 16px;
+  font-size: 16px;
+}
+
+.facturas-table-wrapper {
+  overflow-x: auto;
+  max-height: 600px;
+  overflow-y: auto;
+  border-radius: 8px;
+}
+
+.facturas-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 14px;
+  min-width: 1400px;
+}
+
+.facturas-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--md-surface-container, #e8e8e8);
+}
+
+.facturas-table th {
+  padding: 12px 8px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--md-on-surface, #1a1a1a);
+  border-bottom: 2px solid var(--md-outline-variant, #ccc);
+  white-space: nowrap;
+}
+
+.facturas-table td {
+  padding: 8px;
+  border-bottom: 1px solid var(--md-outline-variant, #e0e0e0);
+  vertical-align: middle;
+}
+
+.factura-row {
+  transition: background-color 0.2s;
+}
+
+.factura-row:hover {
+  background: var(--md-surface-container, #f0f0f0);
+}
+
+/* Indicadores de confianza ─────────────────────────────────────── */
+.confidence-high   { border-left: 3px solid #4caf50; }
+.confidence-medium { border-left: 3px solid #ff9800; }
+.confidence-low    { border-left: 3px solid #f44336; }
+
+/* Celdas editables ─────────────────────────────────────────────── */
+.cell-display {
+  padding: 6px 8px;
+  min-height: 32px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.cell-display:hover,
+.cell-display:focus {
+  background: rgba(0, 0, 0, 0.05);
+  outline: none;
+}
+
+.cell-display.empty {
+  color: var(--md-on-surface-variant, #888);
+  font-style: italic;
+}
+
+.cell-input,
+.cell-select {
+  width: 100%;
+  padding: 6px 8px;
+  border: 2px solid var(--md-primary, #1976d2);
+  border-radius: 4px;
+  background: white;
+  color: var(--md-on-surface, #1a1a1a);
+  font-size: 14px;
+  outline: none;
+}
+
+/* Anchos de columnas ──────────────────────────────────────────── */
+.col-fecha     { min-width: 110px; }
+.col-tipo      { min-width: 140px; }
+.col-serie     { min-width:  80px; }
+.col-numero    { min-width: 100px; }
+.col-ruc       { min-width: 120px; }
+.col-proveedor { min-width: 200px; }
+.col-concepto  { min-width: 250px; }
+.col-moneda    { min-width:  90px; }
+.col-monto     { min-width: 120px; }
+.col-tributo   { min-width: 120px; }
+.col-obra      { min-width: 180px; }
+.col-estado    { min-width: 180px; }
+.col-actions   { width: 80px; text-align: center; }
+
+/* Badge de estado ─────────────────────────────────────────────── */
+.estado-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  background: var(--md-secondary-container, #e3f2fd);
+  color: var(--md-on-secondary-container, #0d47a1);
+  border-radius: 12px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* Botón eliminar + warning ────────────────────────────────────── */
+.btn-delete-row {
+  background: transparent;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  color: #f44336;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+.btn-delete-row:hover {
+  opacity: 1;
+}
+
+.warning-icon {
+  color: #f44336;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+/* Footer ──────────────────────────────────────────────────────── */
+.facturas-table-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--md-outline-variant, #e0e0e0);
+  font-size: 14px;
+  color: var(--md-on-surface-variant, #666);
+}
+
+.facturas-count {
+  font-weight: 600;
+}
+
+.facturas-autosave {
+  color: #4caf50;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Responsive ──────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .facturas-table { font-size: 12px; }
+  .facturas-table th,
+  .facturas-table td { padding: 6px 4px; }
+  .col-concepto  { min-width: 150px; }
+  .col-proveedor { min-width: 150px; }
+}
