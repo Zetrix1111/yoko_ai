@@ -53,11 +53,12 @@ _REQUIRED_ENV = (
 )
 
 # Mapeo nombre del custom tool → action en /api/facturas. Si un tool nuevo
-# aparece, agregar acá y crear la action en facturas.py.
+# aparece, agregar acá y crear la action en facturas.py. Tiene que coincidir
+# con `ALL_TOOLS` de `_yoko_agents/tools/__init__.py`.
 _TOOL_TO_ACTION: dict[str, str] = {
-    "yoko_procesar_archivos": "procesar-chat",
-    "yoko_generar_excel":     "download-chat",
-    "yoko_recuperar_proceso": "recuperar-chat",
+    "yoko_procesar_archivos":         "procesar-chat",
+    "yoko_generar_registro_contable": "registro-contable-chat",
+    # "yoko_recuperar_proceso":       "recuperar-chat",  # uso futuro
 }
 
 # Vault es por empresa. Hoy hardcodeamos cmejia; cuando se sumen más empresas,

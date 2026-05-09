@@ -6,29 +6,31 @@ solo dispatcher por `?action=` y método HTTP libre (cada action sabe
 qué método espera y parsea el body acorde).
 
 Acciones del flujo web (UI clásica):
-  POST   /api/facturas?action=procesar      → multipart, procesa N archivos
-  PUT    /api/facturas?action=actualizar    → JSON, auto-save de ediciones
-  GET    /api/facturas?action=recuperar     → ?proceso_id=…, recupera proceso
-  DELETE /api/facturas?action=eliminar-fila → JSON, borra una factura
-  POST   /api/facturas?action=concar        → genera y descarga el Excel CONCAR
+  POST   /api/facturas?action=procesar       → multipart, procesa N archivos
+  PUT    /api/facturas?action=actualizar     → JSON, auto-save de ediciones
+  GET    /api/facturas?action=recuperar      → ?proceso_id=…, recupera proceso
+  DELETE /api/facturas?action=eliminar-fila  → JSON, borra una factura
+  POST   /api/facturas?action=concar         → genera y descarga el Excel del registro
+                                                contable (CONCAR/SISCONT/etc. según
+                                                Config_Empresa.basicos.sistema_contable)
 
 Acciones consumidas por el agent (Anthropic Managed Agents → custom tools):
-  POST   /api/facturas?action=procesar-chat   → JSON+base64, equivalente a procesar
-  POST   /api/facturas?action=recuperar-chat  → JSON {proceso_id}, equivalente a recuperar
-  POST   /api/facturas?action=download-chat   → JSON {proceso_id}, alias de concar
+  POST   /api/facturas?action=procesar-chat          → JSON+base64, equivalente a procesar
+  POST   /api/facturas?action=recuperar-chat         → JSON {proceso_id}, equivalente a recuperar
+  POST   /api/facturas?action=registro-contable-chat → JSON {proceso_id}, validación liviana
+                                                        para que el agent confirme que el
+                                                        archivo está listo (no devuelve bytes).
 
 Todas validan JWT en el dispatcher; `empresa_id` se extrae del token.
 """
 
 import base64
 import cgi
-import io
 import json
 import os
 import sys
 import time
 import uuid
-from datetime import datetime
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 
@@ -37,9 +39,8 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 
-from _lib import auth, config_loader                                 # noqa: E402
+from _lib import auth                                                # noqa: E402
 from _lib.auth import AuthError                                      # noqa: E402
-from _lib.airtable_client import AirtableError                       # noqa: E402
 from _lib.facturas_processor import process_multiple_files           # noqa: E402
 from _lib.db_manager import (                                        # noqa: E402
     init_db,
@@ -48,11 +49,7 @@ from _lib.db_manager import (                                        # noqa: E40
     update_factura,
     delete_factura,
 )
-from _lib.contabilidad import (                                      # noqa: E402
-    get_contabilidad_config,
-    factura_a_filas_excel,
-    CONCAR_EXCEL_HEADERS,
-)
+from _lib.registro_contable import engine as registro_contable_engine  # noqa: E402
 
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -253,18 +250,21 @@ def _eliminar_fila(req, empresa_id: str) -> None:
 
 def _concar(req, empresa_id: str) -> None:
     """
-    POST JSON — genera el archivo Excel CONCAR para descarga.
+    POST JSON — genera el Excel del registro contable para descarga.
 
     Body: {proceso_id}
 
-    Lee las facturas validadas de SQLite, resuelve la config contable de
-    la empresa, genera 2-3 filas por factura (DEBE gasto / DEBE IGV / HABER
-    cxp) y construye un .xlsx con openpyxl: filas 1-3 con headers azules
-    (replicando la plantilla CONCAR del usuario), datos desde fila 4.
+    Wrapper delgado sobre `registro_contable.engine.generate()`. El motor
+    resuelve qué template usar según `Config_Empresa.basicos.sistema_contable`
+    (CONCAR hoy; SISCONT/etc. cuando se sumen templates) y devuelve los bytes.
 
     Response: binary stream `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`
-    con `Content-Disposition: attachment; filename="CONCAR_<proceso>.xlsx"`.
+    con `Content-Disposition: attachment; filename="REGISTRO_<proceso>.xlsx"`.
     El frontend lo guarda como blob y dispara la descarga.
+
+    El nombre de la action se mantiene como `concar` por compat con el
+    botón "Descargar Excel CONCAR" del frontend; el archivo en sí ya no es
+    necesariamente CONCAR.
     """
     try:
         length = int(req.headers.get("Content-Length", 0))
@@ -280,129 +280,33 @@ def _concar(req, empresa_id: str) -> None:
         if not proceso_id:
             return req._json(400, {"error": "proceso_id requerido."})
 
-        # 1) Cargar proceso desde SQLite (cross-tenant guard via empresa_id).
-        proceso = get_proceso(proceso_id, empresa_id)
-        if not proceso:
-            return req._json(404, {"error": "Proceso no encontrado o expirado."})
-        facturas = proceso.get("facturas") or []
-        if not facturas:
-            return req._json(400, {"error": "El proceso no tiene facturas."})
-
-        # 2) Cargar config contable de la empresa (sistema_contable + overrides).
         try:
-            full_config = config_loader.load_full_config(empresa_id)
-        except AirtableError as e:
-            print(f"[facturas/concar] AirtableError config: {e}", file=sys.stderr)
-            full_config = {"empresa": {}}
-        empresa_data = full_config.get("empresa") or {}
-        contab = get_contabilidad_config(empresa_data)
-
-        # 3) Generar todas las filas (cada factura → 2-3 filas).
-        fecha_hoy = datetime.now().strftime("%d/%m/%Y")
-        todas_las_filas: list = []
-        for factura in facturas:
-            todas_las_filas.extend(factura_a_filas_excel(factura, contab, fecha_hoy))
+            out = registro_contable_engine.generate(proceso_id, empresa_id)
+        except ValueError as e:
+            # Proceso inexistente, sin facturas, o sistema_contable no soportado.
+            status = 404 if "no encontrado" in str(e).lower() else 400
+            return req._json(status, {"error": str(e)})
+        except Exception as e:
+            print(f"[facturas/concar] Error generando xlsx: {type(e).__name__}: {e}", file=sys.stderr)
+            return req._json(500, {"error": "Error al generar el Excel."})
 
         print(
-            f"[facturas/concar] {proceso_id}: {len(facturas)} facturas → "
-            f"{len(todas_las_filas)} filas en el Excel",
+            f"[facturas/concar] {proceso_id} sistema={out['sistema']}: "
+            f"{out['num_facturas']} facturas → {out['num_filas']} filas",
             file=sys.stderr,
         )
 
-        # 4) Generar .xlsx con openpyxl. Headers en filas 1-3, datos desde fila 4.
-        try:
-            xlsx_bytes = _generar_xlsx_concar(todas_las_filas)
-        except Exception as e:
-            print(f"[facturas/concar] Error generando xlsx: {e}", file=sys.stderr)
-            return req._json(500, {"error": "Error al generar el Excel."})
-
-        # 5) Stream binary download.
-        filename = f"CONCAR_{proceso_id}.xlsx"
+        xlsx_bytes = out["content"]
         req.send_response(200)
-        req.send_header(
-            "Content-Type",
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        )
-        req.send_header("Content-Disposition", f'attachment; filename="{filename}"')
+        req.send_header("Content-Type", out["content_type"])
+        req.send_header("Content-Disposition", f'attachment; filename="{out["filename"]}"')
         req.send_header("Content-Length", str(len(xlsx_bytes)))
         req.end_headers()
         req.wfile.write(xlsx_bytes)
 
     except Exception as e:
         print(f"[facturas/concar] Error: {type(e).__name__}: {e}", file=sys.stderr)
-        return req._json(500, {"error": "Error al generar el archivo CONCAR."})
-
-
-def _generar_xlsx_concar(filas: list) -> bytes:
-    """
-    Construye un .xlsx en memoria con:
-      - Fila 1: headers azules (cabecera de columna).
-      - Fila 2: descripciones de validación.
-      - Fila 3: tamaño/formato de cada columna.
-      - Fila 4 en adelante: las filas de datos generadas por
-        factura_a_filas_excel (keys = letras de columna).
-
-    Devuelve el contenido binario del .xlsx listo para servir.
-    """
-    import openpyxl
-    from openpyxl.styles import PatternFill, Font, Alignment
-
-    wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.title = "CONCAR"
-
-    # Fila 1: nombres de columna con cabecera azul + texto blanco bold.
-    fill_blue   = PatternFill(start_color="4F81BD", end_color="4F81BD", fill_type="solid")
-    fill_yellow = PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid")
-    font_white  = Font(color="FFFFFF", bold=True)
-    font_small  = Font(size=9, italic=True)
-    align_wrap  = Alignment(wrap_text=True, vertical="top")
-
-    for col, header in CONCAR_EXCEL_HEADERS["row1"].items():
-        cell = ws[f"{col}1"]
-        cell.value = header
-        cell.fill = fill_blue
-        cell.font = font_white
-        cell.alignment = align_wrap
-
-    # Fila 2: descripciones de validación (amarillo claro).
-    for col, desc in CONCAR_EXCEL_HEADERS["row2"].items():
-        cell = ws[f"{col}2"]
-        cell.value = desc
-        cell.fill = fill_yellow
-        cell.font = font_small
-        cell.alignment = align_wrap
-
-    # Fila 3: tamaño/formato (texto pequeño en gris).
-    for col, fmt in CONCAR_EXCEL_HEADERS["row3"].items():
-        cell = ws[f"{col}3"]
-        cell.value = fmt
-        cell.font = font_small
-        cell.alignment = align_wrap
-
-    # Filas 4+ : datos.
-    for row_idx, fila in enumerate(filas, start=4):
-        for col_letter, value in fila.items():
-            ws[f"{col_letter}{row_idx}"] = value
-
-    # Anchos razonables para las columnas más comunes.
-    anchos = {
-        "A":  6,  "B": 10, "C": 14, "D": 14, "E": 12,
-        "F": 40,  "G": 14, "H": 12, "I": 16, "J": 14,
-        "K": 14, "L": 18, "M": 16, "N": 12, "O": 14,
-        "P": 14, "Q": 14, "R": 12, "S": 18, "T": 14,
-        "U": 14, "W": 30, "AO": 12,
-    }
-    for col, width in anchos.items():
-        ws.column_dimensions[col].width = width
-
-    # Altura mayor para fila 1 y 2 (headers con texto largo).
-    ws.row_dimensions[1].height = 36
-    ws.row_dimensions[2].height = 60
-
-    buf = io.BytesIO()
-    wb.save(buf)
-    return buf.getvalue()
+        return req._json(500, {"error": "Error al generar el archivo."})
 
 
 def _procesar_chat(req, empresa_id: str) -> None:
@@ -538,6 +442,55 @@ def _recuperar_chat(req, empresa_id: str) -> None:
         return req._json(500, {"error": "Error al recuperar proceso."})
 
 
+def _registro_contable_chat(req, empresa_id: str) -> None:
+    """
+    POST JSON — validación liviana del registro contable. Invocado por el
+    custom tool `yoko_generar_registro_contable` del agent.
+
+    NO genera bytes. Solo verifica que el proceso esté listo para ser
+    descargado desde la UI web (existe, tiene facturas, su sistema_contable
+    resuelve a un template registrado) y devuelve metadata para que el
+    agent confirme al usuario que el archivo está disponible.
+
+    Body:     {"proceso_id": "..."}
+    Response: {ok, sistema, num_facturas, num_filas_estimado, mensaje}
+    """
+    try:
+        length = int(req.headers.get("Content-Length", 0))
+        if length == 0:
+            return req._json(400, {"error": "Body vacío."})
+        try:
+            body = json.loads(req.rfile.read(length))
+        except json.JSONDecodeError:
+            return req._json(400, {"error": "JSON inválido."})
+
+        proceso_id = body.get("proceso_id")
+        if not proceso_id:
+            return req._json(400, {"error": "proceso_id requerido."})
+
+        try:
+            out = registro_contable_engine.validate(proceso_id, empresa_id)
+        except ValueError as e:
+            status = 404 if "no encontrado" in str(e).lower() else 400
+            return req._json(status, {"error": str(e)})
+
+        return req._json(200, {
+            "ok":                 out["ok"],
+            "proceso_id":         proceso_id,
+            "sistema":            out["sistema"],
+            "num_facturas":       out["num_facturas"],
+            "num_filas_estimado": out["num_filas_estimado"],
+            "mensaje": (
+                "El registro contable está listo. El usuario puede descargar "
+                "el archivo desde la pantalla Facturas Inteligentes."
+            ),
+        })
+
+    except Exception as e:
+        print(f"[facturas/registro-contable-chat] Error: {type(e).__name__}: {e}", file=sys.stderr)
+        return req._json(500, {"error": "Error al validar el registro contable."})
+
+
 _ACTIONS = {
     # Flujo web (UI clásica)
     "procesar":      _procesar,
@@ -546,9 +499,9 @@ _ACTIONS = {
     "eliminar-fila": _eliminar_fila,
     "concar":        _concar,
     # Flujo chat (Anthropic Managed Agents → custom tools)
-    "procesar-chat":  _procesar_chat,
-    "recuperar-chat": _recuperar_chat,
-    "download-chat":  _concar,   # alias: misma lógica que ?action=concar
+    "procesar-chat":          _procesar_chat,
+    "recuperar-chat":         _recuperar_chat,
+    "registro-contable-chat": _registro_contable_chat,
 }
 
 
