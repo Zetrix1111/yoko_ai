@@ -126,6 +126,43 @@ def handle_post(req) -> None:
             print(f"[chat/managed] KV get_session_id: {e}", file=sys.stderr)
             session_id = None
 
+        # 7a) Si la session viene del cache, validar que siga viva en
+        # Anthropic. Si fue archivada/terminada/eliminada manualmente desde
+        # el Console, el cache KV todavía apunta a ella pero los POSTs
+        # fallarán. Detectarlo acá y forzar nueva sesión es más limpio que
+        # dejar que falle el _run_turn más abajo.
+        if session_id is not None:
+            try:
+                info = mac.get_session(session_id)
+            except mac.ManagedAgentsError as e:
+                print(
+                    f"[chat/managed] no pude validar session {session_id}: {e}",
+                    file=sys.stderr,
+                )
+                info = None
+
+            if not _is_session_alive(info):
+                print(
+                    f"[chat/managed] session cacheada {session_id} no usable "
+                    f"(status={(info or {}).get('status')!r}, "
+                    f"archived_at={(info or {}).get('archived_at')!r}); "
+                    "descartando y creando una nueva.",
+                    file=sys.stderr,
+                )
+                try:
+                    yoko_session_store.force_new_session(empresa_id, user_id)
+                except Exception as e:
+                    print(
+                        f"[chat/managed] force_new_session falló: {e}",
+                        file=sys.stderr,
+                    )
+                # Limpiamos el carrito huérfano de la session muerta.
+                try:
+                    yoko_cart_store.clear_cart(session_id)
+                except Exception:
+                    pass
+                session_id = None
+
         is_new_session = session_id is None
         if is_new_session:
             try:
@@ -257,6 +294,28 @@ def handle_post(req) -> None:
 # ─────────────────────────────────────────────────────────────────────────
 # Helpers
 # ─────────────────────────────────────────────────────────────────────────
+
+def _is_session_alive(info: dict | None) -> bool:
+    """
+    Decide si una session devuelta por mac.get_session sigue siendo usable.
+
+    `info` es None si el GET devolvió 404 (session inexistente), o un dict
+    con `status` y opcionalmente `archived_at`. Estados terminales:
+      - status `terminated`: error irrecuperable.
+      - `archived_at` no null: archivada (manualmente desde el Console o
+        por API). Acepta lecturas pero rechaza POST de events.
+
+    Estados vivos: `idle`, `running`, `rescheduling`.
+    """
+    if not info or not isinstance(info, dict):
+        return False
+    if info.get("archived_at"):
+        return False
+    status = (info.get("status") or "").lower()
+    if status in ("terminated",):
+        return False
+    return True
+
 
 def _last_user_content(messages: list) -> str:
     """Devuelve el content del último mensaje con role='user' o ''."""
