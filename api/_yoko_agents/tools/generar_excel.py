@@ -7,6 +7,7 @@ el orquestador llamando a `POST /api/facturas?action=download-chat`.
 """
 
 TOOL_DEFINITION: dict = {
+    "type": "custom",
     "name": "yoko_generar_excel",
     "description": (
         "Genera el Excel del registro de compras/ventas en el formato contable "

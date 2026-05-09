@@ -7,6 +7,7 @@ orquestador llamando a `POST /api/facturas?action=procesar-chat`.
 """
 
 TOOL_DEFINITION: dict = {
+    "type": "custom",
     "name": "yoko_procesar_archivos",
     "description": (
         "Procesa comprobantes de pago peruanos (factura, boleta, NC, ND, RH, "

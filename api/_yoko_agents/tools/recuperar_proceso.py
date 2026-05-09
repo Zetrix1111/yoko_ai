@@ -7,6 +7,7 @@ totales, alertas). Lo ejecuta el orquestador llamando a
 """
 
 TOOL_DEFINITION: dict = {
+    "type": "custom",
     "name": "yoko_recuperar_proceso",
     "description": (
         "Consulta los detalles de un proceso ya creado (estado, facturas "
