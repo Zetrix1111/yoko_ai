@@ -385,14 +385,25 @@ def _procesar_chat(req, empresa_id: str) -> None:
         )
         save_proceso(proceso_id, empresa_id, resultado["facturas"])
 
+        revision_marker = f"[ABRIR_REVISION:{proceso_id}]"
+
         return req._json(200, {
-            "ok":         True,
-            "proceso_id": proceso_id,
-            "empresa_id": empresa_id,
-            "facturas":   resultado["facturas"],
-            "errores":    resultado["errores"],
-            "alertas":    [],
-            "timestamp":  time.time(),
+            "ok":              True,
+            "proceso_id":      proceso_id,
+            "empresa_id":      empresa_id,
+            "facturas":        resultado["facturas"],
+            "errores":         resultado["errores"],
+            "alertas":         [],
+            "timestamp":       time.time(),
+            "revision_marker": revision_marker,
+            "mensaje_revision": (
+                f"El usuario puede revisar y editar los "
+                f"{len(resultado['facturas'])} comprobantes extraídos en la "
+                f"pantalla web. Para que aparezca el botón clickeable en el "
+                f"chat, INCLUÍ al final de tu respuesta esta línea EXACTA, "
+                f"sin modificarla, sin envolverla en código, sin emojis "
+                f"pegados ni paréntesis: {revision_marker}"
+            ),
         })
 
     except ValueError as e:

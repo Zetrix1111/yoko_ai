@@ -40,7 +40,7 @@ import urllib.request
 
 from _lib import auth, session
 from _lib import managed_agents_client as mac
-from _lib import yoko_context_builder, yoko_session_store
+from _lib import yoko_cart_store, yoko_context_builder, yoko_session_store
 from _lib.airtable_client import AirtableError
 from _lib.auth import AuthError
 
@@ -114,33 +114,7 @@ def handle_post(req) -> None:
         if attachments and not isinstance(attachments, list):
             return req._json(400, {"error": "attachments debe ser una lista."})
 
-        if attachments:
-            # Hint para el agent: explicito que los archivos llegan via tool
-            # injection, NO via filesystem. Sin esto el agent (que tiene
-            # contexto de Claude Code) puede intentar `bash ls /mnt/...`
-            # buscando los uploads.
-            nombres = ", ".join(
-                (a.get("filename") or "archivo") for a in attachments[:5]
-            )
-            if len(attachments) > 5:
-                nombres += f", ... y {len(attachments) - 5} más"
-            msg_adjuntos = (
-                f"[SISTEMA] El usuario adjuntó {len(attachments)} archivo(s): "
-                f"{nombres}. IMPORTANTE: vos NO ves el contenido binario de "
-                f"estos archivos directamente, NI están en ningún path del "
-                f"filesystem. NO uses bash ni intentes leer rutas. Cuando el "
-                f"usuario pida procesarlos, llamá la herramienta "
-                f"`yoko_procesar_archivos` con `tipo` y `mes` — los archivos "
-                f"se inyectan automáticamente en la llamada por el "
-                f"orquestador. Mientras tanto, seguí el flujo del skill "
-                f"yoko-facturas (confirmar recepción tipo \"Listo (N). ¿Más "
-                f"comprobantes?\")."
-            )
-            last_user_content = (
-                f"{last_user_content}\n\n{msg_adjuntos}" if last_user_content else msg_adjuntos
-            )
-
-        if not last_user_content:
+        if not last_user_content and not attachments:
             return req._json(400, {"error": "No hay mensaje del usuario."})
 
         # 7) Get-or-create session (cacheada en KV)
@@ -185,7 +159,9 @@ def handle_post(req) -> None:
             # En el primer turno, prependemos el contexto de empresa al
             # mensaje del usuario para que el agent lo lea sin gastar una
             # corrida solo para procesar el contexto.
-            last_user_content = f"{contexto}\n\n{last_user_content}"
+            last_user_content = (
+                f"{contexto}\n\n{last_user_content}" if last_user_content else contexto
+            )
 
             print(
                 f"[chat/managed] session NUEVA {session_id} para "
@@ -199,6 +175,63 @@ def handle_post(req) -> None:
                 file=sys.stderr,
             )
 
+        # 7b) Persistir adjuntos al carrito KV (y armar hint para el agent
+        # con el TOTAL acumulado del carrito, no solo los de esta request).
+        if attachments:
+            try:
+                yoko_cart_store.add_files(session_id, attachments)
+            except Exception as e:
+                print(
+                    f"[chat/managed] cart_store.add_files falló: {e}",
+                    file=sys.stderr,
+                )
+                return req._json(502, {"error": "Error guardando los adjuntos."})
+
+        try:
+            total_carrito = yoko_cart_store.cart_size(session_id)
+        except Exception as e:
+            print(f"[chat/managed] cart_size falló: {e}", file=sys.stderr)
+            total_carrito = 0
+
+        if attachments:
+            nombres = ", ".join(
+                (a.get("filename") or "archivo") for a in attachments[:5]
+            )
+            if len(attachments) > 5:
+                nombres += f", ... y {len(attachments) - 5} más"
+            msg_adjuntos = (
+                f"[SISTEMA] El usuario adjuntó {len(attachments)} archivo(s) "
+                f"en este turno: {nombres}. Total acumulado en el carrito: "
+                f"{total_carrito}. IMPORTANTE: vos NO ves el contenido binario "
+                f"de estos archivos directamente, NI están en ningún path del "
+                f"filesystem. NO uses bash ni intentes leer rutas. Cuando el "
+                f"usuario pida procesarlos, llamá la herramienta "
+                f"`yoko_procesar_archivos` con `tipo` y `mes` — los archivos "
+                f"se inyectan automáticamente en la llamada por el "
+                f"orquestador. Mientras tanto, seguí el flujo del skill "
+                f"yoko-facturas (confirmar recepción tipo \"Listo (N). ¿Más "
+                f"comprobantes?\")."
+            )
+            last_user_content = (
+                f"{last_user_content}\n\n{msg_adjuntos}"
+                if last_user_content
+                else msg_adjuntos
+            )
+        elif total_carrito > 0:
+            # No hay attachments en esta request pero el carrito tiene archivos
+            # de turnos previos. Recordarle al agent que están disponibles.
+            msg_carrito = (
+                f"[SISTEMA] Hay {total_carrito} archivo(s) acumulados en el "
+                f"carrito desde turnos anteriores. Si el usuario pide procesar, "
+                f"llamá `yoko_procesar_archivos` y los archivos se inyectan "
+                f"automáticamente."
+            )
+            last_user_content = (
+                f"{last_user_content}\n\n{msg_carrito}"
+                if last_user_content
+                else msg_carrito
+            )
+
         # 8) Conversación: stream + posibles tool_uses.
         auth_header = req.headers.get("Authorization") or ""
         try:
@@ -206,7 +239,6 @@ def handle_post(req) -> None:
                 session_id=session_id,
                 user_content=last_user_content,
                 auth_header=auth_header,
-                attachments=attachments,
             )
         except mac.ManagedAgentsError as e:
             print(f"[chat/managed] Error en agent loop: {e}", file=sys.stderr)
@@ -249,7 +281,6 @@ def _run_turn(
     session_id: str,
     user_content: str,
     auth_header: str,
-    attachments: list[dict] | None = None,
 ) -> str:
     """
     Ejecuta un turno completo del agent:
@@ -257,6 +288,10 @@ def _run_turn(
       2. POST user.message.
       3. Lee eventos hasta `session.status_idle` con stop_reason `end_turn`,
          resolviendo cualquier `requires_action` con custom tools en el medio.
+
+    Los archivos para `yoko_procesar_archivos` se leen del carrito KV
+    (`yoko_cart_store.get_files(session_id)`) en el momento de invocar el
+    tool. Tras un éxito (`ok=True`), el carrito se vacía.
 
     Devuelve el texto final acumulado del assistant.
     """
@@ -342,8 +377,26 @@ def _run_turn(
                     tool_name = pending["name"]
                     tool_input = dict(pending["input"] or {})
 
-                    if tool_name == "yoko_procesar_archivos" and attachments:
-                        tool_input["files"] = attachments
+                    # Inyectar archivos desde el carrito KV cuando el agent
+                    # invoca yoko_procesar_archivos. El carrito se persiste
+                    # cross-turn en handle_post; acá lo leemos y, tras un
+                    # procesamiento exitoso, lo vaciamos.
+                    if tool_name == "yoko_procesar_archivos":
+                        try:
+                            cart_files = yoko_cart_store.get_files(session_id)
+                        except Exception as e:
+                            print(
+                                f"[chat/managed] cart_store.get_files falló: {e}",
+                                file=sys.stderr,
+                            )
+                            cart_files = []
+                        if cart_files:
+                            tool_input["files"] = cart_files
+                            print(
+                                f"[chat/managed] inyectados {len(cart_files)} "
+                                f"archivos del carrito en yoko_procesar_archivos",
+                                file=sys.stderr,
+                            )
 
                     action = _TOOL_TO_ACTION.get(tool_name)
                     if not action:
@@ -354,6 +407,27 @@ def _run_turn(
                         )
                     else:
                         result = _exec_local_tool(action, tool_input, auth_header)
+
+                    # Si yoko_procesar_archivos terminó OK, vaciar el carrito.
+                    # Si falló, NO vaciamos: el usuario puede reintentar sin
+                    # tener que re-subir los PDFs.
+                    if (
+                        tool_name == "yoko_procesar_archivos"
+                        and isinstance(result, dict)
+                        and result.get("ok") is True
+                    ):
+                        try:
+                            cleared = yoko_cart_store.clear_cart(session_id)
+                            print(
+                                f"[chat/managed] carrito vaciado tras éxito: "
+                                f"{cleared} archivo(s)",
+                                file=sys.stderr,
+                            )
+                        except Exception as e:
+                            print(
+                                f"[chat/managed] cart_store.clear_cart falló: {e}",
+                                file=sys.stderr,
+                            )
 
                     mac.submit_custom_tool_result(session_id, eid, result)
                 # Seguir leyendo el stream: la session vuelve a `running`.

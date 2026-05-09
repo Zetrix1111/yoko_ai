@@ -67,6 +67,10 @@ export const MODULES = [
     name: 'Facturas Inteligentes (BETA)',
     Icon: FileText,
     iconClass: 'invoice',
+    submenus: [
+      { id: 'inicio',   label: 'Dashboard',              Icon: LayoutDashboard },
+      { id: 'revision', label: 'Revisión de extracción', Icon: Receipt },
+    ],
   },
   {
     id: 'configuracion-empresa',
