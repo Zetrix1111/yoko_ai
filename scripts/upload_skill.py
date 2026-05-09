@@ -120,38 +120,20 @@ def _collect_skill_files(skill_dir: Path) -> list[tuple[str, bytes, str]]:
     return out
 
 
-def upload_skill(skill_dir: Path, display_title: str | None = None) -> dict:
-    """
-    Sube el skill al endpoint POST /v1/skills (multipart). Devuelve el dict de
-    respuesta con `id`, `display_title`, `latest_version`, etc.
-    """
+def _api_request(method: str, path: str, body: bytes | None, content_type: str | None) -> dict:
+    """Wrapper urllib genérico para la Skills API. Devuelve JSON parseado."""
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
         raise RuntimeError("Falta ANTHROPIC_API_KEY en el entorno.")
 
-    files = _collect_skill_files(skill_dir)
-    title = (display_title or skill_dir.name).strip()
-    if not title:
-        raise ValueError("display_title vacío; pasá --title o renombrá la carpeta.")
-
-    multipart_files: list[tuple[str, str, bytes, str]] = [
-        ("files[]", filename, content, ctype) for (filename, content, ctype) in files
-    ]
-    body, content_type = _build_multipart(
-        fields=[("display_title", title)],
-        files=multipart_files,
-    )
-
-    req = urllib.request.Request(
-        f"{_API_URL_BASE}/v1/skills",
-        data=body,
-        method="POST",
-    )
+    req = urllib.request.Request(f"{_API_URL_BASE}{path}", data=body, method=method)
     req.add_header("x-api-key", api_key)
     req.add_header("anthropic-version", _API_VERSION)
     req.add_header("anthropic-beta", _BETA_HEADER)
-    req.add_header("Content-Type", content_type)
-    req.add_header("Content-Length", str(len(body)))
+    if content_type:
+        req.add_header("Content-Type", content_type)
+    if body is not None:
+        req.add_header("Content-Length", str(len(body)))
 
     try:
         with urllib.request.urlopen(req, timeout=60) as res:
@@ -164,10 +146,80 @@ def upload_skill(skill_dir: Path, display_title: str | None = None) -> dict:
         except Exception:
             pass
         raise RuntimeError(
-            f"HTTP {e.code} subiendo skill: {err_body[:500]}"
+            f"HTTP {e.code} en {method} {path}: {err_body[:500]}"
         ) from e
     except urllib.error.URLError as e:
-        raise RuntimeError(f"Error de red subiendo skill: {e}") from e
+        raise RuntimeError(f"Error de red en {method} {path}: {e}") from e
+
+
+def _find_existing_skill(display_title: str) -> dict | None:
+    """
+    Busca un skill custom con el `display_title` indicado vía GET /v1/skills.
+    Devuelve el dict del skill (con `id`, `latest_version`) o None.
+    Pagina si la API devuelve más de una página.
+    """
+    path = f"/v1/skills?source=custom"
+    while path:
+        res = _api_request("GET", path, body=None, content_type=None)
+        for skill in res.get("data", []) or []:
+            if skill.get("display_title") == display_title:
+                return skill
+        # Paginación opcional (si la API la implementa via has_more / last_id).
+        if not res.get("has_more"):
+            break
+        last_id = res.get("last_id") or (res.get("data", [])[-1].get("id") if res.get("data") else None)
+        if not last_id:
+            break
+        path = f"/v1/skills?source=custom&after_id={urllib.parse.quote(last_id)}"
+    return None
+
+
+def upload_skill(skill_dir: Path, display_title: str | None = None) -> dict:
+    """
+    Sube el skill al endpoint apropiado:
+      - Si NO existe un skill con ese display_title → POST /v1/skills (crea uno nuevo).
+      - Si YA existe → POST /v1/skills/{id}/versions (sube nueva versión).
+
+    Devuelve el dict de respuesta con `id`, `latest_version`, etc., con un
+    flag interno `_action` ("created" | "versioned") para que el caller
+    informe al usuario.
+    """
+    files = _collect_skill_files(skill_dir)
+    title = (display_title or skill_dir.name).strip()
+    if not title:
+        raise ValueError("display_title vacío; pasá --title o renombrá la carpeta.")
+
+    multipart_files: list[tuple[str, str, bytes, str]] = [
+        ("files[]", filename, content, ctype) for (filename, content, ctype) in files
+    ]
+
+    existing = _find_existing_skill(title)
+    if existing:
+        # Nueva versión del skill existente. NO se reenvía display_title.
+        body, content_type = _build_multipart(fields=[], files=multipart_files)
+        skill_id = existing["id"]
+        out = _api_request(
+            "POST",
+            f"/v1/skills/{urllib.parse.quote(skill_id)}/versions",
+            body=body,
+            content_type=content_type,
+        )
+        # La respuesta del versions endpoint incluye la nueva version pero
+        # no necesariamente `id` ni `display_title` — los completamos del
+        # skill existente para que el caller tenga toda la info.
+        out.setdefault("id", skill_id)
+        out.setdefault("display_title", title)
+        out["_action"] = "versioned"
+        return out
+
+    # Primera vez: crear el skill nuevo.
+    body, content_type = _build_multipart(
+        fields=[("display_title", title)],
+        files=multipart_files,
+    )
+    out = _api_request("POST", "/v1/skills", body=body, content_type=content_type)
+    out["_action"] = "created"
+    return out
 
 
 def main() -> int:
@@ -206,17 +258,28 @@ def main() -> int:
         return 1
 
     sid = res.get("id")
-    print("OK skill subido")
+    action = res.get("_action", "created")
+    if action == "versioned":
+        print("OK nueva VERSION del skill subida (el agent ya la usa via 'latest')")
+    else:
+        print("OK skill CREADO por primera vez")
     print(f"   skill_id:       {sid}")
-    print(f"   latest_version: {res.get('latest_version')}")
-    print(f"   display_title:  {res.get('display_title')}")
+    new_ver = res.get("version") or res.get("latest_version")
+    if new_ver:
+        print(f"   version:        {new_ver}")
+    if res.get("display_title"):
+        print(f"   display_title:  {res['display_title']}")
     print()
 
-    # Sugerir la env var según el nombre de la carpeta.
-    suffix = skill_dir.name.replace("yoko-", "").replace("-", "_").upper()
-    env_var = f"YOKO_SKILL_{suffix}_ID"
-    print("Pegá esto en Vercel (Production + Preview):")
-    print(f"   {env_var}={sid}")
+    # Sugerir la env var solo si fue create (en versioned ya está seteada).
+    if action == "created":
+        suffix = skill_dir.name.replace("yoko-", "").replace("-", "_").upper()
+        env_var = f"YOKO_SKILL_{suffix}_ID"
+        print("Pegá esto en Vercel (Production + Preview):")
+        print(f"   {env_var}={sid}")
+    else:
+        print("El skill_id no cambió. El agent (versionado con 'latest') usa "
+              "la versión nueva sin re-provisionar.")
     return 0
 
 

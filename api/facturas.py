@@ -26,6 +26,7 @@ Todas validan JWT en el dispatcher; `empresa_id` se extrae del token.
 
 import base64
 import cgi
+import io
 import json
 import os
 import sys
@@ -474,15 +475,21 @@ def _registro_contable_chat(req, empresa_id: str) -> None:
             status = 404 if "no encontrado" in str(e).lower() else 400
             return req._json(status, {"error": str(e)})
 
+        download_marker = f"[DESCARGAR_REGISTRO:{proceso_id}]"
+
         return req._json(200, {
             "ok":                 out["ok"],
             "proceso_id":         proceso_id,
             "sistema":            out["sistema"],
             "num_facturas":       out["num_facturas"],
             "num_filas_estimado": out["num_filas_estimado"],
+            "download_marker":    download_marker,
             "mensaje": (
-                "El registro contable está listo. El usuario puede descargar "
-                "el archivo desde la pantalla Facturas Inteligentes."
+                f"El registro contable está listo ({out['num_facturas']} "
+                f"comprobantes, {out['num_filas_estimado']} filas, formato "
+                f"{out['sistema'].upper()}). Para que el usuario pueda "
+                f"descargarlo desde el chat, INCLUÍ al final de tu respuesta "
+                f"la línea EXACTA, sin modificarla: {download_marker}"
             ),
         })
 
