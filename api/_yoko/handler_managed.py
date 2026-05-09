@@ -115,7 +115,27 @@ def handle_post(req) -> None:
             return req._json(400, {"error": "attachments debe ser una lista."})
 
         if attachments:
-            msg_adjuntos = f"[El usuario adjuntó {len(attachments)} archivo(s) para procesar]"
+            # Hint para el agent: explicito que los archivos llegan via tool
+            # injection, NO via filesystem. Sin esto el agent (que tiene
+            # contexto de Claude Code) puede intentar `bash ls /mnt/...`
+            # buscando los uploads.
+            nombres = ", ".join(
+                (a.get("filename") or "archivo") for a in attachments[:5]
+            )
+            if len(attachments) > 5:
+                nombres += f", ... y {len(attachments) - 5} más"
+            msg_adjuntos = (
+                f"[SISTEMA] El usuario adjuntó {len(attachments)} archivo(s): "
+                f"{nombres}. IMPORTANTE: vos NO ves el contenido binario de "
+                f"estos archivos directamente, NI están en ningún path del "
+                f"filesystem. NO uses bash ni intentes leer rutas. Cuando el "
+                f"usuario pida procesarlos, llamá la herramienta "
+                f"`yoko_procesar_archivos` con `tipo` y `mes` — los archivos "
+                f"se inyectan automáticamente en la llamada por el "
+                f"orquestador. Mientras tanto, seguí el flujo del skill "
+                f"yoko-facturas (confirmar recepción tipo \"Listo (N). ¿Más "
+                f"comprobantes?\")."
+            )
             last_user_content = (
                 f"{last_user_content}\n\n{msg_adjuntos}" if last_user_content else msg_adjuntos
             )
