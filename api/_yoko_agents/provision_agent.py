@@ -32,17 +32,20 @@ def _setup_path() -> None:
 
 def _summary(config: dict) -> str:
     sys_len = len(config.get("system") or "")
-    n_tools = len(config.get("tools") or [])
-    n_skills = len(config.get("skills") or [])
-    skill_names = ", ".join(s["name"] for s in (config.get("skills") or []))
+    tools = config.get("tools") or []
+    skills = config.get("skills") or []
+    tool_names = ", ".join(
+        t.get("name") or t.get("type") or "?" for t in tools
+    ) or "(ninguna)"
+    skill_refs = ", ".join(
+        f"{s.get('type', '?')}:{s.get('skill_id', '?')}" for s in skills
+    ) or "(ninguna)"
     return (
         f"  name:       {config.get('name')}\n"
         f"  model:      {config.get('model')}\n"
         f"  system:     {sys_len} chars\n"
-        f"  tools ({n_tools}): "
-        + ", ".join(t["name"] for t in (config.get("tools") or []))
-        + "\n"
-        f"  skills ({n_skills}): {skill_names or '(ninguna)'}\n"
+        f"  tools ({len(tools)}): {tool_names}\n"
+        f"  skills ({len(skills)}): {skill_refs}\n"
         f"  environment_id: {config.get('environment_id') or '(no seteado)'}"
     )
 

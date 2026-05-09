@@ -38,8 +38,19 @@ def _setup_path() -> None:
         sys.path.insert(0, str(api_dir))
 
 
-def _names(items: list[dict]) -> set[str]:
-    return {i.get("name", "") for i in items if i.get("name")}
+def _tool_names(items: list[dict]) -> set[str]:
+    """Para tools custom el campo distintivo es `name`; para built-in es `type`."""
+    out: set[str] = set()
+    for i in items:
+        n = i.get("name") or i.get("type") or ""
+        if n:
+            out.add(n)
+    return out
+
+
+def _skill_ids(items: list[dict]) -> set[str]:
+    """Skills se referencian por skill_id (custom) o skill_id (anthropic)."""
+    return {i.get("skill_id", "") for i in items if i.get("skill_id")}
 
 
 def _diff_summary(local: dict, remote: dict | None) -> tuple[bool, list[str]]:
@@ -64,8 +75,8 @@ def _diff_summary(local: dict, remote: dict | None) -> tuple[bool, list[str]]:
         )
 
     # Tools
-    local_tools = _names(local.get("tools") or [])
-    remote_tools = _names(remote.get("tools") or [])
+    local_tools = _tool_names(local.get("tools") or [])
+    remote_tools = _tool_names(remote.get("tools") or [])
     added = sorted(local_tools - remote_tools)
     removed = sorted(remote_tools - local_tools)
     if added:
@@ -75,9 +86,9 @@ def _diff_summary(local: dict, remote: dict | None) -> tuple[bool, list[str]]:
         has_changes = True
         lines.append(f"  - tools: {', '.join(removed)}")
 
-    # Skills
-    local_skills = _names(local.get("skills") or [])
-    remote_skills = _names(remote.get("skills") or [])
+    # Skills (por skill_id remoto)
+    local_skills = _skill_ids(local.get("skills") or [])
+    remote_skills = _skill_ids(remote.get("skills") or [])
     added_s = sorted(local_skills - remote_skills)
     removed_s = sorted(remote_skills - local_skills)
     if added_s:
@@ -86,17 +97,6 @@ def _diff_summary(local: dict, remote: dict | None) -> tuple[bool, list[str]]:
     if removed_s:
         has_changes = True
         lines.append(f"  - skills: {', '.join(removed_s)}")
-
-    # Comparar contenido de skills (un cambio en SKILL.md también cuenta)
-    local_by_name = {s["name"]: s.get("content", "") for s in (local.get("skills") or [])}
-    remote_by_name = {s["name"]: s.get("content", "") for s in (remote.get("skills") or [])}
-    for name in local_by_name.keys() & remote_by_name.keys():
-        if local_by_name[name] != remote_by_name[name]:
-            has_changes = True
-            lines.append(
-                f"  ~ skill content {name}: "
-                f"{len(remote_by_name[name])} -> {len(local_by_name[name])} chars"
-            )
 
     if not has_changes:
         lines.append("  (sin cambios)")
