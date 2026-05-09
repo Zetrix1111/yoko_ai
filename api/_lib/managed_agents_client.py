@@ -9,17 +9,25 @@ dedicada, logs a stderr con prefijo [managed_agents]. La dependencia
 `anthropic` declarada en pyproject.toml NO se usa acá — la beta API se llama
 directo por HTTP para no quedar atado a la shape del SDK mientras está beta.
 
-Endpoints asumidos (verificar contra https://docs.anthropic.com cuando se
-ejecute por primera vez; ajustar las constantes _PATH_* si difieren):
+Endpoints reales (verificados contra platform.claude.com/docs/en/managed-agents):
 
-  POST   /v1/agents                          crear agent
-  GET    /v1/agents/{id}                     leer agent
-  POST   /v1/agents/{id}                     actualizar agent (algunos SDKs usan PATCH)
-  POST   /v1/agents/{id}/sessions            crear session
-  POST   /v1/sessions/{id}/messages          enviar mensaje del usuario
-  POST   /v1/sessions/{id}/messages          stream de respuesta del assistant (SSE)
-  POST   /v1/sessions/{id}/tool_results      submit tool_result desde el orquestador
-  DELETE /v1/sessions/{id}                   cerrar session
+  POST   /v1/agents                              crear agent
+  GET    /v1/agents/{id}                         leer agent
+  POST   /v1/agents/{id}                         actualizar agent
+  POST   /v1/sessions                            crear session
+  POST   /v1/sessions/{id}/events                enviar evento(s): user.message,
+                                                 user.custom_tool_result, etc.
+  GET    /v1/sessions/{id}/events/stream         stream SSE de eventos del agent
+  GET    /v1/sessions/{id}                       leer session (status, usage)
+  DELETE /v1/sessions/{id}                       eliminar session
+
+Protocolo:
+  - El POST a /events SOLO encola el evento, devuelve un ack vacío.
+  - La respuesta del assistant llega por GET /events/stream como SSE.
+  - Para custom tools: el agent emite `agent.custom_tool_use`, la session
+    pausa con `session.status_idle` y `stop_reason.type == "requires_action"`,
+    y se responde con un evento `user.custom_tool_result` cuyo
+    `custom_tool_use_id` es el id del evento bloqueante.
 
 Auth:
   x-api-key: ANTHROPIC_API_KEY
@@ -106,29 +114,20 @@ def _request(
         raise ManagedAgentsError(msg) from e
 
 
-def _request_stream(
-    method: str,
-    path: str,
-    body: dict | None = None,
-    timeout: int = 120,
-) -> Iterator[dict]:
+def _open_sse(method: str, path: str, body: dict | None = None, timeout: int = 300):
     """
-    Ejecuta request HTTP con respuesta SSE (Server-Sent Events) y yield-ea
-    cada evento parseado como dict. Cierra el socket al terminar.
-
-    Formato esperado de cada evento:
-        event: <tipo>
-        data: {"...": ...}
-        \n
+    Abre una conexión SSE eagerly. Devuelve el HTTPResponse listo para
+    iterar. CRITICAL: hay que llamarla antes de hacer POSTs que disparan
+    eventos para no perder ninguno (los servidores SSE solo entregan eventos
+    posteriores a la apertura del stream).
     """
     url = f"{_BASE_URL}{path}"
     data = json.dumps(body).encode("utf-8") if body is not None else None
     req = urllib.request.Request(
         url, data=data, headers=_headers({"Accept": "text/event-stream"}), method=method,
     )
-
     try:
-        res = urllib.request.urlopen(req, timeout=timeout)
+        return urllib.request.urlopen(req, timeout=timeout)
     except urllib.error.HTTPError as e:
         body_text = ""
         try:
@@ -143,6 +142,16 @@ def _request_stream(
         print(f"[managed_agents] {msg}", file=sys.stderr)
         raise ManagedAgentsError(msg) from e
 
+
+def _iter_sse_events(res) -> Iterator[dict]:
+    """
+    Itera eventos SSE desde un HTTPResponse abierto. Cierra el socket al terminar.
+
+    Formato esperado de cada evento:
+        event: <tipo>
+        data: {"...": ...}
+        \n
+    """
     try:
         event_type = None
         data_buf: list[str] = []
@@ -210,23 +219,24 @@ def update_agent(agent_id: str, config: dict) -> dict:
 
 def create_session(
     agent_id: str,
-    vault_id: str,
-    metadata: dict | None = None,
+    vault_id: str | None = None,
+    title: str | None = None,
 ) -> str:
     """
     Crea una session asociada al agent. Devuelve `session_id`.
-    `metadata` se persiste en la session (útil para empresa_id, user_id, etc.).
+    `title` aparece en la columna "Nombre" del Console.
+    `environment_id` se toma del env YOKO_ENVIRONMENT_ID (requerido por la beta).
     """
-    body = {
-        "agent": agent_id,
-        "vault_ids": [vault_id] if vault_id else [],
-        "metadata": metadata or {},
-    }
-    
-    # Inyectamos environment_id si está en el env, es requerido por la beta
+    body: dict = {"agent": agent_id}
+
     env_id = os.environ.get("YOKO_ENVIRONMENT_ID")
     if env_id:
         body["environment_id"] = env_id
+
+    if vault_id:
+        body["vault_ids"] = [vault_id]
+    if title:
+        body["title"] = title
 
     res = _request("POST", "/v1/sessions", body=body)
     sid = res.get("id") or res.get("session_id")
@@ -235,69 +245,91 @@ def create_session(
     return sid
 
 
-def send_user_message(
+def send_user_message(session_id: str, content: str) -> dict:
+    """
+    Encola un evento `user.message` con texto plano. La respuesta del agent
+    NO viene en este endpoint — hay que leerla con `stream_session_events`.
+    Devuelve el ack del POST (puede ser dict vacío).
+    """
+    body = {
+        "events": [
+            {
+                "type": "user.message",
+                "content": [{"type": "text", "text": content}],
+            }
+        ]
+    }
+    return _request(
+        "POST",
+        f"/v1/sessions/{urllib.parse.quote(session_id)}/events",
+        body=body,
+    )
+
+
+def submit_custom_tool_result(
     session_id: str,
-    content: str,
-    attachments: list[dict] | None = None,
+    custom_tool_use_id: str,
+    content: object,
 ) -> dict:
     """
-    Envía un mensaje del usuario a la session. `attachments` opcional con
-    archivos en base64 (formato a confirmar con docs).
-
-    Devuelve respuesta sincrónica (no-stream). Para stream usar
-    `stream_assistant_response`.
+    Devuelve el resultado de un custom tool al agent. `custom_tool_use_id` es
+    el id del evento `agent.custom_tool_use` que disparó la pausa
+    `requires_action`. `content` puede ser string o dict; si es dict se serializa.
     """
-    body: dict = {
-        "role": "user",
-        "content": content,
+    if isinstance(content, str):
+        text = content
+    else:
+        try:
+            text = json.dumps(content, ensure_ascii=False)
+        except (TypeError, ValueError):
+            text = str(content)
+
+    body = {
+        "events": [
+            {
+                "type": "user.custom_tool_result",
+                "custom_tool_use_id": custom_tool_use_id,
+                "content": [{"type": "text", "text": text}],
+            }
+        ]
     }
-    if attachments:
-        body["attachments"] = attachments
     return _request(
         "POST",
-        f"/v1/sessions/{urllib.parse.quote(session_id)}/messages",
+        f"/v1/sessions/{urllib.parse.quote(session_id)}/events",
         body=body,
     )
 
 
-def stream_assistant_response(
-    session_id: str,
-    content: str,
-    attachments: list[dict] | None = None,
-) -> Iterator[dict]:
+def stream_session_events(session_id: str, timeout: int = 300) -> Iterator[dict]:
     """
-    Manda el mensaje del usuario y stream-ea los eventos SSE de la respuesta
-    del assistant.
+    Abre el stream SSE de eventos de la session EAGERLY (la conexión HTTP se
+    abre antes de devolver) y devuelve un iterador de eventos.
 
-    Cada evento es un dict con al menos `type` (e.g. "content_block_delta",
-    "tool_use", "message_stop", etc.). El consumidor decide qué hacer con
-    cada uno.
+    NO es una generator function — la apertura del socket ocurre en esta
+    llamada, no en la primera iteración. Esto es indispensable para que el
+    POST de user.message que viene después no pierda eventos:
+
+        stream = mac.stream_session_events(session_id)  # ya abrió el socket
+        mac.send_user_message(session_id, ...)          # dispara eventos
+        for evt in stream: ...                          # los consume
     """
-    body: dict = {
-        "role": "user",
-        "content": content,
-        "stream": True,
-    }
-    if attachments:
-        body["attachments"] = attachments
-    yield from _request_stream(
-        "POST",
-        f"/v1/sessions/{urllib.parse.quote(session_id)}/messages",
-        body=body,
+    res = _open_sse(
+        "GET",
+        f"/v1/sessions/{urllib.parse.quote(session_id)}/events/stream",
+        body=None,
+        timeout=timeout,
     )
+    return _iter_sse_events(res)
 
 
-def submit_tool_result(session_id: str, tool_use_id: str, content: object) -> dict:
-    """
-    Cuando el orquestador ejecutó un tool_use solicitado por el agent, devuelve
-    el resultado vía este endpoint. `content` puede ser string u objeto JSON.
-    """
-    body = {"tool_use_id": tool_use_id, "content": content}
-    return _request(
-        "POST",
-        f"/v1/sessions/{urllib.parse.quote(session_id)}/tool_results",
-        body=body,
-    )
+def get_session(session_id: str) -> dict | None:
+    """Lee el estado actual de una session (status, usage, etc.). None si 404."""
+    try:
+        return _request("GET", f"/v1/sessions/{urllib.parse.quote(session_id)}")
+    except ManagedAgentsError as e:
+        if e.status == 404:
+            return None
+        raise
 
 
 def close_session(session_id: str) -> bool:
