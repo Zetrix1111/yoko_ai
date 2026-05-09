@@ -102,20 +102,19 @@ def _tools_enabled() -> bool:
 def get_agent_config(
     name: str = DEFAULT_NAME,
     model: str = DEFAULT_MODEL,
-    environment_id: str | None = None,
 ) -> dict:
     """
     Devuelve el dict listo para mandar al endpoint del agent. Carga sysprompt,
     skills (por id) y tools al momento de la llamada.
+
+    NOTA: `environment_id` NO va en la config del agent — es un campo de
+    session (/v1/sessions). El agent es independiente del environment;
+    cualquier session puede combinar este agent con cualquier environment.
     """
-    config: dict = {
+    return {
         "name":   name,
         "model":  model,
         "system": _load_system_prompt(),
         "skills": _load_skills(),
         "tools":  ALL_TOOLS if _tools_enabled() else [],
     }
-    env_id = environment_id or os.environ.get("YOKO_ENVIRONMENT_ID")
-    if env_id:
-        config["environment_id"] = env_id
-    return config

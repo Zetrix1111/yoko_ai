@@ -45,8 +45,7 @@ def _summary(config: dict) -> str:
         f"  model:      {config.get('model')}\n"
         f"  system:     {sys_len} chars\n"
         f"  tools ({len(tools)}): {tool_names}\n"
-        f"  skills ({len(skills)}): {skill_refs}\n"
-        f"  environment_id: {config.get('environment_id') or '(no seteado)'}"
+        f"  skills ({len(skills)}): {skill_refs}"
     )
 
 
@@ -89,8 +88,21 @@ def main() -> int:
                     file=sys.stderr,
                 )
                 return 1
-            updated = mac.update_agent(agent_id, config)
+            current_version = existing.get("version")
+            if current_version is None:
+                print(
+                    f"X Agent {agent_id} no devolvió `version` en el GET; "
+                    "no puedo hacer UPDATE optimistic-concurrency.",
+                    file=sys.stderr,
+                )
+                return 1
+            print(f"   versión actual remota: {current_version}")
+            update_body = dict(config)
+            update_body["version"] = current_version
+            updated = mac.update_agent(agent_id, update_body)
             print(f"OK Agent {agent_id} actualizado.")
+            if "version" in updated:
+                print(f"   nueva versión: {updated['version']}")
             if "updated_at" in updated:
                 print(f"   updated_at: {updated['updated_at']}")
         else:
