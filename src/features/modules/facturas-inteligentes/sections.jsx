@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, useRef, Fragment } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Upload, X, Check, Clock, FileText, Download,
   AlertCircle, Loader2, RotateCcw,
@@ -248,7 +248,10 @@ function UploadCard({ tipo, setTipo, mes, setMes, files, setFiles, isLoading, on
   );
 }
 
-function ValidationCard({ proceso, facturas, setFacturas, errores, isLoading, onConfirm, onReset }) {
+function ValidationCard({
+  proceso, facturas, setFacturas, errores, isLoading, onConfirm, onReset,
+  compact = false,
+}) {
   const numExitosas = facturas?.length || 0;
   const numFallidas = errores?.length || 0;
 
@@ -263,7 +266,7 @@ function ValidationCard({ proceso, facturas, setFacturas, errores, isLoading, on
           <div>
             Revisa, corrige y completa la información en la tabla. Los cambios se
             guardan automáticamente. Cuando esté lista, confirma para generar el
-            archivo CONCAR.
+            archivo y volver al chat.
           </div>
         </div>
       </div>
@@ -280,7 +283,7 @@ function ValidationCard({ proceso, facturas, setFacturas, errores, isLoading, on
         </div>
       )}
 
-      <StatusList stage={STAGES.VALIDATING} />
+      {!compact && <StatusList stage={STAGES.VALIDATING} />}
 
       <MetaPanel proceso={proceso} />
 
@@ -298,17 +301,21 @@ function ValidationCard({ proceso, facturas, setFacturas, errores, isLoading, on
           disabled={isLoading || numExitosas === 0}
         >
           {isLoading ? <Loader2 size={18} className="spin" /> : <Check size={18} />}
-          Confirmar y generar archivo
+          {compact
+            ? 'Conforme · descargar y volver al chat'
+            : 'Confirmar y generar archivo'}
         </button>
-        <button
-          type="button"
-          className="fact-btn fact-btn-ghost"
-          onClick={onReset}
-          disabled={isLoading}
-        >
-          <RotateCcw size={16} />
-          Cancelar
-        </button>
+        {!compact && (
+          <button
+            type="button"
+            className="fact-btn fact-btn-ghost"
+            onClick={onReset}
+            disabled={isLoading}
+          >
+            <RotateCcw size={16} />
+            Cancelar
+          </button>
+        )}
       </div>
     </div>
   );
@@ -496,8 +503,17 @@ export function DashboardSection() {
 
 export function RevisionSection({ user }) {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
 
-  const [stage, setStage] = useState(STAGES.UPLOAD);
+  // Modo "from-chat": el usuario llegó acá clickeando el botón "Abrir
+  // revisión" del chat. Tiene un proceso_id en la URL → ya viene cargado,
+  // no hay que mostrar upload ni stepper. Al confirmar, redirige al chat.
+  const procesoIdFromUrl = searchParams.get('proceso_id');
+  const cameFromChat = Boolean(procesoIdFromUrl);
+
+  const [stage, setStage] = useState(
+    cameFromChat ? STAGES.VALIDATING : STAGES.UPLOAD,
+  );
   const [tipo, setTipo] = useState('compra');
   const [mes, setMes] = useState(currentMonthValue());
   const [files, setFiles] = useState([]);
@@ -517,7 +533,6 @@ export function RevisionSection({ user }) {
 
   // Hidratación desde URL: cuando el chat redirige con ?proceso_id=proc-xxx,
   // cargamos ese proceso del backend (sin confirmación).
-  const procesoIdFromUrl = searchParams.get('proceso_id');
   const hydratedRef = useRef(false);
   useEffect(() => {
     if (hydratedRef.current) return;
@@ -633,6 +648,14 @@ export function RevisionSection({ user }) {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
+      // Modo from-chat: cerrar la pantalla de revisión y volver al chat,
+      // pasando `facturas_done=proc-xxx` para que useChat inserte un
+      // mensaje de cierre del bot con el botón de re-descarga listo.
+      if (cameFromChat) {
+        navigate(`/chat?facturas_done=${encodeURIComponent(proceso.proceso_id)}`);
+        return;
+      }
+
       setStage(STAGES.DONE);
     } catch (e) {
       console.error('[facturas/concar]', e);
@@ -645,11 +668,14 @@ export function RevisionSection({ user }) {
 
   return (
     <div className="fact-screen">
-      <Stepper stage={stage} />
+      {/* En modo from-chat el usuario no necesita ver el stepper completo
+          (subir/validar/confirmar/generar): viene directo a revisar.
+          En modo legacy (subió desde la web) sí mostramos el stepper. */}
+      {!cameFromChat && <Stepper stage={stage} />}
 
       {error && <ErrorBanner message={error} />}
 
-      {stage === STAGES.UPLOAD && (
+      {stage === STAGES.UPLOAD && !cameFromChat && (
         <UploadCard
           tipo={tipo} setTipo={setTipo}
           mes={mes} setMes={setMes}
@@ -668,6 +694,7 @@ export function RevisionSection({ user }) {
           isLoading={isLoading}
           onConfirm={handleConfirmar}
           onReset={reset}
+          compact={cameFromChat}
         />
       )}
 
@@ -678,7 +705,7 @@ export function RevisionSection({ user }) {
         />
       )}
 
-      {stage === STAGES.DONE && (
+      {stage === STAGES.DONE && !cameFromChat && (
         <DoneCard
           proceso={proceso}
           onDownloadAgain={handleConfirmar}

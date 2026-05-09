@@ -1,5 +1,5 @@
-import { useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { API, postJsonAuth, postFormAuth } from '../../shared/api';
 
 // Backend conversacional: openai (legacy) | managed_agents (Anthropic).
@@ -26,6 +26,7 @@ function fileToBase64(file) {
 
 export function useChat(user) {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const greeting = user?.nombre
     ? `¡Hola, ${user.nombre}! Soy tu asistente inteligente. Puedo ayudarte a ejecutar procesos como rendiciones, caja chica y pagos. ¿Qué deseas hacer hoy?`
     : `¡Hola! Soy tu asistente inteligente. Puedo ayudarte a ejecutar procesos como rendiciones, caja chica y pagos. ¿Qué deseas hacer hoy?`;
@@ -36,6 +37,37 @@ export function useChat(user) {
     sender: 'yoko',
   }]);
   const [isUploading, setIsUploading] = useState(false);
+
+  // Cuando el usuario vuelve al chat tras descargar el registro contable
+  // desde la pantalla de Revisión (`/chat?facturas_done=proc-xxx`),
+  // inyectamos un mensaje sintético del bot con el botón de re-descarga
+  // listo. NO hacemos round-trip al backend: la descarga ya pasó, el
+  // botón es solo para que el usuario tenga el registro a mano si lo
+  // pierde. Limpiamos el query param para que un reload no re-inyecte.
+  const facturasDoneHandledRef = useRef(false);
+  useEffect(() => {
+    const procesoId = searchParams.get('facturas_done');
+    if (!procesoId) return;
+    if (facturasDoneHandledRef.current) return;
+    facturasDoneHandledRef.current = true;
+
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
+        sender: 'yoko',
+        text:
+          '✅ Listo. Descargaste el registro contable del proceso `' +
+          procesoId + '`. Si necesitás bajarlo otra vez:\n\n' +
+          '[DESCARGAR_REGISTRO:' + procesoId + ']',
+      },
+    ]);
+
+    // Limpiar el query param sin agregar entrada al history.
+    const next = new URLSearchParams(searchParams);
+    next.delete('facturas_done');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const sendMessage = useCallback(async (text, files) => {
     if (!text.trim() && files.length === 0) return;
