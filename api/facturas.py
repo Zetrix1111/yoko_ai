@@ -5,16 +5,22 @@ api/facturas.py — dispatcher de Facturas Inteligentes.
 solo dispatcher por `?action=` y método HTTP libre (cada action sabe
 qué método espera y parsea el body acorde).
 
-Acciones:
+Acciones del flujo web (UI clásica):
   POST   /api/facturas?action=procesar      → multipart, procesa N archivos
   PUT    /api/facturas?action=actualizar    → JSON, auto-save de ediciones
   GET    /api/facturas?action=recuperar     → ?proceso_id=…, recupera proceso
   DELETE /api/facturas?action=eliminar-fila → JSON, borra una factura
-  POST   /api/facturas?action=concar        → 501 (TODO fase futura)
+  POST   /api/facturas?action=concar        → genera y descarga el Excel CONCAR
+
+Acciones consumidas por el agent (Anthropic Managed Agents → custom tools):
+  POST   /api/facturas?action=procesar-chat   → JSON+base64, equivalente a procesar
+  POST   /api/facturas?action=recuperar-chat  → JSON {proceso_id}, equivalente a recuperar
+  POST   /api/facturas?action=download-chat   → JSON {proceso_id}, alias de concar
 
 Todas validan JWT en el dispatcher; `empresa_id` se extrae del token.
 """
 
+import base64
 import cgi
 import io
 import json
@@ -399,12 +405,150 @@ def _generar_xlsx_concar(filas: list) -> bytes:
     return buf.getvalue()
 
 
+def _procesar_chat(req, empresa_id: str) -> None:
+    """
+    POST JSON — variante "chat-friendly" de procesar.
+
+    En vez de multipart, recibe los archivos en base64 dentro del JSON, que
+    es como Anthropic Managed Agents le pasa el lote al custom tool
+    `yoko_procesar_archivos`. Reusa exactamente la misma lógica de extracción
+    que `_procesar`.
+
+    Body:
+      {
+        "tipo":  "compra" | "venta",
+        "mes":   "YYYY-MM",
+        "files": [{"filename": "...", "content_b64": "..."}]   # ≤ 50
+      }
+
+    Response: {ok, proceso_id, empresa_id, facturas, errores, alertas, timestamp}
+    """
+    try:
+        init_db()
+
+        length = int(req.headers.get("Content-Length", 0))
+        if length == 0:
+            return req._json(400, {"error": "Body vacío."})
+        try:
+            body = json.loads(req.rfile.read(length))
+        except json.JSONDecodeError:
+            return req._json(400, {"error": "JSON inválido."})
+
+        tipo     = (body.get("tipo") or "compra").strip().lower()
+        mes      = (body.get("mes") or "").strip()
+        files_in = body.get("files") or []
+
+        if tipo not in ("compra", "venta"):
+            return req._json(400, {"error": "tipo debe ser 'compra' o 'venta'."})
+        if not isinstance(files_in, list) or not files_in:
+            return req._json(400, {"error": "files debe ser una lista no vacía."})
+        if len(files_in) > 50:
+            return req._json(400, {"error": "Máximo 50 archivos por lote."})
+
+        # Decodificar base64 → list[(filename, bytes)]
+        files: list[tuple[str, bytes]] = []
+        for i, item in enumerate(files_in):
+            if not isinstance(item, dict):
+                return req._json(400, {
+                    "error": f"files[{i}] debe ser objeto con filename+content_b64.",
+                })
+            fname = (item.get("filename") or "").strip()
+            content_b64 = item.get("content_b64") or ""
+            if not fname or not content_b64:
+                return req._json(400, {
+                    "error": f"files[{i}] requiere filename y content_b64 no vacíos.",
+                })
+            try:
+                fbytes = base64.b64decode(content_b64, validate=True)
+            except (ValueError, base64.binascii.Error):
+                return req._json(400, {"error": f"files[{i}] content_b64 no es base64 válido."})
+            if not fbytes:
+                return req._json(400, {"error": f"files[{i}] vacío tras decodificar."})
+            files.append((fname, fbytes))
+
+        api_key = os.environ.get("OPENAI_API_KEY")
+        if not api_key:
+            return req._json(500, {"error": "OPENAI_API_KEY no configurada."})
+
+        proceso_id = f"proc-{uuid.uuid4().hex[:12]}"
+
+        resultado = process_multiple_files(
+            files=files,
+            tipo=tipo,
+            mes=mes,
+            api_key=api_key,
+        )
+        save_proceso(proceso_id, empresa_id, resultado["facturas"])
+
+        return req._json(200, {
+            "ok":         True,
+            "proceso_id": proceso_id,
+            "empresa_id": empresa_id,
+            "facturas":   resultado["facturas"],
+            "errores":    resultado["errores"],
+            "alertas":    [],
+            "timestamp":  time.time(),
+        })
+
+    except ValueError as e:
+        print(f"[facturas/procesar-chat] ValueError: {e}", file=sys.stderr)
+        return req._json(400, {"error": str(e)})
+    except Exception as e:
+        print(f"[facturas/procesar-chat] Error: {type(e).__name__}: {e}", file=sys.stderr)
+        return req._json(500, {"error": "Error al procesar facturas."})
+
+
+def _recuperar_chat(req, empresa_id: str) -> None:
+    """
+    POST JSON — variante de recuperar pensada para el agent.
+
+    Diferencia con `_recuperar` (que es GET con ?proceso_id=…): el agent
+    llama esto en POST con body JSON, que es la forma natural en la que
+    Anthropic invoca un custom tool.
+
+    Body: {"proceso_id": "..."}
+    Response: {ok, proceso_id, facturas, timestamp}
+    """
+    try:
+        length = int(req.headers.get("Content-Length", 0))
+        if length == 0:
+            return req._json(400, {"error": "Body vacío."})
+        try:
+            body = json.loads(req.rfile.read(length))
+        except json.JSONDecodeError:
+            return req._json(400, {"error": "JSON inválido."})
+
+        proceso_id = body.get("proceso_id")
+        if not proceso_id:
+            return req._json(400, {"error": "proceso_id requerido."})
+
+        proceso = get_proceso(proceso_id, empresa_id)
+        if not proceso:
+            return req._json(404, {"error": "Proceso no encontrado o expirado."})
+
+        return req._json(200, {
+            "ok":         True,
+            "proceso_id": proceso_id,
+            "facturas":   proceso["facturas"],
+            "timestamp":  proceso["timestamp"],
+        })
+
+    except Exception as e:
+        print(f"[facturas/recuperar-chat] Error: {type(e).__name__}: {e}", file=sys.stderr)
+        return req._json(500, {"error": "Error al recuperar proceso."})
+
+
 _ACTIONS = {
+    # Flujo web (UI clásica)
     "procesar":      _procesar,
     "actualizar":    _actualizar,
     "recuperar":     _recuperar,
     "eliminar-fila": _eliminar_fila,
     "concar":        _concar,
+    # Flujo chat (Anthropic Managed Agents → custom tools)
+    "procesar-chat":  _procesar_chat,
+    "recuperar-chat": _recuperar_chat,
+    "download-chat":  _concar,   # alias: misma lógica que ?action=concar
 }
 
 

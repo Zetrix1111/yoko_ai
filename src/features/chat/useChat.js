@@ -2,6 +2,28 @@ import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API, postJsonAuth, postFormAuth } from '../../shared/api';
 
+// Backend conversacional: openai (legacy) | managed_agents (Anthropic).
+// Tiene que coincidir con la env var YOKO_BACKEND del backend; si no, los
+// archivos se procesan dos veces (parse_file + skill yoko-facturas) o ninguna.
+const YOKO_BACKEND = (import.meta.env.VITE_YOKO_BACKEND || 'openai').toLowerCase();
+const IS_MANAGED_AGENTS = YOKO_BACKEND === 'managed_agents';
+
+// Lee un File del browser y devuelve su contenido en base64 (sin el prefijo
+// "data:<mime>;base64,"). Pensado para mandar adjuntos al backend Managed
+// Agents que los reenvía al tool `yoko_procesar_archivos`.
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result || '';
+      const idx = typeof dataUrl === 'string' ? dataUrl.indexOf(',') : -1;
+      resolve(idx >= 0 ? dataUrl.slice(idx + 1) : '');
+    };
+    reader.onerror = () => reject(reader.error || new Error('FileReader error'));
+    reader.readAsDataURL(file);
+  });
+}
+
 export function useChat(user) {
   const navigate = useNavigate();
   const greeting = user?.nombre
@@ -37,8 +59,14 @@ export function useChat(user) {
     const messageId = crypto.randomUUID();
     let batchId = null;
 
-    // Fase 1: procesar archivos (extraer campos + subir si aplica)
+    // Fase 1: procesar archivos.
+    //   - Backend "managed_agents": codifica los archivos a base64 y los manda
+    //     como attachments dentro del payload del chat. El agent activa el
+    //     skill correspondiente (yoko-facturas) y llama el tool con los archivos.
+    //   - Backend "openai" (legacy): pre-procesa cada archivo con parse_file
+    //     para extraer campos y los inyecta como contexto en el mensaje.
     let camposExtraidos = null;
+    let attachmentsForChat = null;
 
     if (files.length > 0) {
       setIsUploading(true);
@@ -52,46 +80,59 @@ export function useChat(user) {
       }]);
 
       try {
-        // Procesar cada archivo: primero parse_file para extraer campos
-        const todosLosCampos = [];
-        for (let i = 0; i < files.length; i++) {
-          const file = files[i];
-
-          // Actualizar estado visual
-          setMessages((prev) => prev.map(msg =>
-            msg.id === uploadMsgId
-              ? { ...msg, text: `Leyendo archivo ${i + 1} de ${files.length}: ${file.name}...` }
-              : msg
-          ));
-
-          // Llamar a parse_file para extraer campos con IA
-          const formData = new FormData();
-          formData.append('file', file);
-          formData.append('fileName', file.name);
-
-          try {
-            const parsed = await postFormAuth(API.PARSE_FILE, formData);
-            if (parsed && parsed.campos) {
-              todosLosCampos.push(parsed.campos);
-            }
-          } catch (parseErr) {
-            console.warn('parse_file falló para', file.name, parseErr);
+        if (IS_MANAGED_AGENTS) {
+          // Codificar todos los archivos a base64. El agent decide qué hacer.
+          const encoded = [];
+          for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            setMessages((prev) => prev.map(msg =>
+              msg.id === uploadMsgId
+                ? { ...msg, text: `Cargando archivo ${i + 1} de ${files.length}: ${file.name}...` }
+                : msg
+            ));
+            const content_b64 = await fileToBase64(file);
+            encoded.push({ filename: file.name, content_b64 });
           }
-        }
+          attachmentsForChat = encoded;
+          setMessages((prev) => prev.filter(msg => msg.id !== uploadMsgId));
+        } else {
+          // OpenAI legacy: parse_file por archivo, consolidar campos extraídos.
+          const todosLosCampos = [];
+          for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            setMessages((prev) => prev.map(msg =>
+              msg.id === uploadMsgId
+                ? { ...msg, text: `Leyendo archivo ${i + 1} de ${files.length}: ${file.name}...` }
+                : msg
+            ));
 
-        // Consolidar campos extraídos (usar el primero con valor no-null)
-        if (todosLosCampos.length > 0) {
-          camposExtraidos = todosLosCampos.reduce((acc, cur) => {
-            Object.keys(cur).forEach(k => {
-              if (!acc[k] && cur[k] !== null && cur[k] !== undefined) {
-                acc[k] = cur[k];
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('fileName', file.name);
+
+            try {
+              const parsed = await postFormAuth(API.PARSE_FILE, formData);
+              if (parsed && parsed.campos) {
+                todosLosCampos.push(parsed.campos);
               }
-            });
-            return acc;
-          }, {});
-        }
+            } catch (parseErr) {
+              console.warn('parse_file falló para', file.name, parseErr);
+            }
+          }
 
-        setMessages((prev) => prev.filter(msg => msg.id !== uploadMsgId));
+          if (todosLosCampos.length > 0) {
+            camposExtraidos = todosLosCampos.reduce((acc, cur) => {
+              Object.keys(cur).forEach(k => {
+                if (!acc[k] && cur[k] !== null && cur[k] !== undefined) {
+                  acc[k] = cur[k];
+                }
+              });
+              return acc;
+            }, {});
+          }
+
+          setMessages((prev) => prev.filter(msg => msg.id !== uploadMsgId));
+        }
       } catch (err) {
         console.error('Error procesando archivos:', err);
         setMessages((prev) => prev.map(msg =>
@@ -130,20 +171,27 @@ export function useChat(user) {
           : `[Datos extraídos del archivo adjunto:\n${camposStr}]\n\n${instruccion}`;
       }
 
-      const apiMessages = [
-        ...messages,
-        { id: 'temp', text: mensajeConContexto, sender: 'user' }
-      ]
-        .filter(m => !m.isLoading)
-        .map(m => ({
-          role: m.sender === 'user' ? 'user' : 'assistant',
-          content: m.text
-        }));
+      // En modo managed_agents, Anthropic persiste el historial server-side,
+      // así que solo mandamos el último mensaje del usuario. En modo openai
+      // legacy, mandamos el array completo (necesario para el tool-calling loop).
+      const lastUserMsg = { role: 'user', content: mensajeConContexto };
+      const apiMessages = IS_MANAGED_AGENTS
+        ? [lastUserMsg]
+        : [
+            ...messages.filter(m => !m.isLoading).map(m => ({
+              role: m.sender === 'user' ? 'user' : 'assistant',
+              content: m.text,
+            })),
+            lastUserMsg,
+          ];
 
       const payload = {
         user: user || {},
         messages: apiMessages,
       };
+      if (attachmentsForChat) {
+        payload.attachments = attachmentsForChat;
+      }
 
       const data = await postJsonAuth(API.CHAT, payload);
       
