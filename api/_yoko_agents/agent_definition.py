@@ -89,14 +89,40 @@ def _load_skills() -> list[dict]:
     return skills
 
 
-def _tools_enabled() -> bool:
+def _custom_tools_enabled() -> bool:
     """
-    Por defecto NO incluimos tools en el agent (modo conversacional puro
-    durante la fase actual). Para activarlas, setear
-    YOKO_AGENT_TOOLS_ENABLED=true en Vercel.
+    Controla si los CUSTOM tools (`yoko_procesar_archivos`,
+    `yoko_generar_registro_contable`) se adjuntan al agent. Default true
+    porque ya pasamos la fase conversacional pura.
     """
-    raw = (os.environ.get("YOKO_AGENT_TOOLS_ENABLED") or "false").strip().lower()
+    raw = (os.environ.get("YOKO_AGENT_TOOLS_ENABLED") or "true").strip().lower()
     return raw in ("1", "true", "yes", "on")
+
+
+# Configuración del toolset built-in `agent_toolset_20260401` requerido por
+# Managed Agents para que los skills funcionen — los skills son archivos en
+# el filesystem de la VM y el agent los lee con `read`. Sin este toolset, la
+# API rechaza la creación de sesiones que tengan skills adjuntos:
+#     "Missing required tool: skills require the read tool to be usable"
+#
+# Estrategia: habilitamos el toolset completo (default), pero deshabilitamos
+# explícitamente las tools que NO queremos que el agent use en ningún caso:
+#   - `bash` y `web_fetch` y `web_search`: para evitar que el agent intente
+#     "buscar" archivos del usuario en el filesystem o salir a la web. Los
+#     archivos llegan via custom tool injection del orquestador.
+#   - `write` y `edit`: el agent no debe modificar archivos.
+# Quedan habilitados `read`, `glob`, `grep` — necesarios para que el skill
+# yoko-facturas se cargue y se navegue.
+_BUILTIN_TOOLSET: dict = {
+    "type": "agent_toolset_20260401",
+    "configs": [
+        {"name": "bash",       "enabled": False},
+        {"name": "web_fetch",  "enabled": False},
+        {"name": "web_search", "enabled": False},
+        {"name": "write",      "enabled": False},
+        {"name": "edit",       "enabled": False},
+    ],
+}
 
 
 def get_agent_config(
@@ -111,10 +137,14 @@ def get_agent_config(
     session (/v1/sessions). El agent es independiente del environment;
     cualquier session puede combinar este agent con cualquier environment.
     """
+    tools: list[dict] = [_BUILTIN_TOOLSET]
+    if _custom_tools_enabled():
+        tools.extend(ALL_TOOLS)
+
     return {
         "name":   name,
         "model":  model,
         "system": _load_system_prompt(),
         "skills": _load_skills(),
-        "tools":  ALL_TOOLS if _tools_enabled() else [],
+        "tools":  tools,
     }
