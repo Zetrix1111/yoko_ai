@@ -101,10 +101,9 @@ def handle_post(req) -> None:
             print(f"[chat/managed] User inválido: {e}", file=sys.stderr)
             return req._json(400, {"error": "Datos del usuario inválidos."})
 
-        # 5) Vault + MemoryStore por empresa
+        # 5) Vault por empresa
         vault_env_name = _VAULT_ENV_BY_EMPRESA.get(empresa_id)
-        memory_env_name = _MEMORY_ENV_BY_EMPRESA.get(empresa_id)
-        if not vault_env_name or not memory_env_name:
+        if not vault_env_name:
             print(
                 f"[chat/managed] empresa {empresa_id} sin Vault asociado",
                 file=sys.stderr,
@@ -114,10 +113,9 @@ def handle_post(req) -> None:
                 {"error": "Empresa no habilitada para el backend Managed Agents."},
             )
         vault_id = os.environ.get(vault_env_name)
-        memory_store_id = os.environ.get(memory_env_name)
-        if not vault_id or not memory_store_id:
+        if not vault_id:
             print(
-                f"[chat/managed] Faltan {vault_env_name}/{memory_env_name}",
+                f"[chat/managed] Faltan {vault_env_name}",
                 file=sys.stderr,
             )
             return req._json(500, {"error": "Vault de la empresa no configurado."})
@@ -161,7 +159,6 @@ def handle_post(req) -> None:
                 session_id = mac.create_session(
                     agent_id=agent_id,
                     vault_id=vault_id,
-                    memory_store_id=memory_store_id,
                     metadata={"empresa_id": empresa_id, "user_id": user_id},
                 )
                 # Inyectar contexto como primer evento de la session.

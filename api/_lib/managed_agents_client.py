@@ -211,7 +211,6 @@ def update_agent(agent_id: str, config: dict) -> dict:
 def create_session(
     agent_id: str,
     vault_id: str,
-    memory_store_id: str,
     metadata: dict | None = None,
 ) -> str:
     """
@@ -219,11 +218,17 @@ def create_session(
     `metadata` se persiste en la session (útil para empresa_id, user_id, etc.).
     """
     body = {
-        "vault_id": vault_id,
-        "memory_store_id": memory_store_id,
+        "agent": agent_id,
+        "vault_ids": [vault_id] if vault_id else [],
         "metadata": metadata or {},
     }
-    res = _request("POST", f"/v1/agents/{urllib.parse.quote(agent_id)}/sessions", body=body)
+    
+    # Inyectamos environment_id si está en el env, es requerido por la beta
+    env_id = os.environ.get("YOKO_ENVIRONMENT_ID")
+    if env_id:
+        body["environment_id"] = env_id
+
+    res = _request("POST", "/v1/sessions", body=body)
     sid = res.get("id") or res.get("session_id")
     if not sid:
         raise ManagedAgentsError(f"create_session no devolvió session_id: {res}")
