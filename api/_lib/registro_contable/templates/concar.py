@@ -296,7 +296,7 @@ def factura_a_filas(
             "A":  "",
             "B":  sub_diario,
             "C":  numero_comprobante,
-            "D":  fecha_emi,
+            "D":  fecha_hoy,
             "E":  moneda_code,
             "F":  glosa_principal,
             "G":  "",
