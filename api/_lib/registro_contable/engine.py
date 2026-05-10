@@ -59,9 +59,27 @@ def validate(proceso_id: str, empresa_id: str) -> Dict[str, Any]:
     }
 
 
-def generate(proceso_id: str, empresa_id: str) -> Dict[str, Any]:
+def generate(
+    proceso_id: str,
+    empresa_id: str,
+    correlativos: Dict[str, int] | None = None,
+) -> Dict[str, Any]:
     """
     Genera el archivo Excel del registro contable completo en memoria.
+
+    `correlativos` es un dict { sub_diario_codigo: correlativo_inicial_int }
+    (ej: `{"11": 20, "13": 1, "15": 5}`). Para cada factura del proceso, se
+    calcula su `numero_comprobante = MM + zfill(correlativo, 4)` donde:
+      - MM = primeros 2 dígitos del campo `mes` del proceso (ej: "05" para
+        2026-05).
+      - El correlativo arranca en `correlativos[sub_diario]` y se incrementa
+        secuencialmente por sub_diario, en el orden de aparición de las
+        facturas (orden de inserción en SQLite).
+      - Sub_diarios sin correlativo en el dict → columna C queda vacía
+        (back-compat con la pantalla web sin inputs llenados).
+      - Si `inicial + N > 9999`, el zfill devuelve 5+ chars (formato CONCAR
+        técnicamente roto pero archivo xlsx válido). Validación de overflow
+        es responsabilidad del frontend.
 
     Returns:
         {
@@ -81,9 +99,37 @@ def generate(proceso_id: str, empresa_id: str) -> Dict[str, Any]:
     template = registry.get_template(sistema)
     fecha_hoy = datetime.now().strftime("%d/%m/%Y")
 
+    # MM del mes del proceso. Las facturas tienen `mes` ("YYYY-MM") inyectado
+    # por `add_metadata` en facturas_processor. Si no, fallback al mes actual.
+    mes_proceso = (facturas[0].get("mes") if facturas else "") or ""
+    mes_mm = (
+        mes_proceso[5:7] if len(mes_proceso) >= 7
+        else datetime.now().strftime("%m")
+    )
+
+    # Contadores mutables por sub_diario (copia del input para no mutar al caller).
+    contadores: Dict[str, int] = dict(correlativos or {})
+
     todas_las_filas: List[Dict] = []
     for f in facturas:
-        todas_las_filas.extend(template.factura_a_filas(f, contab, fecha_hoy))
+        tipo_doc = (f.get("tipo_doc_codigo") or "FT").upper()
+        sub_diario = contab["sub_diarios"].get(tipo_doc, "11")
+
+        if sub_diario in contadores:
+            n = contadores[sub_diario]
+            # zfill(4) para n <= 9999. Para n > 9999 sale 5+ chars (formato
+            # CONCAR roto pero xlsx válido).
+            numero_comprobante = f"{mes_mm}{n:04d}"
+            contadores[sub_diario] = n + 1
+        else:
+            numero_comprobante = ""  # sub_diario sin correlativo: col C vacía
+
+        todas_las_filas.extend(
+            template.factura_a_filas(
+                f, contab, fecha_hoy,
+                numero_comprobante=numero_comprobante,
+            )
+        )
 
     content: bytes = template.build_xlsx(todas_las_filas)
 

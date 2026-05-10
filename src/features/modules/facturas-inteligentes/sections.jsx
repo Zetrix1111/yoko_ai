@@ -57,6 +57,33 @@ function formatBytes(bytes) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
+// Mapeo tipo_doc → sub_diario CONCAR. Espejo del backend
+// (api/_lib/registro_contable/templates/concar.py:DEFAULTS["sub_diarios"]).
+// Si tocás uno, tocá el otro.
+// ─────────────────────────────────────────────────────────────────────────
+const SUB_DIARIO_BY_TIPO_DOC = {
+  FT: '11', NC: '11', ND: '11', BA: '11', TK: '11',
+  BV: '13',
+  RH: '15',
+};
+
+const SUB_DIARIO_LABELS = {
+  '11': 'Facturas / Tickets / Notas',
+  '13': 'Boletas',
+  '15': 'Recibos por honorarios',
+};
+
+function computeSubDiariosPresentes(facturas) {
+  const counts = {};
+  for (const f of (facturas || [])) {
+    const tipo = String(f?.tipo_doc_codigo || 'FT').toUpperCase();
+    const sd = SUB_DIARIO_BY_TIPO_DOC[tipo] || '11';
+    counts[sd] = (counts[sd] || 0) + 1;
+  }
+  return counts;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
 // Sub-componentes UI (movidos desde FacturasInteligentesScreen.jsx)
 // ─────────────────────────────────────────────────────────────────────────
 
@@ -248,8 +275,80 @@ function UploadCard({ tipo, setTipo, mes, setMes, files, setFiles, isLoading, on
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// CorrelativosPanel: inputs para el correlativo inicial por sub_diario.
+// Se renderiza arriba del botón "Conforme" y solo muestra los sub_diarios
+// presentes en el lote (ej: si solo hay facturas, solo aparece sub 11).
+// El cálculo del numero_comprobante (MM + zfill) vive en el backend
+// (api/_lib/registro_contable/engine.py); acá solo recolectamos input.
+// ─────────────────────────────────────────────────────────────────────────
+function CorrelativosPanel({ facturas, correlativos, setCorrelativos }) {
+  const counts = computeSubDiariosPresentes(facturas);
+  const presentes = Object.keys(counts).sort();
+  if (presentes.length === 0) return null;
+
+  return (
+    <div className="fact-correlativos">
+      <h3 className="fact-correlativos-title">Correlativo inicial por tipo</h3>
+      <p className="fact-correlativos-desc">
+        Cada comprobante del Excel tendrá su número de comprobante con
+        formato <code>MMNNNN</code> (mes + correlativo de 4 dígitos).
+        Decide desde qué número arranca cada secuencia. Las secuencias
+        son independientes por tipo.
+      </p>
+      {presentes.map((sd) => {
+        const cantidad = counts[sd];
+        const inicial = correlativos[sd] ?? '';
+        const numInicial = parseInt(inicial, 10);
+        const finalEstimado = Number.isFinite(numInicial)
+          ? numInicial + cantidad - 1
+          : null;
+        const overflow = finalEstimado !== null && finalEstimado > 9999;
+
+        return (
+          <div key={sd} className="fact-correlativo-row">
+            <label className="fact-correlativo-label">
+              {SUB_DIARIO_LABELS[sd] || `Sub-diario ${sd}`}{' '}
+              <span className="fact-correlativo-meta">
+                ({cantidad} comprobante{cantidad !== 1 ? 's' : ''}, sub {sd})
+              </span>
+            </label>
+            <input
+              type="number"
+              min="1"
+              className="fact-input fact-correlativo-input"
+              value={inicial}
+              onChange={(e) => {
+                const v = e.target.value;
+                setCorrelativos((prev) => ({
+                  ...prev,
+                  [sd]: v === '' ? '' : Number(v),
+                }));
+              }}
+              placeholder="Ej: 20"
+            />
+            {Number.isFinite(numInicial) && numInicial >= 1 && (
+              <small className="fact-correlativo-hint">
+                Va de {numInicial} a {finalEstimado} ({cantidad} comprobante{cantidad !== 1 ? 's' : ''}).
+              </small>
+            )}
+            {overflow && (
+              <small className="fact-correlativo-warn">
+                ⚠️ {numInicial} + {cantidad} llega a {finalEstimado},
+                sobrepasa los 4 dígitos del formato CONCAR. El archivo
+                igual se descarga, pero CONCAR puede rechazarlo al importar.
+              </small>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function ValidationCard({
   proceso, facturas, setFacturas, errores, isLoading, onConfirm, onReset,
+  correlativos, setCorrelativos,
   compact = false,
 }) {
   const numExitosas = facturas?.length || 0;
@@ -291,6 +390,12 @@ function ValidationCard({
         proceso={proceso}
         facturas={facturas}
         setFacturas={setFacturas}
+      />
+
+      <CorrelativosPanel
+        facturas={facturas}
+        correlativos={correlativos}
+        setCorrelativos={setCorrelativos}
       />
 
       <div className="fact-btn-row">
@@ -522,6 +627,10 @@ export function RevisionSection({ user }) {
   const [errores, setErrores] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  // Correlativo inicial por sub_diario presente en el lote. Shape:
+  //   { "11": 20, "13": 1, "15": 5 } (claves = códigos sub_diario CONCAR).
+  // Se manda al backend al apretar "Conforme · descargar".
+  const [correlativos, setCorrelativos] = useState({});
 
   // Recuperación desde localStorage (sesión anterior).
   const handleRecover = useCallback((procesoRestaurado, facturasRestauradas) => {
@@ -622,6 +731,17 @@ export function RevisionSection({ user }) {
     setStage(STAGES.CONFIRMING);
     try {
       const token = getAuthToken();
+
+      // Sanitizar correlativos: dropear strings vacíos y convertir a int.
+      // El backend rechaza values < 1, así que evitamos 0 y NaN acá.
+      const correlativosLimpios = {};
+      for (const [sd, val] of Object.entries(correlativos || {})) {
+        const num = parseInt(val, 10);
+        if (Number.isFinite(num) && num >= 1) {
+          correlativosLimpios[sd] = num;
+        }
+      }
+
       const res = await fetch(API.FACTURAS_CONCAR, {
         method: 'POST',
         headers: {
@@ -629,8 +749,9 @@ export function RevisionSection({ user }) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          proceso_id: proceso.proceso_id,
-          dni: user?.dni || '',
+          proceso_id:   proceso.proceso_id,
+          dni:          user?.dni || '',
+          correlativos: correlativosLimpios,
         }),
       });
       if (!res.ok) {
@@ -695,6 +816,8 @@ export function RevisionSection({ user }) {
           onConfirm={handleConfirmar}
           onReset={reset}
           compact={cameFromChat}
+          correlativos={correlativos}
+          setCorrelativos={setCorrelativos}
         />
       )}
 

@@ -208,7 +208,10 @@ _DEFAULT_FLAG_CONVERSION = "S"
 # Generador de filas (factura → 2-3 filas A-AO)
 # ─────────────────────────────────────────────────────────────────────────
 
-def factura_a_filas(factura: Dict, contab: Dict, fecha_hoy: str) -> List[Dict]:
+def factura_a_filas(
+    factura: Dict, contab: Dict, fecha_hoy: str,
+    numero_comprobante: str = "",
+) -> List[Dict]:
     """
     Convierte una factura en 2-3 dicts cuyas KEYS son letras de columna
     (A, B, ..., AO) listas para escribir directo al Excel CONCAR.
@@ -219,9 +222,15 @@ def factura_a_filas(factura: Dict, contab: Dict, fecha_hoy: str) -> List[Dict]:
       - Línea 3: CXP PROVEEDOR (HABER) — cuenta cxp, total con IGV, anexo = ruc.
 
     Args:
-        factura:    dict con campos OCR-extraídos + obra_area.
-        contab:     dict resultado de engine.merge_config(DEFAULTS, overrides).
-        fecha_hoy:  string DD/MM/YYYY para columna J ("Fecha Tipo de Cambio").
+        factura:           dict con campos OCR-extraídos + obra_area.
+        contab:            dict resultado de engine.merge_config(DEFAULTS, overrides).
+        fecha_hoy:         string DD/MM/YYYY para columna J ("Fecha Tipo de Cambio").
+        numero_comprobante: string para columna C ("Número de Comprobante").
+                            Formato esperado MMNNNN (6 chars). El cálculo del
+                            valor (mes + correlativo zero-padded por sub_diario)
+                            vive en `engine.generate`; acá solo lo usamos en la
+                            salida. Default "" deja la columna vacía (back-compat
+                            con consumers que llaman sin este arg).
     """
     tipo_doc    = (factura.get("tipo_doc_codigo") or "FT").upper()
     sub_diario  = contab["sub_diarios"].get(tipo_doc, "11")
@@ -259,7 +268,7 @@ def factura_a_filas(factura: Dict, contab: Dict, fecha_hoy: str) -> List[Dict]:
         return {
             "A":  "",
             "B":  sub_diario,
-            "C":  "",
+            "C":  numero_comprobante,
             "D":  fecha_emi,
             "E":  moneda_code,
             "F":  glosa_principal,

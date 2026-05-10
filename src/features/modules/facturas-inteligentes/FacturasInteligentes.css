@@ -467,6 +467,75 @@
   text-align: right;
 }
 
+/* ── Panel de correlativos por sub_diario (CorrelativosPanel) ── */
+.fact-correlativos {
+  margin-top: 1.5rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--md-outline-variant, #c7c5d0);
+  border-radius: 12px;
+  background: var(--md-surface-container-low, #f7f4f9);
+}
+.fact-correlativos-title {
+  margin: 0 0 0.35rem 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--md-on-surface);
+}
+.fact-correlativos-desc {
+  margin: 0 0 0.85rem 0;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: var(--md-on-surface-variant, #49454e);
+}
+.fact-correlativos-desc code {
+  font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+  font-size: 0.78rem;
+  padding: 1px 6px;
+  background: var(--md-surface-variant, #e7e0ec);
+  border-radius: 4px;
+}
+.fact-correlativo-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 140px;
+  grid-template-areas:
+    "label  input"
+    "hint   hint"
+    "warn   warn";
+  align-items: center;
+  gap: 0.4rem 0.8rem;
+  padding: 0.55rem 0;
+  border-top: 1px solid var(--md-outline-variant, #c7c5d0);
+}
+.fact-correlativo-row:first-of-type {
+  border-top: none;
+  padding-top: 0.25rem;
+}
+.fact-correlativo-label {
+  grid-area: label;
+  font-size: 0.88rem;
+  color: var(--md-on-surface);
+}
+.fact-correlativo-meta {
+  font-size: 0.78rem;
+  color: var(--md-on-surface-variant, #49454e);
+  font-weight: 400;
+}
+.fact-correlativo-input {
+  grid-area: input;
+  width: 100%;
+}
+.fact-correlativo-hint {
+  grid-area: hint;
+  font-size: 0.75rem;
+  color: var(--md-on-surface-variant, #49454e);
+}
+.fact-correlativo-warn {
+  grid-area: warn;
+  font-size: 0.75rem;
+  color: var(--md-error, #ba1a1a);
+  line-height: 1.3;
+}
+
 /* ── Mobile tweaks ── */
 @media (max-width: 640px) {
   .fact-card { padding: 1.25rem; border-radius: 16px; }
@@ -475,4 +544,13 @@
   .fact-step-line { min-width: 12px; margin-top: 14px; }
   .fact-btn-row { flex-direction: column; align-items: stretch; }
   .fact-btn-row .fact-btn { width: 100%; }
+  .fact-correlativo-row {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "label"
+      "input"
+      "hint"
+      "warn";
+  }
+  .fact-correlativo-input { width: 100%; }
 }

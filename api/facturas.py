@@ -281,8 +281,32 @@ def _concar(req, empresa_id: str) -> None:
         if not proceso_id:
             return req._json(400, {"error": "proceso_id requerido."})
 
+        # Correlativos por sub_diario (opcional). Shape esperado:
+        #   {"11": 20, "13": 1, "15": 5}  → keys = códigos sub_diario CONCAR,
+        #                                    values = correlativo inicial int.
+        # Si no viene o es {}, el engine deja columna C vacía (back-compat).
+        correlativos_raw = body.get("correlativos") or {}
+        if not isinstance(correlativos_raw, dict):
+            return req._json(400, {"error": "correlativos debe ser un dict."})
+        correlativos: dict[str, int] = {}
+        for sd_key, val in correlativos_raw.items():
+            sd = str(sd_key).strip()
+            try:
+                ival = int(val)
+            except (TypeError, ValueError):
+                return req._json(400, {
+                    "error": f"correlativos['{sd}'] debe ser entero positivo.",
+                })
+            if ival < 1:
+                return req._json(400, {
+                    "error": f"correlativos['{sd}'] debe ser >= 1.",
+                })
+            correlativos[sd] = ival
+
         try:
-            out = registro_contable_engine.generate(proceso_id, empresa_id)
+            out = registro_contable_engine.generate(
+                proceso_id, empresa_id, correlativos=correlativos,
+            )
         except ValueError as e:
             # Proceso inexistente, sin facturas, o sistema_contable no soportado.
             status = 404 if "no encontrado" in str(e).lower() else 400
@@ -293,7 +317,8 @@ def _concar(req, empresa_id: str) -> None:
 
         print(
             f"[facturas/concar] {proceso_id} sistema={out['sistema']}: "
-            f"{out['num_facturas']} facturas → {out['num_filas']} filas",
+            f"{out['num_facturas']} facturas → {out['num_filas']} filas; "
+            f"correlativos={correlativos or '(vacío, col C en blanco)'}",
             file=sys.stderr,
         )
 
