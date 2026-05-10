@@ -7,8 +7,12 @@
     { "source": "/api/(.*)", "destination": "/api/$1" }
   ],
   "functions": {
-    "api/**/*.py": { "maxDuration": 60 },
-    "api/chat.py":     { "maxDuration": 300 },
-    "api/facturas.py": { "maxDuration": 300 }
+    "api/chat.py":        { "maxDuration": 300 },
+    "api/facturas.py":    { "maxDuration": 300 },
+    "api/config.py":      { "maxDuration": 60 },
+    "api/login.py":       { "maxDuration": 60 },
+    "api/parse_file.py":  { "maxDuration": 60 },
+    "api/transcribe.py":  { "maxDuration": 60 },
+    "api/ventas.py":      { "maxDuration": 60 }
   }
 }
