@@ -106,12 +106,17 @@ def factura_a_asientos(factura: Dict, contab: Dict) -> List[Dict]:
     concepto_corto = concepto[:30]
     tasa           = contab.get("tasa_igv", 18.0)
 
+    # Cuenta contable de la línea GASTO: la del usuario (editable en la
+    # pantalla de revisión) prevalece sobre el default del template.
+    cuenta_gasto_factura = (factura.get("cuenta_contable") or "").strip()
+    cuenta_gasto = cuenta_gasto_factura or contab["cuentas"]["gasto"]
+
     asientos: List[Dict] = []
 
     # ── LÍNEA 1: GASTO (DEBE) ──────────────────────────────────────────
     asientos.append({
         "sub_diario":      sub_diario,
-        "cuenta_contable": contab["cuentas"]["gasto"],
+        "cuenta_contable": cuenta_gasto,
         "ruc_dni":         "",
         "cc":              cc,
         "debe_haber":      "D",

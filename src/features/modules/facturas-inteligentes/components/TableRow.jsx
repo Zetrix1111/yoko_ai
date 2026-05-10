@@ -181,6 +181,21 @@ export default function TableRow({
         />
       </td>
 
+      {/* Cuenta contable — input libre. Vacía → fallback al default
+          del template CONCAR (63/65). Se usa en columna K del Excel. */}
+      <td className="col-cuenta">
+        <EditableCell
+          value={factura.cuenta_contable}
+          type="text"
+          isEditing={isEditing('cuenta_contable')}
+          onStartEdit={() => handleStartEdit('cuenta_contable')}
+          onStopEdit={handleStopEdit}
+          onChange={(val) => handleChange('cuenta_contable', val)}
+          placeholder="63/65 (default)"
+          maxLength={12}
+        />
+      </td>
+
       {/* Estado */}
       <td className="col-estado">
         <span className="estado-badge">{factura.estado}</span>

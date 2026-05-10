@@ -338,9 +338,16 @@ def factura_a_filas(
 
     filas: List[Dict] = []
 
+    # Cuenta contable de la línea de GASTO. Por factura, el usuario puede
+    # editar `cuenta_contable` en la pantalla de revisión y eso prevalece
+    # sobre el default del template (63/65 para CONCAR). Si el campo viene
+    # vacío o no existe, fallback al default → behavior previo intacto.
+    cuenta_gasto_factura = (factura.get("cuenta_contable") or "").strip()
+    cuenta_gasto = cuenta_gasto_factura or contab["cuentas"]["gasto"]
+
     # ── LÍNEA 1: GASTO (DEBE) ─────────────────────────────────────
     fila_gasto = _fila_base(base)
-    fila_gasto["K"] = contab["cuentas"]["gasto"]
+    fila_gasto["K"] = cuenta_gasto
     fila_gasto["M"] = cc
     fila_gasto["N"] = "D"
     filas.append(fila_gasto)
