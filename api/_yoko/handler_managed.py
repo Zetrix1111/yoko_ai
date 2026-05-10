@@ -185,7 +185,10 @@ def handle_post(req) -> None:
                 )
             except AirtableError as e:
                 print(f"[chat/managed] Airtable: {e}", file=sys.stderr)
-                return req._json(502, {"error": "Error al consultar la base de datos."})
+                return req._json(502, {
+                    "error": "Error al consultar la base de datos.",
+                    "where": "construir_contexto_empresa",
+                })
 
             try:
                 title = f"yoko/{empresa_id}/{user_id}"
@@ -196,7 +199,11 @@ def handle_post(req) -> None:
                 )
             except mac.ManagedAgentsError as e:
                 print(f"[chat/managed] No pude crear session: {e}", file=sys.stderr)
-                return req._json(502, {"error": "Error iniciando la conversación."})
+                return req._json(502, {
+                    "error": "Error iniciando la conversación.",
+                    "where": "mac.create_session",
+                    "anthropic_status": e.status,
+                })
 
             try:
                 yoko_session_store.store_session(
@@ -236,7 +243,11 @@ def handle_post(req) -> None:
                     f"[chat/managed] cart_store.add_files falló: {e}",
                     file=sys.stderr,
                 )
-                return req._json(502, {"error": "Error guardando los adjuntos."})
+                return req._json(502, {
+                    "error": "Error guardando los adjuntos.",
+                    "where": "yoko_cart_store.add_files",
+                    "detail": f"{type(e).__name__}: {e}",
+                })
 
         try:
             total_carrito = yoko_cart_store.cart_size(session_id)
@@ -289,16 +300,32 @@ def handle_post(req) -> None:
         # bloquear esta function.
         auth_header = req.headers.get("Authorization") or ""
         task_id = yoko_task_store.new_task_id()
-        ok = yoko_task_store.create(
-            task_id,
-            session_id=session_id,
-            user_id=user_id,
-            empresa_id=empresa_id,
-            user_content=last_user_content,
-            auth_header=auth_header,
-        )
+        try:
+            ok = yoko_task_store.create(
+                task_id,
+                session_id=session_id,
+                user_id=user_id,
+                empresa_id=empresa_id,
+                user_content=last_user_content,
+                auth_header=auth_header,
+            )
+        except Exception as e:
+            print(
+                f"[chat/managed] task_store.create excepción: "
+                f"{type(e).__name__}: {e}",
+                file=sys.stderr,
+            )
+            return req._json(502, {
+                "error": "No se pudo encolar la conversación.",
+                "where": "yoko_task_store.create",
+                "detail": f"{type(e).__name__}: {e}",
+            })
+
         if not ok:
-            return req._json(502, {"error": "No se pudo encolar la conversación."})
+            return req._json(502, {
+                "error": "No se pudo encolar la conversación.",
+                "where": "yoko_task_store.create returned False",
+            })
 
         try:
             _kick_worker(task_id)
@@ -306,11 +333,20 @@ def handle_post(req) -> None:
             # Si fire-and-forget falla, el task queda pending y el frontend
             # va a hacer polling — pero el worker nunca arrancó. Mejor
             # avisar y dejar que el usuario reintente.
-            print(f"[chat/managed] _kick_worker falló: {e}", file=sys.stderr)
+            import traceback
+            print(
+                f"[chat/managed] _kick_worker falló: "
+                f"{type(e).__name__}: {e}\n{traceback.format_exc()}",
+                file=sys.stderr,
+            )
             yoko_task_store.mark_error(
                 task_id, f"No se pudo arrancar el worker: {e}"
             )
-            return req._json(502, {"error": "Error iniciando el procesamiento."})
+            return req._json(502, {
+                "error": "Error iniciando el procesamiento.",
+                "where": "_kick_worker",
+                "detail": f"{type(e).__name__}: {e}",
+            })
 
         print(
             f"[chat/managed] task {task_id} encolado y worker disparado",
@@ -320,11 +356,17 @@ def handle_post(req) -> None:
         return req._json(202, {"task_id": task_id, "status": "pending"})
 
     except Exception as e:
+        import traceback
+        tb = traceback.format_exc()
         print(
-            f"[chat/managed] Error inesperado: {type(e).__name__}: {e}",
+            f"[chat/managed] Error inesperado: {type(e).__name__}: {e}\n{tb}",
             file=sys.stderr,
         )
-        return req._json(500, {"error": "Error interno del servidor."})
+        return req._json(500, {
+            "error": "Error interno del servidor.",
+            "where": "handle_post outer except",
+            "detail": f"{type(e).__name__}: {e}",
+        })
 
 
 # ─────────────────────────────────────────────────────────────────────────
