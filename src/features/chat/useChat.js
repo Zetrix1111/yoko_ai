@@ -3,10 +3,25 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { API, postJsonAuth, postFormAuth, getJsonAuth } from '../../shared/api';
 
 // Backend conversacional: openai (legacy) | managed_agents (Anthropic).
-// Tiene que coincidir con la env var YOKO_BACKEND del backend; si no, los
-// archivos se procesan dos veces (parse_file + skill yoko-facturas) o ninguna.
-const YOKO_BACKEND = (import.meta.env.VITE_YOKO_BACKEND || 'openai').toLowerCase();
-const IS_MANAGED_AGENTS = YOKO_BACKEND === 'managed_agents';
+// Antes era una constante a load-time (env var VITE_YOKO_BACKEND). Ahora
+// el usuario puede alternar desde el header del chat (BackendSwitch), así
+// que la decisión vive en state runtime + localStorage. El env var sigue
+// siendo el default si el usuario nunca tocó el switch.
+//
+// Cada request lleva un header HTTP `X-Yoko-Backend` que el backend usa
+// para decidir el cerebro — el body queda inalterado.
+const DEFAULT_BACKEND = (import.meta.env.VITE_YOKO_BACKEND || 'openai').toLowerCase();
+const BACKEND_STORAGE_KEY = 'yoko_backend_preference';
+
+function readInitialBackend() {
+  try {
+    const stored = localStorage.getItem(BACKEND_STORAGE_KEY);
+    if (stored === 'managed_agents' || stored === 'openai') return stored;
+  } catch {
+    // localStorage no disponible (incognito strict, etc.) → fallback al default.
+  }
+  return DEFAULT_BACKEND === 'managed_agents' ? 'managed_agents' : 'openai';
+}
 
 // Vercel impone un hard limit de 4.5MB por request body. 1 PDF promedio
 // pesa ~750KB después de base64 inflation, así que 4 archivos ~3MB cabe
@@ -39,19 +54,47 @@ function fileToBase64(file) {
   });
 }
 
+function buildGreetingMessage(user) {
+  const text = user?.nombre
+    ? `¡Hola, ${user.nombre}! Soy tu asistente inteligente. Puedo ayudarte a ejecutar procesos como rendiciones, caja chica y pagos. ¿Qué deseas hacer hoy?`
+    : `¡Hola! Soy tu asistente inteligente. Puedo ayudarte a ejecutar procesos como rendiciones, caja chica y pagos. ¿Qué deseas hacer hoy?`;
+  return { id: crypto.randomUUID(), text, sender: 'yoko' };
+}
+
 export function useChat(user) {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const greeting = user?.nombre
-    ? `¡Hola, ${user.nombre}! Soy tu asistente inteligente. Puedo ayudarte a ejecutar procesos como rendiciones, caja chica y pagos. ¿Qué deseas hacer hoy?`
-    : `¡Hola! Soy tu asistente inteligente. Puedo ayudarte a ejecutar procesos como rendiciones, caja chica y pagos. ¿Qué deseas hacer hoy?`;
 
-  const [messages, setMessages] = useState([{
-    id: crypto.randomUUID(),
-    text: greeting,
-    sender: 'yoko',
-  }]);
+  const [messages, setMessages] = useState(() => [buildGreetingMessage(user)]);
   const [isUploading, setIsUploading] = useState(false);
+  const [currentBackend, setCurrentBackend] = useState(readInitialBackend);
+  const isManaged = currentBackend === 'managed_agents';
+
+  // Cambia el cerebro activo. Si la conversación tiene mensajes propios
+  // (más que el greeting), pide confirmación porque el reset descarta el
+  // contexto visible. La session vieja del backend anterior queda colgada
+  // server-side y expira sola por el TTL de KV (4 hrs).
+  const switchBackend = useCallback((next) => {
+    if (next !== 'managed_agents' && next !== 'openai') return;
+    if (next === currentBackend) return;
+
+    // > 1 mensaje significa que ya hubo intercambio con el bot.
+    const hasConversation = messages.length > 1;
+    if (hasConversation) {
+      const proceed = window.confirm(
+        'Cambiar de cerebro reseteará la conversación actual. ¿Continuar?'
+      );
+      if (!proceed) return;
+    }
+
+    try {
+      localStorage.setItem(BACKEND_STORAGE_KEY, next);
+    } catch {
+      // ignoramos errores de localStorage (storage lleno, modo strict, etc.)
+    }
+    setCurrentBackend(next);
+    setMessages([buildGreetingMessage(user)]);
+  }, [currentBackend, messages.length, user]);
 
   // Cuando el usuario vuelve al chat tras descargar el registro contable
   // desde la pantalla de Revisión (`/chat?facturas_done=proc-xxx`),
@@ -92,7 +135,10 @@ export function useChat(user) {
       await sleep(POLL_INTERVAL_MS);
       let res;
       try {
-        res = await getJsonAuth(`/api/chat?action=status&task_id=${encodeURIComponent(taskId)}`);
+        res = await getJsonAuth(
+          `/api/chat?action=status&task_id=${encodeURIComponent(taskId)}`,
+          { headers: { 'X-Yoko-Backend': currentBackend } },
+        );
       } catch (err) {
         // Errores transitorios de red: seguir polleando hasta el techo.
         console.warn('[chat/status] poll error', err);
@@ -136,7 +182,7 @@ export function useChat(user) {
         ? { ...m, text: '⏰ Se agotó el tiempo de espera. Probá de nuevo.', isLoading: false }
         : m
     ));
-  }, []);
+  }, [currentBackend]);
 
   // ───────────────────────────────────────────────────────────────────
   // Encoding y POST de UN chunk (o de un mensaje sin archivos).
@@ -167,7 +213,7 @@ export function useChat(user) {
       }]);
 
       try {
-        if (IS_MANAGED_AGENTS) {
+        if (isManaged) {
           const encoded = [];
           for (let i = 0; i < files.length; i++) {
             const file = files[i];
@@ -250,7 +296,7 @@ export function useChat(user) {
       }
 
       const lastUserMsg = { role: 'user', content: mensajeConContexto };
-      const apiMessages = IS_MANAGED_AGENTS
+      const apiMessages = isManaged
         ? [lastUserMsg]
         : [
             ...messages.filter((m) => !m.isLoading).map((m) => ({
@@ -263,7 +309,9 @@ export function useChat(user) {
       const payload = { user: user || {}, messages: apiMessages };
       if (attachmentsForChat) payload.attachments = attachmentsForChat;
 
-      const data = await postJsonAuth(API.CHAT, payload);
+      const data = await postJsonAuth(API.CHAT, payload, {
+        headers: { 'X-Yoko-Backend': currentBackend },
+      });
 
       // Modo async (managed_agents nuevo): backend devuelve task_id, polleamos.
       if (data && data.task_id) {
@@ -304,7 +352,7 @@ export function useChat(user) {
         ));
       }
     }
-  }, [user, messages, navigate, pollTaskUntilDone]);
+  }, [user, messages, navigate, pollTaskUntilDone, currentBackend, isManaged]);
 
   // ───────────────────────────────────────────────────────────────────
   // Entry point: el componente llama esto. Si hay >CHUNK_SIZE archivos,
@@ -329,7 +377,7 @@ export function useChat(user) {
     }]);
 
     // Si caben en un solo POST, ruta directa.
-    if (!IS_MANAGED_AGENTS || safeFiles.length <= CHUNK_SIZE) {
+    if (!isManaged || safeFiles.length <= CHUNK_SIZE) {
       await sendOneChunk({
         text,
         files: safeFiles,
@@ -355,7 +403,7 @@ export function useChat(user) {
         showLoadingBubble: true,            // cada chunk: bot confirma "Listo (N)"
       });
     }
-  }, [sendOneChunk]);
+  }, [sendOneChunk, isManaged]);
 
-  return { messages, sendMessage, isUploading };
+  return { messages, sendMessage, isUploading, currentBackend, switchBackend };
 }

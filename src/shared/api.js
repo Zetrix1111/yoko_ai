@@ -76,12 +76,12 @@ export async function apiFetch(url, options = {}) {
   return res.text();
 }
 
-export async function postJsonAuth(url, body) {
-  return apiFetch(url, { method: 'POST', body });
+export async function postJsonAuth(url, body, options = {}) {
+  return apiFetch(url, { ...options, method: 'POST', body });
 }
 
-export async function getJsonAuth(url) {
-  return apiFetch(url, { method: 'GET' });
+export async function getJsonAuth(url, options = {}) {
+  return apiFetch(url, { ...options, method: 'GET' });
 }
 
 export async function patchJsonAuth(url, body) {

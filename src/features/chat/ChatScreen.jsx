@@ -3,10 +3,11 @@ import { LayoutGrid, UploadCloud, LogOut } from 'lucide-react';
 import { APP_NAME, APP_LOGO } from '../../shared/branding';
 import MessageBubble from './MessageBubble';
 import ChatInput from './ChatInput';
+import BackendSwitch from './BackendSwitch';
 import { useChat } from './useChat';
 
 export default function ChatScreen({ user, onOpenModules, onLogout }) {
-  const { messages, sendMessage, isUploading } = useChat(user);
+  const { messages, sendMessage, isUploading, currentBackend, switchBackend } = useChat(user);
   const [files, setFiles] = useState([]);
   const [isDragging, setIsDragging] = useState(false);
   const messagesEndRef = useRef(null);
@@ -78,6 +79,7 @@ export default function ChatScreen({ user, onOpenModules, onLogout }) {
             <p className="agent-status">En línea</p>
           </div>
         </div>
+        <BackendSwitch value={currentBackend} onChange={switchBackend} />
         <div className="header-actions">
           <button
             className="icon-btn"
