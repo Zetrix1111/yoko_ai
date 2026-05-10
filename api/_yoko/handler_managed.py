@@ -30,11 +30,9 @@ Flujo (protocolo real de la beta `managed-agents-2026-04-01`):
   8. Devolver `{"text": "...", "action": null}` al frontend.
 """
 
-import base64
 import json
 import os
 import sys
-import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -57,23 +55,11 @@ _REQUIRED_ENV = (
     "KV_REST_API_TOKEN",
 )
 
-# Mapeo nombre del custom tool → action en /api/facturas. Si un tool nuevo
-# aparece, agregar acá y crear la action en facturas.py. Tiene que coincidir
-# con `ALL_TOOLS` de `_yoko_agents/tools/__init__.py`.
-_TOOL_TO_ACTION: dict[str, str] = {
-    "yoko_procesar_archivos":         "procesar-chat",
-    "yoko_generar_registro_contable": "registro-contable-chat",
-    # "yoko_recuperar_proceso":       "recuperar-chat",  # uso futuro
-}
-
 # Vault es por empresa. Hoy hardcodeamos cmejia; cuando se sumen más empresas,
 # se mueve a Airtable o a un dict externo.
 _VAULT_ENV_BY_EMPRESA: dict[str, str] = {
     "cmejia": "YOKO_VAULT_ID_CMEJIA",
 }
-
-_TOOL_HTTP_TIMEOUT = 120  # 2 min: procesar 50 PDFs puede tardar
-_MAX_TURNS = 8            # safety: corta loops de requires_action ↔ tool_result
 
 
 def handle_post(req) -> None:
@@ -459,66 +445,8 @@ def _last_user_content(messages: list) -> str:
 
 
 # NOTA: la antigua función `_run_turn` (versión síncrona) se movió al
-# worker async como `_run_turn_streaming` en `handler_worker.py`. Acá
-# solo dejamos los helpers que el worker importa: `_exec_local_tool` y
-# `_TOOL_TO_ACTION`.
-
-
-def _exec_local_tool(action: str, input_args: dict, auth_header: str) -> dict:
-    """
-    Ejecuta un custom tool del agent haciendo HTTP loopback a la propia API
-    Yoko en `/api/facturas?action=<action>` con el JWT del usuario reenviado.
-
-    Devuelve dict que se serializa como `user.custom_tool_result`. Si la
-    respuesta del endpoint es binaria (xlsx en download-chat), la codifica en
-    base64 y la incluye en el dict.
-    """
-    base = (os.environ.get("YOKO_API_BASE") or "https://yokochat.vercel.app").rstrip("/")
-    url = f"{base}/api/facturas?action={urllib.parse.quote(action)}"
-
-    body = json.dumps(input_args).encode("utf-8")
-    request = urllib.request.Request(url, data=body, method="POST")
-    request.add_header("Content-Type", "application/json")
-    if auth_header:
-        request.add_header("Authorization", auth_header)
-
-    try:
-        with urllib.request.urlopen(request, timeout=_TOOL_HTTP_TIMEOUT) as res:
-            content_type = res.headers.get("Content-Type", "") or ""
-            data = res.read()
-            if "application/json" in content_type:
-                return json.loads(data) if data else {}
-            if "spreadsheet" in content_type or action == "download-chat":
-                disposition = res.headers.get("Content-Disposition", "") or ""
-                return {
-                    "ok":           True,
-                    "filename":     _filename_from_disposition(disposition),
-                    "content_b64":  base64.b64encode(data).decode("ascii"),
-                    "content_type": content_type,
-                }
-            return {"ok": True, "raw_size": len(data), "content_type": content_type}
-    except urllib.error.HTTPError as e:
-        try:
-            err_body = e.read().decode("utf-8", errors="replace")
-        except Exception:
-            err_body = ""
-        print(
-            f"[chat/managed] tool {action} HTTP {e.code}: {err_body[:300]}",
-            file=sys.stderr,
-        )
-        return {"error": f"HTTP {e.code} en {action}", "detail": err_body[:300]}
-    except urllib.error.URLError as e:
-        print(f"[chat/managed] tool {action} URL error: {e}", file=sys.stderr)
-        return {"error": f"Error de red al ejecutar {action}"}
-    except Exception as e:
-        print(
-            f"[chat/managed] tool {action} excepción {type(e).__name__}: {e}",
-            file=sys.stderr,
-        )
-        return {"error": f"Error inesperado en {action}: {type(e).__name__}"}
-
-
-def _filename_from_disposition(header: str) -> str:
-    if "filename=" not in header:
-        return "archivo"
-    return header.split("filename=", 1)[1].strip(' ;"\'')
+# worker async como `_run_turn_streaming` en `handler_worker.py`. La
+# ejecución de custom tools (`execute_local_tool` + `TOOL_TO_ACTION`)
+# se extrajo a `_lib/tool_executor.py` para que ambos handlers (y futuros
+# consumidores) la importen de un lugar neutral, sin acoplarse a
+# handler_managed.

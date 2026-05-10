@@ -22,17 +22,12 @@ Nunca devuelve texto al cliente HTTP que lo invocó (el dispatcher
 
 import os
 import sys
-import urllib.error
-import urllib.parse
-import urllib.request
 from urllib.parse import parse_qs, urlparse
 
 from _lib import managed_agents_client as mac
 from _lib import yoko_cart_store, yoko_task_store
-from _yoko.handler_managed import _exec_local_tool, _TOOL_TO_ACTION
-
-
-_MAX_TURNS = 8
+from _lib._config import MAX_TURNS_PER_RUN as _MAX_TURNS  # centralizado
+from _lib.tool_executor import TOOL_TO_ACTION, execute_local_tool
 
 
 def handle_post(req) -> None:
@@ -213,7 +208,7 @@ def _run_turn_streaming(
                         except Exception:
                             pass
 
-                    action = _TOOL_TO_ACTION.get(tool_name)
+                    action = TOOL_TO_ACTION.get(tool_name)
                     if not action:
                         result: dict = {"error": f"Tool '{tool_name}' no soportado."}
                         print(
@@ -221,7 +216,7 @@ def _run_turn_streaming(
                             file=sys.stderr,
                         )
                     else:
-                        result = _exec_local_tool(action, tool_input, auth_header)
+                        result = execute_local_tool(action, tool_input, auth_header)
 
                     # Si yoko_procesar_archivos terminó OK, vaciar el carrito.
                     if (
