@@ -19,9 +19,8 @@ import sys
 from datetime import datetime, timezone
 
 from . import kv_client
+from ._config import SESSION_TTL_SECONDS  # centralizado
 
-
-SESSION_TTL_SECONDS = 4 * 60 * 60  # 4 horas
 
 _SESSION_KEY_PREFIX = "yoko:session"
 _METADATA_KEY_PREFIX = "yoko:session_meta"

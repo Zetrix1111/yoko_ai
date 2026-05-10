@@ -40,13 +40,13 @@ import uuid
 from typing import Any
 
 from . import kv_client
+from ._config import (  # centralizado
+    TASK_TTL_ACTIVE_SECONDS as _TTL_ACTIVE,
+    TASK_TTL_FINAL_SECONDS as _TTL_FINAL,
+)
 
 
 _KEY_TPL = "yoko:task:{task_id}"
-
-# TTLs separados para active vs final state.
-_TTL_ACTIVE   = 5 * 60   # 5 minutos: suficiente para el turno más largo (300s) + slack
-_TTL_FINAL    = 60       # 60 segundos: ventana para que el frontend recoja el resultado
 
 
 def _key(task_id: str) -> str:
