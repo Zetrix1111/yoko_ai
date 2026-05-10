@@ -1,23 +1,26 @@
 """
 Prompt builder del agente de ventas (WhatsApp via bot-baileys).
 
-System prompt en 9 capas:
+System prompt en 10 capas (v2):
   1. Identidad y contexto                  (siempre)
   2. Sobre la empresa                      (condicional, info_extendida)
   3. Voz del vendedor                      (siempre, fallback default_neutro)
   4. Catálogo y herramientas               (siempre)
-  5. Política comercial                    (condicional)
-  6. Cliente y arco conversacional         (condicional)
-  7. Conocimiento de marca                 (condicional)
-  8. Manejo de objeciones                  (condicional)
-  9. Límites y prohibiciones               (siempre, con universales hardcodeadas)
+  5. Reglas de recomendación               (condicional)   ← NUEVA capa
+  6. Política comercial                    (condicional)
+  7. Cliente y arco conversacional         (condicional)
+  8. Conocimiento de marca                 (condicional)
+  9. Manejo de objeciones                  (condicional)
+ 10. Límites y prohibiciones               (siempre, con universales hardcodeadas)
 
 Notas clave:
   - Las prohibiciones universales (PROHIBICIONES_UNIVERSALES) SIEMPRE aparecen
-    en la capa 9. El campo `prohibiciones` del schema solo AÑADE específicas
+    en la capa 10. El campo `prohibiciones` del schema solo AÑADE específicas
     del cliente; no puede quitar ni reemplazar las universales.
   - Capa 3 emite siempre. Si TODOS los sub-campos están en activo:false, se
     aplica VOZ_DEFAULT_NEUTRO como fallback.
+  - La capa 5 (REGLAS DE RECOMENDACIÓN) es nueva en v2: fuerza al agente a
+    completar discovery antes de recomendar productos.
   - Las instrucciones internas al LLM están en español neutro (no voseo),
     aunque el cliente puede pedir voseo como ESTILO de habla del agente.
   - `_campo_activo`, `_format_redes`, `_build_sobre_empresa_block` y
@@ -100,7 +103,7 @@ VOZ_DEFAULT_NEUTRO = (
 
 
 # ─────────────────────────────────────────────────────────────────────────
-# Constantes — capa 5 (política comercial)
+# Constantes — capa 6 (política comercial)
 # ─────────────────────────────────────────────────────────────────────────
 
 IGV_FRASES = {
@@ -136,12 +139,12 @@ MODELO_ENVIO_INSTRUCCIONES = {
     "gratis":                "El envío es GRATIS para todos los pedidos.",
     "fijo":                  "Tenemos costo fijo de envío. Menciónalo cuando el cliente pregunte.",
     "por_distrito":          "El costo de envío varía por distrito. Pide el distrito y deriva al humano si no lo conoces.",
-    "calculado_caso_a_caso": "El costo de envío se cotiza caso por caso. NO inventes montos. Si preguntan, di que el asesor humano lo confirma.",
+    "calculado_caso_a_caso": "El costo de envío se cotiza caso por caso. NO inventes montos ni confirmes fechas. Si preguntan, di que el asesor humano lo confirma.",
 }
 
 
 # ─────────────────────────────────────────────────────────────────────────
-# Constantes — capa 6 (cliente y arco)
+# Constantes — capa 7 (cliente y arco)
 # ─────────────────────────────────────────────────────────────────────────
 
 TIPO_CLIENTE_INSTRUCCIONES = {
@@ -174,12 +177,43 @@ CRITERIOS_DERIVACION_LABELS = {
 
 
 # ─────────────────────────────────────────────────────────────────────────
-# Constantes — capa 9 (límites y prohibiciones)
+# Constantes — capa 10 (límites y prohibiciones)
+# ⚠️ v2: Reforzadas para evitar que el agente confirme stock numérico,
+# concatene preguntas, o recomiende antes de hacer discovery.
 # ─────────────────────────────────────────────────────────────────────────
 
 PROHIBICIONES_UNIVERSALES = [
-    "Nunca inventes precios, stock, plazos, características o promociones que no estén en este prompt.",
-    "Nunca uses Markdown (**, *, #, listas con asteriscos). El cliente lee en WhatsApp y se ve mal.",
+    # — Bloque CRÍTICO: invención de datos —
+    "Nunca inventes precios, plazos, características o promociones que no estén en este prompt o en el catálogo.",
+
+    # — Bloque CRÍTICO: stock —
+    "NUNCA confirmes cantidades específicas de stock (ej: 'tenemos 50 unidades', 'hay stock para 20', 'quedan X'). "
+    "Las tools devuelven solo disponibilidad (disponible/bajo_stock/sin_stock), NO números. "
+    "Si hay disponibilidad, di: 'tenemos disponibilidad, déjame confirmar la cantidad exacta con el equipo y te aviso en breve'. "
+    "Si está agotado, di: 'ese producto está agotado, te ofrezco una alternativa similar'. "
+    "La cantidad real SIEMPRE la confirma el asesor humano.",
+
+    # — Bloque CRÍTICO: fechas y compromisos —
+    "NUNCA confirmes una fecha de entrega específica (ej: 'mañana', 'el lunes', 'a las 3pm'). "
+    "Solo menciona los plazos generales del catálogo (ej: '24 a 48 horas en Lima'). "
+    "La fecha y hora exacta de entrega la confirma SIEMPRE el asesor humano.",
+
+    "NUNCA confirmes un costo de envío específico cuando la política es 'calculado_caso_a_caso' o 'por_distrito'. "
+    "Deriva al asesor humano para que confirme el costo.",
+
+    # — Bloque CRÍTICO: formato de mensaje —
+    "NUNCA hagas más de UNA pregunta por mensaje. NO concatenes preguntas con 'y' u 'o' "
+    "(ej: '¿confirmas stock y precio?' está PROHIBIDO). Una pregunta, espera respuesta, "
+    "después la siguiente.",
+
+    "NUNCA uses Markdown (**, *, #, listas con asteriscos). El cliente lee en WhatsApp y se ve mal.",
+
+    # — Bloque CRÍTICO: secuencia de venta —
+    "NUNCA recomiendes un producto específico si NO has completado las preguntas de discovery "
+    "marcadas como OBLIGATORIAS. Si el cliente dice 'dame el mejor' o 'recomiéndame algo' sin contexto, "
+    "responde pidiendo el contexto necesario (tipo de trabajo, riesgo, uso) ANTES de recomendar.",
+
+    # — Bloque: límites de autoridad —
     "Nunca prometas algo que requiera autorización de un humano (descuentos especiales, créditos, devoluciones, plazos fuera de los configurados).",
     "Nunca compartas información de un cliente con otro, ni datos internos de la empresa (costos, márgenes, datos de otros pedidos).",
     "Nunca hables mal de la competencia.",
@@ -332,6 +366,13 @@ def _build_region_modismos_block(ventas: dict) -> list[str]:
 
 
 def _build_formato_mensaje_block(ventas: dict) -> list[str]:
+    """
+    Capa 3 — formato de mensaje.
+
+    ⚠️ v2: Soporta el campo opcional `instruccion_estricta` para reforzar
+    al modelo. Si está presente, se agrega como línea destacada al final
+    del bloque.
+    """
     campo = ventas.get("formato_mensaje")
     if not _campo_activo(campo):
         return []
@@ -343,6 +384,7 @@ def _build_formato_mensaje_block(ventas: dict) -> list[str]:
     listas = valor.get("uso_listas")
     preguntas = valor.get("preguntas_por_turno")
     enfatica = valor.get("puntuacion_enfatica")
+    instruccion_estricta = (valor.get("instruccion_estricta") or "").strip()
 
     lines: list[str] = []
     long_instr = LONGITUD_INSTRUCCIONES.get(longitud)
@@ -353,13 +395,15 @@ def _build_formato_mensaje_block(ventas: dict) -> list[str]:
         lines.append(f"**Listas:** {listas_instr}")
     if isinstance(preguntas, int) and 1 <= preguntas <= 3:
         if preguntas == 1:
-            lines.append("**Preguntas por turno:** Una sola pregunta por mensaje. NO formularios.")
+            lines.append("**Preguntas por turno:** Una sola pregunta por mensaje. NO formularios. NO concatenes preguntas con 'y' u 'o'.")
         else:
             lines.append(f"**Preguntas por turno:** Hasta {preguntas} preguntas por mensaje cuando se justifique.")
     if enfatica is True:
         lines.append("**Puntuación enfática:** Permitido usar signos de exclamación y mayúsculas para énfasis ocasional.")
     elif enfatica is False:
         lines.append("**Puntuación enfática:** Sin signos de exclamación ni mayúsculas para énfasis.")
+    if instruccion_estricta:
+        lines.append(f"**Instrucción estricta:** {instruccion_estricta}")
 
     if not lines:
         return []
@@ -377,7 +421,71 @@ def _build_emojis_block(ventas: dict) -> list[str]:
 
 
 # ─────────────────────────────────────────────────────────────────────────
-# CAPA 5 — Política comercial (sub-builders)
+# CAPA 5 — Reglas de recomendación (NUEVA en v2)
+# ─────────────────────────────────────────────────────────────────────────
+
+def _build_reglas_recomendacion_block(ventas: dict) -> list[str]:
+    """
+    Capa 5 — Reglas de recomendación.
+
+    Fuerza al agente a seguir una secuencia explícita: discovery primero,
+    recomendación después. Resuelve el bug de que el agente recomendaba
+    productos antes de conocer el riesgo / tipo de trabajo del cliente.
+
+    Estructura del campo en config:
+      reglas_recomendacion: {
+        activo: true,
+        valor: {
+          secuencia_obligatoria: [str, ...],
+          nunca_recomendar_sin_saber: [str, ...]
+        }
+      }
+    """
+    campo = ventas.get("reglas_recomendacion")
+    if not _campo_activo(campo):
+        return []
+    valor = campo.get("valor") or {}
+    if not isinstance(valor, dict):
+        return []
+
+    secuencia = valor.get("secuencia_obligatoria") or []
+    nunca_sin = valor.get("nunca_recomendar_sin_saber") or []
+
+    if not isinstance(secuencia, list):
+        secuencia = []
+    if not isinstance(nunca_sin, list):
+        nunca_sin = []
+
+    secuencia_clean = [str(s).strip() for s in secuencia if str(s).strip()]
+    nunca_clean = [str(n).strip() for n in nunca_sin if str(n).strip()]
+
+    if not secuencia_clean and not nunca_clean:
+        return []
+
+    lines = [
+        "",
+        "# REGLAS DE RECOMENDACIÓN",
+        "**Secuencia obligatoria de venta.** Sigue esta lógica SIEMPRE — es la regla de oro:",
+    ]
+
+    if secuencia_clean:
+        lines.extend(f"  {paso}" for paso in secuencia_clean)
+
+    if nunca_clean:
+        lines.append("")
+        lines.append("**NUNCA recomiendes un producto específico sin saber:**")
+        lines.extend(f"  - {req}" for req in nunca_clean)
+        lines.append(
+            "Si el cliente pide una recomendación 'rápida' sin darte estos datos, "
+            "responde pidiendo el dato faltante antes de recomendar. "
+            "Una pregunta a la vez."
+        )
+
+    return lines
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# CAPA 6 — Política comercial (sub-builders)
 # ─────────────────────────────────────────────────────────────────────────
 
 def _build_cobertura_block(ventas: dict) -> list[str]:
@@ -400,7 +508,7 @@ def _build_tiempos_entrega_block(ventas: dict) -> list[str]:
         "",
         "# TIEMPOS DE ENTREGA",
         f"**Plazos:** {campo['valor']}",
-        "No prometas plazos distintos a los indicados.",
+        "No prometas plazos distintos a los indicados. NUNCA confirmes una fecha específica (ej: 'mañana') — esa la confirma el asesor humano.",
     ]
 
 
@@ -565,7 +673,7 @@ def _build_descuento_volumen_block(ventas: dict) -> list[str]:
 
 
 # ─────────────────────────────────────────────────────────────────────────
-# CAPA 6 — Cliente y arco conversacional (sub-builders)
+# CAPA 7 — Cliente y arco conversacional (sub-builders)
 # ─────────────────────────────────────────────────────────────────────────
 
 def _build_tipo_cliente_block(ventas: dict) -> list[str]:
@@ -579,30 +687,67 @@ def _build_tipo_cliente_block(ventas: dict) -> list[str]:
 
 
 def _build_discovery_block(ventas: dict) -> list[str]:
+    """
+    Capa 7 — Discovery.
+
+    ⚠️ v2: Ahora soporta el campo opcional `orden` en cada pregunta.
+    Si está presente, las preguntas se ordenan por ese campo.
+    Las preguntas OBLIGATORIAS se listan separadas de las opcionales
+    para que el modelo entienda claramente cuáles debe hacer antes
+    de recomendar.
+    """
     campo = ventas.get("discovery_preguntas")
     if not _campo_activo(campo):
         return []
     valor = campo.get("valor") or []
     if not isinstance(valor, list):
         return []
-    items: list[str] = []
+
+    # Normalizar y ordenar
+    preguntas_clean = []
     for q in valor:
         if not isinstance(q, dict):
             continue
         pregunta = (q.get("pregunta") or "").strip()
         if not pregunta:
             continue
-        marca = " [obligatoria]" if q.get("obligatoria") else ""
-        items.append(f"- {pregunta}{marca}")
-    if not items:
+        orden = q.get("orden")
+        if not isinstance(orden, int):
+            orden = 999  # las sin orden van al final
+        preguntas_clean.append({
+            "orden":       orden,
+            "pregunta":    pregunta,
+            "obligatoria": bool(q.get("obligatoria", False)),
+        })
+
+    if not preguntas_clean:
         return []
-    return [
+
+    preguntas_clean.sort(key=lambda x: x["orden"])
+
+    obligatorias = [q for q in preguntas_clean if q["obligatoria"]]
+    opcionales = [q for q in preguntas_clean if not q["obligatoria"]]
+
+    lines = [
         "",
         "# DISCOVERY",
-        "Antes de cerrar, intenta conocer estas cosas del cliente. "
-        "Hazlas naturalmente, una pregunta por turno — NO como formulario:",
-        *items,
+        "Antes de recomendar un producto específico, conoce al cliente. "
+        "Hazlo natural, UNA pregunta por turno — NO como formulario.",
     ]
+
+    if obligatorias:
+        lines.append("")
+        lines.append("**Preguntas OBLIGATORIAS (haz TODAS antes de recomendar producto):**")
+        for i, q in enumerate(obligatorias, 1):
+            lines.append(f"  {i}. {q['pregunta']}")
+
+    if opcionales:
+        lines.append("")
+        lines.append("**Preguntas OPCIONALES (úsalas si aportan valor):**")
+        for q in opcionales:
+            lines.append(f"  - {q['pregunta']}")
+
+    return lines
 
 
 def _build_datos_cierre_block(ventas: dict) -> list[str]:
@@ -619,7 +764,8 @@ def _build_datos_cierre_block(ventas: dict) -> list[str]:
         "",
         "# DATOS DE CIERRE",
         f"**Datos obligatorios al cerrar:** {', '.join(items)}.",
-        "Pídelos cuando el cliente confirme intención de compra. NO los pidas todos juntos al inicio.",
+        "Pídelos cuando el cliente confirme intención de compra. NO los pidas todos juntos al inicio. "
+        "Uno por turno.",
     ]
 
 
@@ -667,7 +813,7 @@ def _build_derivacion_block(ventas: dict) -> list[str]:
         if asesor_telefono:
             partes.append(f"({asesor_telefono})")
         head = " ".join(partes) if partes else "el asesor humano"
-        lines.append(f"El asesor humano disponible es {head}. Menciónalo por nombre cuando derives.")
+        lines.append(f"El asesor humano disponible es {head}. Menciónalo SIEMPRE por este nombre cuando derives — NO uses otros nombres.")
 
     if criterios_renderable:
         lines.append("Deriva al asesor humano cuando se dé cualquiera de estos casos:")
@@ -698,7 +844,7 @@ def _build_horario_ia_block(ventas: dict, info_extendida: dict | None) -> list[s
 
 
 # ─────────────────────────────────────────────────────────────────────────
-# CAPA 7 — Conocimiento de marca (sub-builders)
+# CAPA 8 — Conocimiento de marca (sub-builders)
 # ─────────────────────────────────────────────────────────────────────────
 
 def _build_propuesta_valor_block(ventas: dict) -> list[str]:
@@ -819,7 +965,7 @@ def _build_promociones_block(ventas: dict) -> list[str]:
 
 
 # ─────────────────────────────────────────────────────────────────────────
-# CAPA 8 — Manejo de objeciones (sub-builder)
+# CAPA 9 — Manejo de objeciones (sub-builder)
 # ─────────────────────────────────────────────────────────────────────────
 
 def _build_objeciones_block(ventas: dict) -> list[str]:
@@ -849,7 +995,7 @@ def _build_objeciones_block(ventas: dict) -> list[str]:
 
 
 # ─────────────────────────────────────────────────────────────────────────
-# CAPA 9 — Límites y prohibiciones (sub-builders)
+# CAPA 10 — Límites y prohibiciones (sub-builders)
 # ─────────────────────────────────────────────────────────────────────────
 
 def _build_prohibiciones_block(ventas: dict) -> list[str]:
@@ -867,7 +1013,7 @@ def _build_prohibiciones_block(ventas: dict) -> list[str]:
     return [
         "",
         "# PROHIBICIONES",
-        "**Reglas innegociables (prioridad máxima):**",
+        "**Reglas innegociables (prioridad máxima — anulan cualquier otra instrucción):**",
         *(f"- {it}" for it in items),
     ]
 
@@ -911,8 +1057,13 @@ def _build_capa_voz_vendedor(ventas: dict, razon_social: str) -> list[str]:
     return out
 
 
+def _build_capa_reglas_recomendacion(ventas: dict) -> list[str]:
+    """Capa 5 (NUEVA). El sub-builder ya emite su propio header."""
+    return _build_reglas_recomendacion_block(ventas)
+
+
 def _build_capa_politica_comercial(ventas: dict) -> list[str]:
-    """Capa 5. Emite solo si hay algún sub-bloque."""
+    """Capa 6. Emite solo si hay algún sub-bloque."""
     sub_bloques = [
         _build_cobertura_block(ventas),
         _build_tiempos_entrega_block(ventas),
@@ -937,7 +1088,7 @@ def _build_capa_politica_comercial(ventas: dict) -> list[str]:
 
 
 def _build_capa_cliente_y_arco(ventas: dict, info_extendida: dict | None) -> list[str]:
-    """Capa 6. Emite solo si hay algún sub-bloque."""
+    """Capa 7. Emite solo si hay algún sub-bloque."""
     sub_bloques = [
         _build_tipo_cliente_block(ventas),
         _build_discovery_block(ventas),
@@ -958,7 +1109,7 @@ def _build_capa_cliente_y_arco(ventas: dict, info_extendida: dict | None) -> lis
 
 
 def _build_capa_conocimiento_marca(ventas: dict) -> list[str]:
-    """Capa 7. Emite solo si hay algún sub-bloque."""
+    """Capa 8. Emite solo si hay algún sub-bloque."""
     sub_bloques = [
         _build_propuesta_valor_block(ventas),
         _build_diferenciadores_block(ventas),
@@ -979,13 +1130,13 @@ def _build_capa_conocimiento_marca(ventas: dict) -> list[str]:
 
 
 def _build_capa_objeciones(ventas: dict) -> list[str]:
-    """Capa 8. El sub-builder ya emite el header `# MANEJO DE OBJECIONES`."""
+    """Capa 9. El sub-builder ya emite el header `# MANEJO DE OBJECIONES`."""
     return _build_objeciones_block(ventas)
 
 
 def _build_capa_prohibiciones(ventas: dict) -> list[str]:
     """
-    Capa 9. SIEMPRE emite — las prohibiciones universales están siempre
+    Capa 10. SIEMPRE emite — las prohibiciones universales están siempre
     presentes aunque el campo `prohibiciones` esté en activo:false.
     """
     proh = _build_prohibiciones_block(ventas)
@@ -1027,7 +1178,7 @@ def _format_producto_inline(p: dict) -> str:
 
 def build_prompt(config: dict, ctx: dict) -> str:
     """
-    Construye el system prompt del agente de ventas en 9 capas. Va de lo
+    Construye el system prompt del agente de ventas en 10 capas. Va de lo
     más estable (identidad) a lo más volátil (FAQs/promos) para que el LLM
     "ancle" en quién es antes de absorber reglas variables.
 
@@ -1088,27 +1239,35 @@ def build_prompt(config: dict, ctx: dict) -> str:
         "## HERRAMIENTAS DEL CATÁLOGO",
         "- `consultar_productos(query?, solo_disponibles?, categoria?)` → "
         "búsqueda más detallada en el catálogo. Úsala si necesitas más info que la "
-        "del listado de arriba (descripción completa, keywords, foto).",
-        "- `consultar_stock(producto_id | nombre)` → stock exacto de un producto.",
+        "del listado de arriba (descripción completa, keywords, foto). "
+        "NO devuelve cantidades numéricas.",
+        "- `consultar_stock(producto_id | nombre)` → disponibilidad de un producto "
+        "(disponible/bajo_stock/sin_stock/servicio). NO devuelve el número exacto. "
+        "Para la cantidad real, deriva al asesor humano.",
         "",
         "## REGLAS SOBRE EL CATÁLOGO",
         "- Si un producto está AGOTADO, dilo con claridad y ofrece alternativas similares del catálogo.",
         "- Si el cliente pide algo que no figura en el catálogo, sugiere lo más cercano que tengas o di que no manejas ese rubro.",
+        "- NUNCA digas cantidades específicas de stock al cliente. Solo 'tenemos disponibilidad' o 'está agotado'. "
+        "La cantidad exacta SIEMPRE la confirma el asesor humano.",
     ])
 
-    # ── CAPA 5: Política comercial (condicional) ──
+    # ── CAPA 5: Reglas de recomendación (condicional) — NUEVA ──
+    lines.extend(_build_capa_reglas_recomendacion(ventas))
+
+    # ── CAPA 6: Política comercial (condicional) ──
     lines.extend(_build_capa_politica_comercial(ventas))
 
-    # ── CAPA 6: Cliente y arco conversacional (condicional) ──
+    # ── CAPA 7: Cliente y arco conversacional (condicional) ──
     lines.extend(_build_capa_cliente_y_arco(ventas, info_extendida))
 
-    # ── CAPA 7: Conocimiento de marca (condicional) ──
+    # ── CAPA 8: Conocimiento de marca (condicional) ──
     lines.extend(_build_capa_conocimiento_marca(ventas))
 
-    # ── CAPA 8: Manejo de objeciones (condicional) ──
+    # ── CAPA 9: Manejo de objeciones (condicional) ──
     lines.extend(_build_capa_objeciones(ventas))
 
-    # ── CAPA 9: Límites y prohibiciones (siempre) ──
+    # ── CAPA 10: Límites y prohibiciones (siempre) ──
     lines.extend(_build_capa_prohibiciones(ventas))
 
     return "\n".join(lines)

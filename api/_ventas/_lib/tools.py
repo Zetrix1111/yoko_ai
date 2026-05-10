@@ -12,6 +12,13 @@ lista de tools que ve el chat normal. Exponemos:
 Todas las tablas (productos, conversaciones, mensajes, wa_sessions, outbox)
 viven en la base default `AIRTABLE_BASE_ID`. Multi-tenant via la columna
 `empresa_id`. Estas tools solo leen productos.
+
+⚠️ CAMBIO IMPORTANTE (v2):
+Las tools NO devuelven el stock NUMÉRICO al LLM. Solo devuelven:
+  - `estado_stock`: disponible / bajo_stock / sin_stock / servicio
+  - `hay_disponibilidad`: boolean
+  - `instruccion_agente`: recordatorio explícito de no mencionar cantidades
+Esto evita que el agente diga "tenemos 50 unidades" sin verificación humana.
 """
 
 from _lib import airtable_client
@@ -39,8 +46,26 @@ def _get_field(fields: dict, name: str, default=None):
     return default
 
 
+def _calcular_estado_stock(stock, stock_minimo) -> str:
+    """Calcula el estado del stock con las mismas reglas que el frontend."""
+    if stock is None or stock == "":
+        return "servicio"
+    if stock == 0:
+        return "sin_stock"
+    if stock_minimo is not None and stock <= stock_minimo:
+        return "bajo_stock"
+    return "disponible"
+
+
 def _normalize_producto(rec: dict) -> dict:
-    """Aplana un record de productos al shape que consumirá el LLM."""
+    """
+    Aplana un record de productos al shape que consumirá el LLM.
+
+    ⚠️ NO incluye el campo `stock` (numérico) intencionalmente. El LLM
+    solo recibe `estado_stock` (disponible/bajo_stock/sin_stock/servicio)
+    para evitar que mencione cantidades sin verificación humana.
+    El stock numérico real se sigue leyendo de Airtable pero NO se expone.
+    """
     f = rec.get("fields", {})
     foto_field = _get_field(f, "foto")
     foto_url = None
@@ -51,23 +76,14 @@ def _normalize_producto(rec: dict) -> dict:
 
     stock = _get_field(f, "stock")
     stock_minimo = _get_field(f, "stock_minimo")
-
-    # Estado del stock (mismas reglas que el frontend)
-    if stock is None or stock == "":
-        estado = "servicio"
-    elif stock == 0:
-        estado = "sin_stock"
-    elif stock_minimo is not None and stock <= stock_minimo:
-        estado = "bajo_stock"
-    else:
-        estado = "disponible"
+    estado = _calcular_estado_stock(stock, stock_minimo)
 
     return {
         "id":             rec.get("id"),
         "nombre":         _get_field(f, "nombre", ""),
         "descripcion":    _get_field(f, "descripcion", ""),
         "precio":         _get_field(f, "precio", 0) or 0,
-        "stock":          stock,
+        # ❌ NO exponer stock numérico al LLM: "stock": stock,
         "estado_stock":   estado,
         "categoria":      _get_field(f, "categoria"),
         "foto":           foto_url,
@@ -96,6 +112,15 @@ def _filter_match_query(producto: dict, query: str) -> bool:
 # ─────────────────────────────────────────────────────────────────────────
 # Tool: consultar_productos
 # ─────────────────────────────────────────────────────────────────────────
+
+_INSTRUCCION_NO_MENCIONAR_STOCK = (
+    "IMPORTANTE: NO menciones cantidades de stock al cliente. "
+    "Si estado_stock='disponible' o 'bajo_stock', di solo: 'tenemos disponibilidad'. "
+    "Si estado_stock='sin_stock', di: 'ese producto está agotado' y ofrece alternativa. "
+    "Si estado_stock='servicio', es un servicio (no aplica stock). "
+    "La cantidad exacta SIEMPRE la confirma el asesor humano."
+)
+
 
 def consultar_productos(args: dict, context: dict) -> dict:
     """
@@ -140,9 +165,10 @@ def consultar_productos(args: dict, context: dict) -> dict:
         productos = [p for p in productos if p["estado_stock"] != "sin_stock"]
 
     return {
-        "productos":    productos,
-        "total":        len(productos),
-        "filtros":      {"query": query, "solo_disponibles": solo_disponibles, "categoria": categoria},
+        "productos":          productos,
+        "total":              len(productos),
+        "filtros":            {"query": query, "solo_disponibles": solo_disponibles, "categoria": categoria},
+        "instruccion_agente": _INSTRUCCION_NO_MENCIONAR_STOCK,
     }
 
 
@@ -152,8 +178,13 @@ def consultar_productos(args: dict, context: dict) -> dict:
 
 def consultar_stock(args: dict, context: dict) -> dict:
     """
-    Devuelve el stock exacto de un producto. Acepta `producto_id` (recId
-    de Airtable) o `nombre` (match exacto).
+    Devuelve el estado de disponibilidad de un producto (NO el número).
+    Acepta `producto_id` (recId de Airtable) o `nombre` (match parcial).
+
+    ⚠️ Esta tool NO devuelve la cantidad numérica de stock. Solo devuelve:
+      - estado_stock: disponible / bajo_stock / sin_stock / servicio
+      - hay_disponibilidad: boolean
+      - instruccion_agente: recordatorio de no mencionar cantidades
     """
     empresa_id = (context or {}).get("empresa_id")
     if not empresa_id:
@@ -188,18 +219,27 @@ def consultar_stock(args: dict, context: dict) -> dict:
                     "encontrado": True,
                     "ambiguo":    True,
                     "candidatos": [_normalize_producto(r) for r in records],
+                    "instruccion_agente": (
+                        "Hay varios productos que coinciden. Pídele al cliente que "
+                        "especifique cuál exactamente. NO menciones cantidades."
+                    ),
                 }
             producto = _normalize_producto(records[0])
     except AirtableError as e:
         return {"error": "interno", "detail": f"No se pudo leer producto: {e}"}
 
+    estado = producto["estado_stock"]
+    hay_disponibilidad = estado in ("disponible", "bajo_stock", "servicio")
+
     return {
-        "encontrado":   True,
-        "id":           producto["id"],
-        "nombre":       producto["nombre"],
-        "stock":        producto["stock"],
-        "estado_stock": producto["estado_stock"],
-        "precio":       producto["precio"],
+        "encontrado":         True,
+        "id":                 producto["id"],
+        "nombre":             producto["nombre"],
+        # ❌ ELIMINADO: "stock": producto["stock"],  (no exponer número)
+        "estado_stock":       estado,
+        "hay_disponibilidad": hay_disponibilidad,
+        "precio":             producto["precio"],
+        "instruccion_agente": _INSTRUCCION_NO_MENCIONAR_STOCK,
     }
 
 
@@ -215,8 +255,10 @@ TOOLS_OPENAI = [
             "description": (
                 "Lista los productos del catálogo de la empresa. Úsala cuando el "
                 "cliente pregunta '¿qué venden?', '¿tienen X?', 'cuánto cuesta…', "
-                "'productos disponibles', etc. Devuelve nombre, precio, stock, "
-                "estado_stock (disponible/bajo_stock/sin_stock/servicio) y descripción."
+                "'productos disponibles', etc. Devuelve nombre, precio, estado_stock "
+                "(disponible/bajo_stock/sin_stock/servicio) y descripción. "
+                "IMPORTANTE: NO devuelve cantidades numéricas — NO menciones stock "
+                "específico al cliente, solo disponibilidad general."
             ),
             "parameters": {
                 "type": "object",
@@ -230,7 +272,7 @@ TOOLS_OPENAI = [
                     },
                     "solo_disponibles": {
                         "type": "boolean",
-                        "description": "Si True, excluye productos con stock=0.",
+                        "description": "Si True, excluye productos agotados.",
                     },
                     "categoria": {
                         "type": "string",
@@ -245,9 +287,10 @@ TOOLS_OPENAI = [
         "function": {
             "name": "consultar_stock",
             "description": (
-                "Devuelve el stock exacto de un producto específico. Úsala cuando "
-                "el cliente pregunta '¿cuántos quedan?', '¿hay stock?'. Acepta "
-                "producto_id (recId interno) o nombre."
+                "Devuelve la DISPONIBILIDAD (no la cantidad) de un producto específico. "
+                "Úsala cuando el cliente pregunta '¿hay stock?', '¿está disponible?'. "
+                "Acepta producto_id (recId interno) o nombre. Devuelve estado_stock "
+                "y hay_disponibilidad (boolean). NUNCA devuelve el número de unidades."
             ),
             "parameters": {
                 "type": "object",
