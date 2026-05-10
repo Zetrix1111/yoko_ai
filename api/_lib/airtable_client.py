@@ -11,10 +11,11 @@ Forma de los registros devueltos: {"id": <recId>, "fields": {...}}.
 """
 
 import json
-import os
 import urllib.error
 import urllib.parse
 import urllib.request
+
+from ._http_utils import read_http_error_body, require_env
 
 
 _BASE_URL = "https://api.airtable.com/v0"
@@ -30,19 +31,11 @@ class AirtableError(Exception):
 
 
 def _get_token() -> str:
-    """Lee y valida AIRTABLE_TOKEN."""
-    token = os.environ.get("AIRTABLE_TOKEN")
-    if not token:
-        raise AirtableError("Falta AIRTABLE_TOKEN en las variables de entorno.")
-    return token
+    return require_env("AIRTABLE_TOKEN", AirtableError)
 
 
 def _get_base_id() -> str:
-    """Lee y valida AIRTABLE_BASE_ID."""
-    base = os.environ.get("AIRTABLE_BASE_ID")
-    if not base:
-        raise AirtableError("Falta AIRTABLE_BASE_ID en las variables de entorno.")
-    return base
+    return require_env("AIRTABLE_BASE_ID", AirtableError)
 
 
 def _table_url(table: str) -> str:
@@ -67,11 +60,7 @@ def _request(method: str, url: str, body: dict | None = None, timeout: int = 15)
             raw = res.read()
             return json.loads(raw) if raw else {}
     except urllib.error.HTTPError as e:
-        body_text = ""
-        try:
-            body_text = e.read().decode("utf-8", errors="replace")
-        except Exception:
-            pass
+        body_text = read_http_error_body(e)
         raise AirtableError(
             f"Airtable HTTP {e.code} en {method} {url}", status=e.code, body=body_text
         ) from e

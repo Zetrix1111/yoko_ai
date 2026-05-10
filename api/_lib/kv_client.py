@@ -20,10 +20,11 @@ especiales (no hay que URL-encodear).
 """
 
 import json
-import os
 import sys
 import urllib.error
 import urllib.request
+
+from ._http_utils import read_http_error_body, require_env
 
 
 class KVError(Exception):
@@ -36,17 +37,11 @@ class KVError(Exception):
 
 
 def _get_base_url() -> str:
-    url = os.environ.get("KV_REST_API_URL")
-    if not url:
-        raise KVError("Falta KV_REST_API_URL en las variables de entorno.")
-    return url.rstrip("/")
+    return require_env("KV_REST_API_URL", KVError).rstrip("/")
 
 
 def _get_token() -> str:
-    token = os.environ.get("KV_REST_API_TOKEN")
-    if not token:
-        raise KVError("Falta KV_REST_API_TOKEN en las variables de entorno.")
-    return token
+    return require_env("KV_REST_API_TOKEN", KVError)
 
 
 def _command(args: list, timeout: int = 10) -> object:
@@ -73,11 +68,7 @@ def _command(args: list, timeout: int = 10) -> object:
                 raise KVError(msg)
             return payload.get("result") if isinstance(payload, dict) else None
     except urllib.error.HTTPError as e:
-        body_text = ""
-        try:
-            body_text = e.read().decode("utf-8", errors="replace")
-        except Exception:
-            pass
+        body_text = read_http_error_body(e)
         msg = f"KV HTTP {e.code} en cmd {args[0]}"
         print(f"[kv_client] {msg} body={body_text[:200]}", file=sys.stderr)
         raise KVError(msg, status=e.code, body=body_text) from e

@@ -43,6 +43,8 @@ import urllib.parse
 import urllib.request
 from typing import Iterator
 
+from ._http_utils import read_http_error_body, require_env
+
 
 _BASE_URL = "https://api.anthropic.com"
 _BETA_HEADER = "managed-agents-2026-04-01"
@@ -59,10 +61,7 @@ class ManagedAgentsError(Exception):
 
 
 def _get_api_key() -> str:
-    key = os.environ.get("ANTHROPIC_API_KEY")
-    if not key:
-        raise ManagedAgentsError("Falta ANTHROPIC_API_KEY en las variables de entorno.")
-    return key
+    return require_env("ANTHROPIC_API_KEY", ManagedAgentsError)
 
 
 def _headers(extra: dict | None = None) -> dict:
@@ -96,11 +95,7 @@ def _request(
             raw = res.read()
             return json.loads(raw) if raw else {}
     except urllib.error.HTTPError as e:
-        body_text = ""
-        try:
-            body_text = e.read().decode("utf-8", errors="replace")
-        except Exception:
-            pass
+        body_text = read_http_error_body(e)
         msg = f"Anthropic HTTP {e.code} en {method} {path}"
         print(f"[managed_agents] {msg} body={body_text[:300]}", file=sys.stderr)
         raise ManagedAgentsError(msg, status=e.code, body=body_text) from e
@@ -129,11 +124,7 @@ def _open_sse(method: str, path: str, body: dict | None = None, timeout: int = 3
     try:
         return urllib.request.urlopen(req, timeout=timeout)
     except urllib.error.HTTPError as e:
-        body_text = ""
-        try:
-            body_text = e.read().decode("utf-8", errors="replace")
-        except Exception:
-            pass
+        body_text = read_http_error_body(e)
         msg = f"Anthropic HTTP {e.code} (stream) en {method} {path}"
         print(f"[managed_agents] {msg} body={body_text[:300]}", file=sys.stderr)
         raise ManagedAgentsError(msg, status=e.code, body=body_text) from e
