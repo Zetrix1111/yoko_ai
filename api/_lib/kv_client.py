@@ -140,3 +140,22 @@ def kv_expire(key: str, ttl_seconds: int) -> bool:
         return int(result) > 0
     except (TypeError, ValueError):
         return False
+
+
+def kv_mget(keys: list) -> list:
+    """
+    Lee N claves en una sola llamada Redis (pipelining nativo).
+    Devuelve una lista del mismo largo que `keys`, con `str` para claves
+    existentes y `None` para las que no existen.
+
+    Útil cuando hay que leer muchas claves relacionadas (ej. el carrito
+    de archivos): pasa de N round trips a 1.
+    """
+    if not keys:
+        return []
+    result = _command(["MGET", *keys])
+    if not isinstance(result, list):
+        # Upstash REST devuelve lista; si por algún motivo viene otra cosa,
+        # caemos a None para todas las claves.
+        return [None] * len(keys)
+    return [None if v is None else str(v) for v in result]

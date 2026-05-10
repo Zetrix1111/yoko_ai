@@ -343,6 +343,22 @@ def _procesar_chat(req, empresa_id: str) -> None:
         mes      = (body.get("mes") or "").strip()
         files_in = body.get("files") or []
 
+        # Modo nuevo (pass-by-reference): el orquestador del chat manda
+        # `session_id_for_cart` en lugar de inlinear `files`. Esto evita el
+        # límite de 4.5MB del body de Vercel cuando hay >5 archivos.
+        # El modo legacy (`files` inline) sigue funcionando para
+        # compatibilidad con consumers viejos / tests.
+        session_id_for_cart = (body.get("session_id_for_cart") or "").strip()
+        if not files_in and session_id_for_cart:
+            from _lib import yoko_cart_store
+            cart_files = yoko_cart_store.get_files(session_id_for_cart)
+            print(
+                f"[facturas/procesar-chat] cart fetched: "
+                f"{len(cart_files)} archivo(s) de session={session_id_for_cart}",
+                file=sys.stderr,
+            )
+            files_in = cart_files
+
         if tipo not in ("compra", "venta"):
             return req._json(400, {"error": "tipo debe ser 'compra' o 'venta'."})
         if not isinstance(files_in, list) or not files_in:

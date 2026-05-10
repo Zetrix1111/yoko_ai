@@ -40,7 +40,12 @@ import urllib.request
 
 from _lib import auth, session
 from _lib import managed_agents_client as mac
-from _lib import yoko_cart_store, yoko_context_builder, yoko_session_store
+from _lib import (
+    yoko_cart_store,
+    yoko_context_builder,
+    yoko_session_store,
+    yoko_task_store,
+)
 from _lib.airtable_client import AirtableError
 from _lib.auth import AuthError
 
@@ -278,19 +283,41 @@ def handle_post(req) -> None:
                 else msg_carrito
             )
 
-        # 8) Conversación: stream + posibles tool_uses.
+        # 8) Async pattern: encolar task y kickear worker. NO corremos
+        # _run_turn acá — eso vive en /api/chat?action=worker, que tiene
+        # su propio presupuesto de Vercel y puede tomar hasta 300s sin
+        # bloquear esta function.
         auth_header = req.headers.get("Authorization") or ""
-        try:
-            text = _run_turn(
-                session_id=session_id,
-                user_content=last_user_content,
-                auth_header=auth_header,
-            )
-        except mac.ManagedAgentsError as e:
-            print(f"[chat/managed] Error en agent loop: {e}", file=sys.stderr)
-            return req._json(502, {"error": "Error del servicio IA."})
+        task_id = yoko_task_store.new_task_id()
+        ok = yoko_task_store.create(
+            task_id,
+            session_id=session_id,
+            user_id=user_id,
+            empresa_id=empresa_id,
+            user_content=last_user_content,
+            auth_header=auth_header,
+        )
+        if not ok:
+            return req._json(502, {"error": "No se pudo encolar la conversación."})
 
-        return req._json(200, {"text": text, "action": None})
+        try:
+            _kick_worker(task_id)
+        except Exception as e:
+            # Si fire-and-forget falla, el task queda pending y el frontend
+            # va a hacer polling — pero el worker nunca arrancó. Mejor
+            # avisar y dejar que el usuario reintente.
+            print(f"[chat/managed] _kick_worker falló: {e}", file=sys.stderr)
+            yoko_task_store.mark_error(
+                task_id, f"No se pudo arrancar el worker: {e}"
+            )
+            return req._json(502, {"error": "Error iniciando el procesamiento."})
+
+        print(
+            f"[chat/managed] task {task_id} encolado y worker disparado",
+            file=sys.stderr,
+        )
+        # Frontend va a hacer polling a GET /api/chat?action=status&task_id=...
+        return req._json(202, {"task_id": task_id, "status": "pending"})
 
     except Exception as e:
         print(
@@ -303,6 +330,37 @@ def handle_post(req) -> None:
 # ─────────────────────────────────────────────────────────────────────────
 # Helpers
 # ─────────────────────────────────────────────────────────────────────────
+
+def _kick_worker(task_id: str) -> None:
+    """
+    Dispara una request HTTP a `POST /api/chat?action=worker&task_id=<id>`
+    sin esperar la respuesta (fire-and-forget). Vercel arranca esa segunda
+    function en paralelo con su propio presupuesto de duration (~300s con
+    fluid compute), separado del POST inicial del usuario.
+
+    Auth interna: header `X-Internal-Token` (env var YOKO_INTERNAL_TOKEN).
+
+    El timeout de 2s solo cubre el TCP handshake + envío del request.
+    El worker mismo corre su lógica después de que esto retorne.
+    """
+    base = (os.environ.get("YOKO_API_BASE") or "https://yokochat.vercel.app").rstrip("/")
+    token = os.environ.get("YOKO_INTERNAL_TOKEN")
+    if not token:
+        raise RuntimeError("YOKO_INTERNAL_TOKEN no configurado")
+
+    url = f"{base}/api/chat?action=worker&task_id={urllib.parse.quote(task_id)}"
+    request = urllib.request.Request(url, data=b"", method="POST")
+    request.add_header("X-Internal-Token", token)
+    request.add_header("Content-Type", "application/json")
+    request.add_header("Content-Length", "0")
+
+    try:
+        urllib.request.urlopen(request, timeout=2)
+    except urllib.error.URLError:
+        # Es esperable que esto timee si Vercel cold-start: lo importante
+        # es que la función worker se haya arrancado, no que termine.
+        pass
+
 
 def _is_session_alive(info: dict | None) -> bool:
     """
@@ -345,175 +403,10 @@ def _last_user_content(messages: list) -> str:
     return ""
 
 
-def _run_turn(
-    session_id: str,
-    user_content: str,
-    auth_header: str,
-) -> str:
-    """
-    Ejecuta un turno completo del agent:
-      1. Abre stream SSE de eventos.
-      2. POST user.message.
-      3. Lee eventos hasta `session.status_idle` con stop_reason `end_turn`,
-         resolviendo cualquier `requires_action` con custom tools en el medio.
-
-    Los archivos para `yoko_procesar_archivos` se leen del carrito KV
-    (`yoko_cart_store.get_files(session_id)`) en el momento de invocar el
-    tool. Tras un éxito (`ok=True`), el carrito se vacía.
-
-    Devuelve el texto final acumulado del assistant.
-    """
-    text_parts: list[str] = []
-    pending_tools: dict[str, dict] = {}  # event_id → {name, input}
-
-    stream = mac.stream_session_events(session_id)
-    print(f"[chat/managed] stream abierto session={session_id}", file=sys.stderr)
-
-    # Posteamos el mensaje del usuario DESPUÉS de abrir el stream para no
-    # perder eventos. urlopen() ya devolvió el response (headers leídos);
-    # los eventos del POST llegarán por el socket abierto.
-    mac.send_user_message(session_id, user_content)
-    print(
-        f"[chat/managed] user.message posteado ({len(user_content)} chars)",
-        file=sys.stderr,
-    )
-
-    events_seen = 0
-    turns = 0
-    for evt in stream:
-        events_seen += 1
-        etype = evt.get("type") or ""
-        if events_seen <= 3 or etype.startswith("session.") or etype == "session.error":
-            print(f"[chat/managed] evt#{events_seen} type={etype}", file=sys.stderr)
-
-        if etype == "agent.message":
-            for block in evt.get("content") or []:
-                if isinstance(block, dict) and block.get("type") == "text":
-                    t = block.get("text") or ""
-                    if t:
-                        text_parts.append(t)
-
-        elif etype == "agent.custom_tool_use":
-            evt_id = evt.get("id") or ""
-            name = evt.get("name") or ""
-            tool_input = evt.get("input") or {}
-            if evt_id and name:
-                pending_tools[evt_id] = {"name": name, "input": tool_input}
-
-        elif etype == "session.error":
-            err = evt.get("error") or {}
-            msg = err.get("message") if isinstance(err, dict) else str(err)
-            print(f"[chat/managed] session.error: {msg}", file=sys.stderr)
-            break
-
-        elif etype == "session.status_idle":
-            stop = evt.get("stop_reason") or {}
-            stop_type = stop.get("type") if isinstance(stop, dict) else None
-
-            if stop_type == "end_turn":
-                break
-
-            if stop_type == "requires_action":
-                blocking_ids: list[str] = []
-                if isinstance(stop, dict):
-                    blocking_ids = list(stop.get("event_ids") or [])
-
-                if not blocking_ids:
-                    # Idle sin acciones bloqueantes: corte por seguridad.
-                    break
-
-                turns += 1
-                if turns > _MAX_TURNS:
-                    print(
-                        f"[chat/managed] cap de turnos alcanzado ({_MAX_TURNS}); "
-                        "interrumpiendo loop de tools",
-                        file=sys.stderr,
-                    )
-                    break
-
-                for eid in blocking_ids:
-                    pending = pending_tools.get(eid)
-                    if not pending:
-                        # No tenemos el tool_use cacheado: respondemos un error
-                        # para destrabar la session.
-                        mac.submit_custom_tool_result(
-                            session_id, eid,
-                            {"error": "tool_use no encontrado en el stream"},
-                        )
-                        continue
-
-                    tool_name = pending["name"]
-                    tool_input = dict(pending["input"] or {})
-
-                    # Inyectar archivos desde el carrito KV cuando el agent
-                    # invoca yoko_procesar_archivos. El carrito se persiste
-                    # cross-turn en handle_post; acá lo leemos y, tras un
-                    # procesamiento exitoso, lo vaciamos.
-                    if tool_name == "yoko_procesar_archivos":
-                        try:
-                            cart_files = yoko_cart_store.get_files(session_id)
-                        except Exception as e:
-                            print(
-                                f"[chat/managed] cart_store.get_files falló: {e}",
-                                file=sys.stderr,
-                            )
-                            cart_files = []
-                        if cart_files:
-                            tool_input["files"] = cart_files
-                            print(
-                                f"[chat/managed] inyectados {len(cart_files)} "
-                                f"archivos del carrito en yoko_procesar_archivos",
-                                file=sys.stderr,
-                            )
-
-                    action = _TOOL_TO_ACTION.get(tool_name)
-                    if not action:
-                        result: dict = {"error": f"Tool '{tool_name}' no soportado."}
-                        print(
-                            f"[chat/managed] tool desconocido: {tool_name}",
-                            file=sys.stderr,
-                        )
-                    else:
-                        result = _exec_local_tool(action, tool_input, auth_header)
-
-                    # Si yoko_procesar_archivos terminó OK, vaciar el carrito.
-                    # Si falló, NO vaciamos: el usuario puede reintentar sin
-                    # tener que re-subir los PDFs.
-                    if (
-                        tool_name == "yoko_procesar_archivos"
-                        and isinstance(result, dict)
-                        and result.get("ok") is True
-                    ):
-                        try:
-                            cleared = yoko_cart_store.clear_cart(session_id)
-                            print(
-                                f"[chat/managed] carrito vaciado tras éxito: "
-                                f"{cleared} archivo(s)",
-                                file=sys.stderr,
-                            )
-                        except Exception as e:
-                            print(
-                                f"[chat/managed] cart_store.clear_cart falló: {e}",
-                                file=sys.stderr,
-                            )
-
-                    mac.submit_custom_tool_result(session_id, eid, result)
-                # Seguir leyendo el stream: la session vuelve a `running`.
-                continue
-
-            # Otros stop_reasons (tool_confirmation, etc.): cortamos para
-            # evitar quedar colgados. El agent devolverá lo que tenga hasta
-            # el momento.
-            print(
-                f"[chat/managed] stop_reason inesperado: {stop_type}",
-                file=sys.stderr,
-            )
-            break
-
-        # Otros eventos (agent.thinking, span.*, agent.tool_use de toolset
-        # built-in, etc.) los ignoramos para el texto al usuario.
-
-    return "".join(text_parts).strip()
+# NOTA: la antigua función `_run_turn` (versión síncrona) se movió al
+# worker async como `_run_turn_streaming` en `handler_worker.py`. Acá
+# solo dejamos los helpers que el worker importa: `_exec_local_tool` y
+# `_TOOL_TO_ACTION`.
 
 
 def _exec_local_tool(action: str, input_args: dict, auth_header: str) -> dict:

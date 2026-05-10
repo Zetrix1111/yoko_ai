@@ -7,6 +7,8 @@
     { "source": "/api/(.*)", "destination": "/api/$1" }
   ],
   "functions": {
-    "api/**/*.py": { "maxDuration": 60 }
+    "api/**/*.py": { "maxDuration": 60 },
+    "api/chat.py":     { "maxDuration": 300 },
+    "api/facturas.py": { "maxDuration": 300 }
   }
 }

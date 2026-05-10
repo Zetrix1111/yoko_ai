@@ -64,78 +64,137 @@ DEFAULTS: Dict = {
 }
 
 
-# Headers que se escriben en las filas 1-3 del Excel CONCAR. Replican la
-# plantilla del usuario: fila 1 = nombres de columna (cabecera azul +
-# blanco bold), fila 2 = descripciones de validación, fila 3 = tamaño/
-# formato. Las columnas no especificadas (A, V, X-AN) quedan vacías.
+# Headers que se escriben en las filas 1-3 del Excel CONCAR.
+# Extraídos del template real N_Excel_CONCAR.xlsx.
 EXCEL_HEADERS: Dict = {
     # Fila 1: nombres de columna
     "row1": {
-        "A":  "WE",
-        "B":  "Sub Diario",
-        "C":  "Número de Comprobante",
-        "D":  "Fecha de Comprobante",
-        "E":  "Código de Moneda",
-        "F":  "Glosa Principal",
-        "G":  "Tipo de Cambio",
-        "H":  "Tipo de Conversión",
-        "I":  "Flag de Conversión de Moneda",
-        "J":  "Fecha Tipo de Cambio",
-        "K":  "Cuenta Contable",
-        "L":  "Código de Anexo",
-        "M":  "Código de Centro de Costo",
-        "N":  "Debe / Haber",
-        "O":  "Importe Original",
-        "P":  "Importe USD",
-        "Q":  "Importe PEN",
-        "R":  "Tipo de Documento",
-        "S":  "Serie-Número",
-        "T":  "Fecha de Emisión",
-        "U":  "Fecha de Vencimiento",
-        "W":  "Glosa Corta",
-        "AO": "Tasa Tributo",
+        "A": "WE",
+        "B": "Sub Diario",
+        "C": "Número de Comprobante",
+        "D": "Fecha de Comprobante",
+        "E": "Código de Moneda",
+        "F": "Glosa Principal",
+        "G": "Tipo de Cambio",
+        "H": "Tipo de Conversión",
+        "I": "Flag de Conversión de Moneda",
+        "J": "Fecha Tipo de Cambio",
+        "K": "Cuenta Contable",
+        "L": "Código de Anexo",
+        "M": "Código de Centro de Costo",
+        "N": "Debe / Haber",
+        "O": "Importe Original",
+        "P": "Importe en Dólares",
+        "Q": "Importe en Soles",
+        "R": "Tipo de Documento",
+        "S": "Número de Documento",
+        "T": "Fecha de Documento",
+        "U": "Fecha de Vencimiento",
+        "V": "Código de Area",
+        "W": "Glosa Detalle",
+        "X": "Código de Anexo Auxiliar",
+        "Y": "Medio de Pago",
+        "Z": "Tipo de Documento de Referencia",
+        "AA": "Número de Documento Referencia",
+        "AB": "Fecha Documento Referencia",
+        "AC": "Nro Máq. Registradora Tipo Doc. Ref.",
+        "AD": "Base Imponible Documento Referencia",
+        "AE": "IGV Documento Provisión",
+        "AF": "Tipo Referencia en estado MQ",
+        "AG": "Número Serie Caja Registradora",
+        "AH": "Fecha de Operación",
+        "AI": "Tipo de Tasa",
+        "AJ": "Tasa Detracción/Percepción",
+        "AK": "Importe Base Detracción/Percepción Dólares",
+        "AL": "Importe Base Detracción/Percepción Soles",
+        "AM": "Tipo Cambio para 'F'",
+        "AN": "Importe de IGV sin derecho crédito fiscal",
+        "AO": "Tasa IGV",
     },
-    # Fila 2: descripciones de validación / referencia (replicadas del
-    # screenshot original del usuario para A-O; P-AO sin descripción).
+    # Fila 2: descripciones de validación
     "row2": {
-        "B":  "Ver T.G. 02",
-        "C":  "Los dos primeros dígitos son el mes y los otros 4 siguientes un correlativo",
-        "E":  "Ver T.G. 03",
-        "G":  "Llenar solo si Tipo de Conversión es 'C'. Debe estar entre >=0 y <=9999.999999",
-        "H":  "Solo: 'C'= Especial, 'M'=Compra, 'V'=Venta, 'F' De acuerdo a fecha",
-        "I":  "Solo: 'S' = Si se convierte, 'N'= No se convierte",
-        "J":  "Si Tipo de Conversión 'F'",
-        "K":  "Debe existir en el Plan de Cuentas",
-        "L":  "Si Cuenta Contable tiene seleccionado Tipo de Anexo, debe existir en la tabla de Anexos",
-        "M":  "Si Cuenta Contable tiene habilitado C. Costo, Ver T.G. 05",
-        "N":  "'D' ó 'H'",
-        "O":  "Importe original de la cuenta contable. Obligatorio, debe estar entre >=0 y <=99999999999.99",
+        "A": "Contabilidad",
+        "B": "Ver T.G. 02",
+        "C": "Los dos primeros dígitos son el mes y los otros 4 siguientes un correlativo",
+        "E": "Ver T.G. 03",
+        "G": "Llenar  solo si Tipo de Conversión es 'C'. Debe estar entre >=0 y <=9999.999999",
+        "H": "Solo: 'C'= Especial, 'M'=Compra, 'V'=Venta , 'F' De acuerdo a fecha",
+        "I": "Solo: 'S' = Si se convierte, 'N'= No se convierte",
+        "J": "Si  Tipo de Conversión 'F'",
+        "K": "Debe existir en el Plan de Cuentas",
+        "L": "Si Cuenta Contable tiene seleccionado Tipo de Anexo, debe existir en la tabla de Anexos",
+        "M": "Si Cuenta Contable tiene habilitado C. Costo, Ver T.G. 05",
+        "N": "'D' ó 'H'",
+        "O": "Importe original de la cuenta contable. Obligatorio, debe estar entre >=0 y <=99999999999.99",
+        "P": "Importe de la Cuenta Contable en Dólares. Obligatorio si Flag de Conversión de Moneda esta en 'N', debe estar entre >=0 y <=99999999999.99",
+        "Q": "Importe de la Cuenta Contable en Soles. Obligatorio si Flag de Conversión de Moneda esta en 'N', debe estra entre >=0 y <=99999999999.99",
+        "R": "Si Cuenta Contable tiene habilitado el Documento Referencia Ver T.G. 06",
+        "S": "Si Cuenta Contable tiene habilitado el Documento Referencia Incluye Serie y Número",
+        "T": "Si Cuenta Contable tiene habilitado el Documento Referencia",
+        "U": "Si Cuenta Contable tiene habilitada la Fecha de Vencimiento",
+        "V": "Si Cuenta Contable tiene habilitada el Area. Ver T.G. 26",
+        "X": "Si Cuenta Contable tiene seleccionado Tipo de Anexo Referencia",
+        "Y": "Si Cuenta Contable tiene habilitado Tipo Medio Pago. Ver T.G. 'S1'",
+        "Z": "Si Tipo de Documento es 'NA' ó 'ND' Ver T.G. 06",
+        "AA": "Si Tipo de Documento es 'NC', 'NA' ó 'ND', incluye Serie y Número",
+        "AB": "Si Tipo de Documento es 'NC', 'NA' ó 'ND'",
+        "AC": "Si Tipo de Documento es 'NC', 'NA' ó 'ND'. Solo cuando el Tipo Documento de Referencia 'TK'",
+        "AD": "Si Tipo de Documento es 'NC', 'NA' ó 'ND'",
+        "AE": "Si Tipo de Documento es 'NC', 'NA' ó 'ND'",
+        "AF": "Si la Cuenta Contable tiene Habilitado Documento Referencia 2 y  Tipo de Documento es 'TK'",
+        "AG": "Si la Cuenta Contable teien Habilitado Documento Referencia 2 y  Tipo de Documento es 'TK'",
+        "AH": "Si la Cuenta Contable tiene Habilitado Documento Referencia 2. Cuando Tipo de Documento es 'TK', consignar la fecha de emision del ticket",
+        "AI": "Si la Cuenta Contable tiene configurada la Tasa:  Si es '1' ver T.G. 28 y '2' ver T.G. 29",
+        "AJ": "Si la Cuenta Contable tiene conf. en Tasa:  Si es '1' ver T.G. 28 y '2' ver T.G. 29. Debe estar entre >=0 y <=999.99",
+        "AK": "Si la Cuenta Contable tiene configurada la Tasa. Debe ser el importe total del documento y estar entre >=0 y <=99999999999.99",
+        "AL": "Si la Cuenta Contable tiene configurada la Tasa. Debe ser el importe total del documento y estar entre >=0 y <=99999999999.99",
+        "AM": "Especificar solo si Tipo Conversión es 'F'. Se permite 'M' Compra y 'V' Venta.",
+        "AN": "Especificar solo para comprobantes de compras con IGV sin derecho de crédito Fiscal. Se detalle solo en la cuenta 42xxxx",
+        "AO": "Obligatorio para comprobantes de compras, valores validos 0,10,18.",
     },
-    # Fila 3: Tamaño/Formato de cada columna.
+    # Fila 3: Tamaño/Formato de cada columna
     "row3": {
-        "A":  "Tamaño/Formato",
-        "B":  "4 Caracteres",
-        "C":  "6 Caracteres",
-        "D":  "dd/mm/aaaa",
-        "E":  "2 Caracteres",
-        "F":  "40 Caracteres",
-        "G":  "Numérico 11,6",
-        "H":  "1 Caracteres",
-        "I":  "1 Caracteres",
-        "J":  "dd/mm/aaaa",
-        "K":  "12 Caracteres",
-        "L":  "18 Caracteres",
-        "M":  "6 Caracteres",
-        "N":  "1 Carácter",
-        "O":  "Numérico 14,2",
-        "P":  "Numérico 14,2",
-        "Q":  "Numérico 14,2",
-        "R":  "2 Caracteres",
-        "S":  "—",
-        "T":  "dd/mm/aaaa",
-        "U":  "dd/mm/aaaa",
-        "W":  "30 Caracteres",
-        "AO": "Numérico",
+        "A": "Tamaño/Formato",
+        "B": "4 Caracteres",
+        "C": "6 Caracteres",
+        "D": "dd/mm/aaaa",
+        "E": "2 Caracteres",
+        "F": "40 Caracteres",
+        "G": "Numérico 11, 6",
+        "H": "1 Caracteres",
+        "I": "1 Caracteres",
+        "J": "dd/mm/aaaa",
+        "K": "12 Caracteres",
+        "L": "18 Caracteres",
+        "M": "6 Caracteres",
+        "N": "1 Carácter",
+        "O": "Numérico 14,2",
+        "P": "Numérico 14,2",
+        "Q": "Numérico 14,2",
+        "R": "2 Caracteres",
+        "S": "20 Caracteres",
+        "T": "dd/mm/aaaa",
+        "U": "dd/mm/aaaa",
+        "V": "3 Caracteres",
+        "W": "30 Caracteres",
+        "X": "18 Caracteres",
+        "Y": "8 Caracteres",
+        "Z": "2 Caracteres",
+        "AA": "20 Caracteres",
+        "AB": "dd/mm/aaaa",
+        "AC": "20 Caracteres",
+        "AD": "Numérico 14,2",
+        "AE": "Numérico 14,2",
+        "AF": "'MQ'",
+        "AG": "15 caracteres",
+        "AH": "dd/mm/aaaa",
+        "AI": "5 Caracteres",
+        "AJ": "Numérico 14,2",
+        "AK": "Numérico 14,2",
+        "AL": "Numérico 14,2",
+        "AM": "1 Caracter",
+        "AN": "Numérico 14,2",
+        "AO": "Numérico 14,2",
     },
 }
 
@@ -190,7 +249,7 @@ def factura_a_filas(factura: Dict, contab: Dict, fecha_hoy: str) -> List[Dict]:
 
     concepto        = (factura.get("concepto") or "").strip()
     glosa_principal = concepto[:40]
-    glosa_corta     = concepto[:30]
+    glosa_detalle   = concepto[:30]
 
     tasa = contab.get("tasa_igv", 18.0)
 
@@ -219,7 +278,25 @@ def factura_a_filas(factura: Dict, contab: Dict, fecha_hoy: str) -> List[Dict]:
             "S":  serie_numero,
             "T":  fecha_emi,
             "U":  vencimiento,
-            "W":  glosa_corta,
+            "V":  "",
+            "W":  glosa_detalle,
+            "X":  "",
+            "Y":  "",
+            "Z":  "",
+            "AA": "",
+            "AB": "",
+            "AC": "",
+            "AD": "",
+            "AE": "",
+            "AF": "",
+            "AG": "",
+            "AH": "",
+            "AI": "",
+            "AJ": "",
+            "AK": "",
+            "AL": "",
+            "AM": "",
+            "AN": "",
             "AO": tasa,
         }
 
@@ -273,12 +350,14 @@ def build_xlsx(filas: List[Dict]) -> bytes:
     ws = wb.active
     ws.title = "CONCAR"
 
+    # Estilos del template original
     fill_blue   = PatternFill(start_color="4F81BD", end_color="4F81BD", fill_type="solid")
     fill_yellow = PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid")
     font_white  = Font(color="FFFFFF", bold=True)
     font_small  = Font(size=9, italic=True)
     align_wrap  = Alignment(wrap_text=True, vertical="top")
 
+    # Escribir fila 1 (headers azules)
     for col, header in EXCEL_HEADERS["row1"].items():
         cell = ws[f"{col}1"]
         cell.value = header
@@ -286,6 +365,7 @@ def build_xlsx(filas: List[Dict]) -> bytes:
         cell.font = font_white
         cell.alignment = align_wrap
 
+    # Escribir fila 2 (descripciones amarillas)
     for col, desc in EXCEL_HEADERS["row2"].items():
         cell = ws[f"{col}2"]
         cell.value = desc
@@ -293,28 +373,69 @@ def build_xlsx(filas: List[Dict]) -> bytes:
         cell.font = font_small
         cell.alignment = align_wrap
 
+    # Escribir fila 3 (formatos)
     for col, fmt in EXCEL_HEADERS["row3"].items():
         cell = ws[f"{col}3"]
         cell.value = fmt
         cell.font = font_small
         cell.alignment = align_wrap
 
+    # Escribir datos desde fila 4
     for row_idx, fila in enumerate(filas, start=4):
         for col_letter, value in fila.items():
             ws[f"{col_letter}{row_idx}"] = value
 
+    # Anchos de columna extraídos del template real
     anchos = {
-        "A":  6,  "B": 10, "C": 14, "D": 14, "E": 12,
-        "F": 40,  "G": 14, "H": 12, "I": 16, "J": 14,
-        "K": 14, "L": 18, "M": 16, "N": 12, "O": 14,
-        "P": 14, "Q": 14, "R": 12, "S": 18, "T": 14,
-        "U": 14, "W": 30, "AO": 12,
+        "A": 17.25,
+        "B": 12.75,
+        "C": 18.75,
+        "D": 13.75,
+        "E": 11.75,
+        "F": 41.5,
+        "G": 18.75,
+        "H": 13.0,
+        "I": 16.75,
+        "J": 14.75,
+        "K": 15.75,
+        "L": 13.0,
+        "M": 16.75,
+        "N": 12.75,
+        "O": 18.75,
+        "P": 13.0,
+        "Q": 13.0,
+        "R": 17.75,
+        "S": 13.0,
+        "T": 16.75,
+        "U": 13.0,
+        "V": 15.75,
+        "W": 41.13,
+        "X": 15.75,
+        "Y": 18.75,
+        "Z": 14.75,
+        "AA": 16.75,
+        "AB": 14.75,
+        "AC": 15.75,
+        "AD": 13.0,
+        "AE": 13.0,
+        "AF": 19.75,
+        "AG": 13.0,
+        "AH": 13.0,
+        "AI": 17.75,
+        "AJ": 22.75,
+        "AK": 13.0,
+        "AL": 13.0,
+        "AM": 18.75,
+        "AN": 13.0,
+        "AO": 13.0,
     }
+    
     for col, width in anchos.items():
         ws.column_dimensions[col].width = width
 
-    ws.row_dimensions[1].height = 36
-    ws.row_dimensions[2].height = 60
+    # Altura de filas de header (si se especificaron en el template)
+    # ws.row_dimensions[1].height = 36
+    # ws.row_dimensions[2].height = 60
 
     buf = io.BytesIO()
     wb.save(buf)

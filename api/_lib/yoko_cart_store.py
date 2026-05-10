@@ -125,10 +125,20 @@ def add_files(session_id: str, files: list[dict]) -> int:
     return len(index)
 
 
-def get_files(session_id: str) -> list[dict]:
+def get_files(session_id: str, renew_ttl: bool = False) -> list[dict]:
     """
     Devuelve todos los archivos del carrito en orden de inserción.
-    Cada elemento es `{filename, content_b64}`. Renueva TTL.
+    Cada elemento es `{filename, content_b64}`.
+
+    Usa MGET (Redis pipelining) para leer N archivos en 1 round trip:
+    25 archivos pasa de ~3s (N+1 GETs) a ~150ms.
+
+    `renew_ttl` por defecto FALSE porque el caso de uso típico
+    (worker que va a procesar y después llama clear_cart) no necesita
+    extender la vida del carrito — se va a borrar enseguida. Pasar True
+    cuando se quiere mantener el carrito vivo después de leer (ej:
+    chequeos intermedios). Cada renew agrega ~100ms × N round trips,
+    así que evitarlo en el path crítico es importante.
     """
     if not session_id:
         return []
@@ -136,10 +146,19 @@ def get_files(session_id: str) -> list[dict]:
     if not index:
         return []
 
+    file_keys = [_file_key(session_id, u) for u in index]
+    try:
+        raws = kv_client.kv_mget(file_keys)
+    except kv_client.KVError as e:
+        print(
+            f"[yoko_cart_store] kv_mget falló para {session_id}: {e}",
+            file=sys.stderr,
+        )
+        return []
+
     files: list[dict] = []
     surviving_uuids: list[str] = []
-    for u in index:
-        raw = kv_client.kv_get(_file_key(session_id, u))
+    for u, raw in zip(index, raws):
         if not raw:
             # File expiró individualmente (no debería pasar con TTLs sincronizados)
             # o no existe. Lo dropeamos del índice.
@@ -161,7 +180,11 @@ def get_files(session_id: str) -> list[dict]:
     # Si dropeamos algún uuid, reescribimos el índice para que no se acumulen huérfanos.
     if len(surviving_uuids) != len(index):
         _write_index(session_id, surviving_uuids)
-    else:
+    elif renew_ttl:
+        # Solo renovamos TTL si el caller lo pide explicitamente. Cada
+        # EXPIRE es un round trip a Upstash; con 25 archivos son 26 calls
+        # ≈ 2-3s, dominando el costo del get_files. El path típico
+        # (worker → get_files → clear_cart) NO necesita esto.
         _renew_all_ttls(session_id, surviving_uuids)
 
     return files
