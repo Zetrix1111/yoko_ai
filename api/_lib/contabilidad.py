@@ -142,9 +142,12 @@ def factura_a_asientos(factura: Dict, contab: Dict) -> List[Dict]:
         })
 
     # ── LÍNEA 3: CXP PROVEEDOR (HABER) ─────────────────────────────────
+    # Cuenta CXP varía por moneda (PEN → 421201, USD → 421202). Usamos
+    # el helper del template concar para resolver con fallback a PEN.
+    moneda = (factura.get("moneda") or "PEN").upper()
     asientos.append({
         "sub_diario":      sub_diario,
-        "cuenta_contable": contab["cuentas"]["cxp"],
+        "cuenta_contable": _concar_template.resolve_cxp_account(contab["cuentas"], moneda),
         "ruc_dni":         ruc,
         "cc":              "",
         "debe_haber":      "H",

@@ -25,10 +25,18 @@ DESCRIPTION = "Registro de compras/ventas formato CONCAR (Perú)"
 # Plan de cuentas estándar peruano para CONCAR. Replica las constantes del
 # escenario Make.com original. La empresa puede overridear cualquiera de
 # estos valores en Config_Empresa.data.contabilidad.
+#
+# Nota sobre `cxp`: la cuenta de cuentas-por-pagar varía por moneda
+# (421201 para soles, 421202 para dólares). Por eso es un dict.
+# El helper `resolve_cxp_account(cuentas, moneda)` resuelve la cuenta
+# correcta y cae a PEN si la moneda no está mapeada.
 DEFAULTS: Dict = {
     "cuentas": {
         "gasto":      "63/65",   # 63 = servicios prestados por terceros, 65 = otros gastos
-        "cxp":        "421201",  # cuentas por pagar comerciales — facturas
+        "cxp": {
+            "PEN": "421201",     # cuentas por pagar comerciales — soles
+            "USD": "421202",     # cuentas por pagar comerciales — dólares
+        },
         "igv":        "401111",  # IGV crédito fiscal
     },
     # Sub-diario CONCAR por tipo de comprobante (codigo de 2 letras del OCR).
@@ -204,6 +212,25 @@ _DEFAULT_TIPO_CONVERSION = "V"
 _DEFAULT_FLAG_CONVERSION = "S"
 
 
+def resolve_cxp_account(cuentas: Dict, moneda: str) -> str:
+    """
+    Devuelve la cuenta CXP correcta según la moneda de la factura.
+
+    El plan de cuentas tiene `cuentas["cxp"]` como dict por moneda
+    (ej: `{"PEN": "421201", "USD": "421202"}`). Si la moneda específica
+    no está mapeada (ej: EUR, CNY), cae automáticamente a la cuenta de
+    PEN — comportamiento más resiliente que fallar.
+
+    Acepta también el shape legacy donde `cxp` era un string plano:
+    en ese caso lo devuelve tal cual, ignorando la moneda. Esto preserva
+    consumers de Config_Empresa.contabilidad que no fueron migrados.
+    """
+    cxp = cuentas.get("cxp", "421201")
+    if isinstance(cxp, dict):
+        return cxp.get((moneda or "").upper()) or cxp.get("PEN") or "421201"
+    return str(cxp) if cxp is not None else "421201"
+
+
 # ─────────────────────────────────────────────────────────────────────────
 # Generador de filas (factura → 2-3 filas A-AO)
 # ─────────────────────────────────────────────────────────────────────────
@@ -328,8 +355,10 @@ def factura_a_filas(
         filas.append(fila_igv)
 
     # ── LÍNEA 3: CXP PROVEEDOR (HABER) ────────────────────────────
+    # Cuenta CXP varía por moneda (PEN → 421201, USD → 421202).
+    # El helper cae a PEN si la moneda no está mapeada.
     fila_cxp = _fila_base(monto_total)
-    fila_cxp["K"] = contab["cuentas"]["cxp"]
+    fila_cxp["K"] = resolve_cxp_account(contab["cuentas"], moneda)
     fila_cxp["L"] = ruc
     fila_cxp["N"] = "H"
     filas.append(fila_cxp)
