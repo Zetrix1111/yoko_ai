@@ -31,7 +31,7 @@ import uuid
 from . import kv_client
 
 
-SESSION_TTL_SECONDS = 4 * 60 * 60  # 4 horas
+from ._config import SESSION_TTL_SECONDS  # noqa: E402  (centralizado)
 
 _INDEX_KEY_TPL = "yoko:cart:{session_id}:index"
 _FILE_KEY_TPL  = "yoko:cart:{session_id}:file:{uuid}"
