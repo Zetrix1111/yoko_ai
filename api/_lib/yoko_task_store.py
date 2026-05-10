@@ -44,13 +44,7 @@ from ._config import (  # centralizado
     TASK_TTL_ACTIVE_SECONDS as _TTL_ACTIVE,
     TASK_TTL_FINAL_SECONDS as _TTL_FINAL,
 )
-
-
-_KEY_TPL = "yoko:task:{task_id}"
-
-
-def _key(task_id: str) -> str:
-    return _KEY_TPL.format(task_id=task_id)
+from .kv_schema import task_key as _key
 
 
 def new_task_id() -> str:

@@ -20,18 +20,8 @@ from datetime import datetime, timezone
 
 from . import kv_client
 from ._config import SESSION_TTL_SECONDS  # centralizado
-
-
-_SESSION_KEY_PREFIX = "yoko:session"
-_METADATA_KEY_PREFIX = "yoko:session_meta"
-
-
-def _session_key(empresa_id: str, user_id: str) -> str:
-    return f"{_SESSION_KEY_PREFIX}:{empresa_id}:{user_id}"
-
-
-def _metadata_key(session_id: str) -> str:
-    return f"{_METADATA_KEY_PREFIX}:{session_id}"
+from .kv_schema import session_key as _session_key
+from .kv_schema import session_metadata_key as _metadata_key
 
 
 def get_session_id(empresa_id: str, user_id: str) -> str | None:

@@ -29,20 +29,9 @@ import sys
 import uuid
 
 from . import kv_client
-
-
-from ._config import SESSION_TTL_SECONDS  # noqa: E402  (centralizado)
-
-_INDEX_KEY_TPL = "yoko:cart:{session_id}:index"
-_FILE_KEY_TPL  = "yoko:cart:{session_id}:file:{uuid}"
-
-
-def _index_key(session_id: str) -> str:
-    return _INDEX_KEY_TPL.format(session_id=session_id)
-
-
-def _file_key(session_id: str, file_uuid: str) -> str:
-    return _FILE_KEY_TPL.format(session_id=session_id, uuid=file_uuid)
+from ._config import SESSION_TTL_SECONDS  # centralizado
+from .kv_schema import cart_index_key as _index_key
+from .kv_schema import cart_file_key as _file_key
 
 
 def _read_index(session_id: str) -> list[str]:

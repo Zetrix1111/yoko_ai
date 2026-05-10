@@ -157,6 +157,49 @@ def test_tool_executor_contract() -> bool:
     return True
 
 
+def test_kv_schema_back_compat() -> bool:
+    """
+    Las keys generadas por kv_schema deben matchear bit-por-bit el schema
+    documentado. Cualquier drift invalidaría los datos ya escritos en KV
+    de producción (Upstash) — esto es un regression guard para que un
+    rename accidental no nos mate los carritos/sessions de los usuarios.
+    """
+    from _lib import kv_schema, yoko_task_store, yoko_session_store, yoko_cart_store
+
+    expected_keys = [
+        (kv_schema.task_key("abc123"),
+         "yoko:task:abc123"),
+        (kv_schema.session_key("cmejia", "user_42"),
+         "yoko:session:cmejia:user_42"),
+        (kv_schema.session_metadata_key("sesn_xyz"),
+         "yoko:session_meta:sesn_xyz"),
+        (kv_schema.cart_index_key("sesn_abc"),
+         "yoko:cart:sesn_abc:index"),
+        (kv_schema.cart_file_key("sesn_abc", "file_def"),
+         "yoko:cart:sesn_abc:file:file_def"),
+    ]
+    for got, want in expected_keys:
+        if got != want:
+            _fail(f"kv_schema drift: {got!r} != {want!r} (rompería datos en KV producción)")
+            return False
+
+    # Los 3 stores usan los factories de kv_schema (no su propia copia).
+    store_pairs = [
+        (yoko_task_store._key("xx"),                     kv_schema.task_key("xx")),
+        (yoko_session_store._session_key("e", "u"),      kv_schema.session_key("e", "u")),
+        (yoko_session_store._metadata_key("s"),          kv_schema.session_metadata_key("s")),
+        (yoko_cart_store._index_key("s"),                kv_schema.cart_index_key("s")),
+        (yoko_cart_store._file_key("s", "f"),            kv_schema.cart_file_key("s", "f")),
+    ]
+    for got, want in store_pairs:
+        if got != want:
+            _fail(f"store no usa kv_schema: {got!r} != {want!r}")
+            return False
+
+    _ok(f"kv_schema back-compat (5 dominios + 5 stores sin drift)")
+    return True
+
+
 def test_filename_parser() -> bool:
     """_filename_from_disposition parsea Content-Disposition correctamente."""
     from _lib.tool_executor import _filename_from_disposition
@@ -277,6 +320,7 @@ def main() -> int:
         test_stores_use_central_config,
         test_handler_managed_clean,
         test_tool_executor_contract,
+        test_kv_schema_back_compat,
         test_filename_parser,
         test_task_store_lifecycle,
     ]
