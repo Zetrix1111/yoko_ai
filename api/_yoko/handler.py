@@ -35,18 +35,37 @@ except ImportError:
 _REQUIRED_ENV = ("OPENAI_API_KEY", "AIRTABLE_TOKEN", "AIRTABLE_BASE_ID")
 
 
+def _resolve_backend(req) -> str:
+    """
+    Decide qué backend usar para esta request.
+
+    Precedencia:
+      1. Header HTTP `X-Yoko-Backend` (si trae "managed_agents" u "openai") —
+         lo mete el frontend cuando el usuario cambia el switch de UI, así
+         alterna por request sin tocar Vercel.
+      2. Env var `YOKO_BACKEND` (server-side default), valores idem.
+      3. Fallback final: "openai" (back-compat).
+
+    Cualquier valor desconocido (typo, header malformado) cae al siguiente
+    nivel — no se "fail-loud" porque rompería el chat en producción si el
+    cliente manda algo raro.
+    """
+    header = (req.headers.get("X-Yoko-Backend") or "").strip().lower()
+    if header in ("managed_agents", "openai"):
+        return header
+    return (os.environ.get("YOKO_BACKEND") or "openai").strip().lower()
+
+
 def handle_post(req) -> None:
     """Maneja un POST /api/chat. `req` es el BaseHTTPRequestHandler.
 
-    Feature flag `YOKO_BACKEND` (env):
-      - "openai" (default)        → flujo legacy de este archivo (tool-calling con OpenAI).
-      - "managed_agents"          → delega en _yoko/handler_managed.py
-                                    (Anthropic Managed Agents).
+    El backend se resuelve por request via `_resolve_backend(req)`:
+      - "managed_agents"  → delega en _yoko/handler_managed.py
+                            (Anthropic Managed Agents).
+      - "openai" (default) → flujo legacy de este archivo
+                            (tool-calling con OpenAI).
     """
-    # Feature flag: si el backend es managed_agents, delegar y salir.
-    # Se lee en cada request (no a nivel módulo) para que un cambio de env
-    # var en Vercel se aplique sin redeploy.
-    if (os.environ.get("YOKO_BACKEND") or "openai").strip().lower() == "managed_agents":
+    if _resolve_backend(req) == "managed_agents":
         from _yoko import handler_managed
         return handler_managed.handle_post(req)
 
