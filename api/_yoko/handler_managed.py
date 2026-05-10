@@ -384,6 +384,13 @@ def _kick_worker(task_id: str) -> None:
 
     El timeout de 2s solo cubre el TCP handshake + envío del request.
     El worker mismo corre su lógica después de que esto retorne.
+
+    NO propagar excepciones de la red al caller: ya que es fire-and-forget,
+    cualquier error después de enviar el request es informativo, no fatal.
+    Específicamente, urlopen con timeout puede levantar `socket.timeout`
+    (subclase de OSError, NO de URLError), por eso atrapamos broad.
+    El handle_post NO debe devolver 502 solo porque el kick "tardó" — la
+    request al worker ya viajó y Vercel arrancó la function.
     """
     base = (os.environ.get("YOKO_API_BASE") or "https://yokochat.vercel.app").rstrip("/")
     token = os.environ.get("YOKO_INTERNAL_TOKEN")
@@ -398,10 +405,16 @@ def _kick_worker(task_id: str) -> None:
 
     try:
         urllib.request.urlopen(request, timeout=2)
-    except urllib.error.URLError:
-        # Es esperable que esto timee si Vercel cold-start: lo importante
-        # es que la función worker se haya arrancado, no que termine.
-        pass
+    except Exception as e:
+        # Atrapamos amplio: socket.timeout, OSError, URLError, HTTPError…
+        # son todos "esperables" cuando Vercel cold-startea el worker y la
+        # respuesta tarda más que el timeout de 2s. Lo que importa es que
+        # la request salió: el worker function arranca igual.
+        print(
+            f"[chat/managed] _kick_worker fire-and-forget non-fatal: "
+            f"{type(e).__name__}: {e}",
+            file=sys.stderr,
+        )
 
 
 def _is_session_alive(info: dict | None) -> bool:
