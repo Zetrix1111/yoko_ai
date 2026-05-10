@@ -11,6 +11,7 @@ import {
   AREAS, formatPEN, formatDate,
 } from './mockData';
 import { useEmpresaConfig } from '../../../shared/useEmpresaConfig';
+import Toggle from '../../../shared/components/Toggle';
 
 // ─────────────────────────────────────
 // Helpers UI
@@ -601,21 +602,6 @@ export function ReportesSection() {
 // Helpers: Toggle + ConfigCard
 // ─────────────────────────────────────
 
-function Toggle({ checked, onChange, ariaLabel }) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={ariaLabel}
-      className={`gcc-toggle ${checked ? 'on' : ''}`}
-      onClick={() => onChange(!checked)}
-    >
-      <span className="gcc-toggle-thumb" />
-    </button>
-  );
-}
-
 function ConfigCard({ title, titleBadge, description, summary, enabled, onToggle, children }) {
   return (
     <div className={`gcc-card gcc-config-card ${enabled ? 'is-on' : ''}`}>
@@ -629,7 +615,7 @@ function ConfigCard({ title, titleBadge, description, summary, enabled, onToggle
         </div>
         <div className="gcc-config-controls">
           {summary && <span className="gcc-config-summary">{summary}</span>}
-          <Toggle checked={enabled} onChange={onToggle} ariaLabel={typeof title === 'string' ? title : ''} />
+          <Toggle classPrefix="gcc" checked={enabled} onChange={onToggle} ariaLabel={typeof title === 'string' ? title : ''} />
         </div>
       </div>
       {enabled && children && <div className="gcc-config-body">{children}</div>}

@@ -6,6 +6,7 @@ import {
 import ModuleLayout from '../ModuleLayout';
 import { API, getJsonAuth } from '../../../shared/api';
 import { useEmpresaConfig } from '../../../shared/useEmpresaConfig';
+import Toggle from '../../../shared/components/Toggle';
 import './ConfiguracionEmpresa.css';
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -38,21 +39,6 @@ const SISTEMAS_CONTABLES = [
   { id: 'siigo',    name: 'SIIGO',    description: 'Software contable cloud para Latinoamérica.' },
 ];
 
-function Toggle({ checked, onChange, ariaLabel }) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={ariaLabel}
-      className={`ce-toggle ${checked ? 'on' : ''}`}
-      onClick={() => onChange(!checked)}
-    >
-      <span className="ce-toggle-thumb" />
-    </button>
-  );
-}
-
 // ─────────────────────────────────────────────────────────────────────────
 // Helpers de campo para "Información extendida"
 // ─────────────────────────────────────────────────────────────────────────
@@ -65,7 +51,7 @@ function CampoRow({ campo, label, activo, onActivoChange, helpText, children }) 
   return (
     <div className={`ce-campo-row ${activo ? '' : 'disabled'}`}>
       <div className="ce-campo-header">
-        <Toggle checked={activo} onChange={onActivoChange} ariaLabel={label} />
+        <Toggle classPrefix="ce" checked={activo} onChange={onActivoChange} ariaLabel={label} />
         <label className="ce-campo-label" htmlFor={`ce-campo-${campo}`}>
           {label}
           <span className="ce-campo-optional"> (opcional)</span>
@@ -637,6 +623,7 @@ export default function ConfiguracionEmpresaScreen({ user, onOpenModules, onLogo
                     : 'Desactivado'}
               </span>
               <Toggle
+                classPrefix="ce"
                 checked={centrosEnabled}
                 onChange={handleToggleCentros}
                 ariaLabel="Activar centros de costo"

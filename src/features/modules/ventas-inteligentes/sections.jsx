@@ -14,6 +14,7 @@ import {
   formatPEN, formatNum, formatDate,
 } from './mockData';
 import { API, getJsonAuth, postJsonAuth, patchJsonAuth, deleteJsonAuth } from '../../../shared/api';
+import Toggle from '../../../shared/components/Toggle';
 
 // ─────────────────────────────────────
 // Helpers UI
@@ -37,21 +38,6 @@ function Badge({ value, label }) {
 
 function ChannelBadge({ value }) {
   return <span className="vom-channel-badge">{CANAL_LABELS[value] || value}</span>;
-}
-
-export function Toggle({ checked, onChange, ariaLabel }) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={ariaLabel}
-      className={`vom-toggle ${checked ? 'on' : ''}`}
-      onClick={() => onChange(!checked)}
-    >
-      <span className="vom-toggle-thumb" />
-    </button>
-  );
 }
 
 // Error Boundary local — captura crashes en sub-secciones para no dejar
@@ -1249,7 +1235,7 @@ export function CampoToggle({ campo, label, helpText, activo, onActivoChange, ch
   return (
     <div className={`via-config-row ${activo ? '' : 'disabled'}`}>
       <div className="via-config-row-header">
-        <Toggle checked={activo} onChange={onActivoChange} ariaLabel={label} />
+        <Toggle classPrefix="vom" checked={activo} onChange={onActivoChange} ariaLabel={label} />
         <label className="via-config-row-label" htmlFor={campo ? `via-${campo}` : undefined}>
           {label}
           <span className="via-config-row-optional"> (opcional)</span>
