@@ -127,28 +127,38 @@ def handle_post(req) -> None:
             session_id = None
 
         # 7a) Si la session viene del cache, validar que siga viva en
-        # Anthropic. Si fue archivada/terminada/eliminada manualmente desde
-        # el Console, el cache KV todavía apunta a ella pero los POSTs
-        # fallarán. Detectarlo acá y forzar nueva sesión es más limpio que
-        # dejar que falle el _run_turn más abajo.
+        # Anthropic SOLO si podemos confirmar el estado. Casos a manejar:
+        #   - GET 404 → session no existe → muerta, recrear.
+        #   - status `terminated` o archived_at != null → muerta, recrear.
+        #   - GET con 5xx / red caída → NO sabemos. Asumir viva: si está
+        #     muerta de verdad, los POSTs de events fallarán abajo y el
+        #     usuario tiene que reintentar; pero si el GET falló por un
+        #     hipo transitorio, no perdemos el contexto de la conversación.
         if session_id is not None:
+            session_dead = False
             try:
                 info = mac.get_session(session_id)
+                # mac.get_session devuelve None solo si HTTP 404
+                # (session no existe).
+                if not _is_session_alive(info):
+                    session_dead = True
+                    print(
+                        f"[chat/managed] session cacheada {session_id} no "
+                        f"usable (status={(info or {}).get('status')!r}, "
+                        f"archived_at={(info or {}).get('archived_at')!r}); "
+                        "descartando y creando una nueva.",
+                        file=sys.stderr,
+                    )
             except mac.ManagedAgentsError as e:
+                # Error no-404: probablemente transitorio. Loggear y
+                # seguir con la session cacheada.
                 print(
-                    f"[chat/managed] no pude validar session {session_id}: {e}",
+                    f"[chat/managed] get_session HTTP {e.status} transitorio; "
+                    f"asumiendo session {session_id} viva.",
                     file=sys.stderr,
                 )
-                info = None
 
-            if not _is_session_alive(info):
-                print(
-                    f"[chat/managed] session cacheada {session_id} no usable "
-                    f"(status={(info or {}).get('status')!r}, "
-                    f"archived_at={(info or {}).get('archived_at')!r}); "
-                    "descartando y creando una nueva.",
-                    file=sys.stderr,
-                )
+            if session_dead:
                 try:
                     yoko_session_store.force_new_session(empresa_id, user_id)
                 except Exception as e:
@@ -156,7 +166,6 @@ def handle_post(req) -> None:
                         f"[chat/managed] force_new_session falló: {e}",
                         file=sys.stderr,
                     )
-                # Limpiamos el carrito huérfano de la session muerta.
                 try:
                     yoko_cart_store.clear_cart(session_id)
                 except Exception:
