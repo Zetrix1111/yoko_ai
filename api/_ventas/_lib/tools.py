@@ -247,9 +247,9 @@ def enviar_catalogo(args: dict, context: dict) -> dict:
     """
     Devuelve el URL público del PDF del catálogo de la empresa para que el
     agent lo comparta con el cliente en su próximo mensaje. Lee la config
-    `info_extendida.catalogo_pdf_url` que ya viene en el `context`
-    (cargada por `sales_chat_post`) — NO re-consultamos Airtable acá para
-    evitar un round trip extra por turno.
+    `ventas.catalogo_pdf_url` (capa 7 — Conocimiento de marca) que ya
+    viene en el `context` cargada por `sales_chat_post` — NO re-consultamos
+    Airtable acá para evitar un round trip extra por turno.
 
     Patrón de respuesta:
       - Si hay URL configurado y activo:
@@ -263,8 +263,8 @@ def enviar_catalogo(args: dict, context: dict) -> dict:
     No postea al outbox directamente: el handler de ventas pone la `reply`
     final en el outbox como texto plano (incluyendo el URL).
     """
-    info_extendida = (context or {}).get("info_extendida") or {}
-    campo = info_extendida.get("catalogo_pdf_url") or {}
+    ventas = (context or {}).get("ventas") or {}
+    campo = ventas.get("catalogo_pdf_url") or {}
     activo = bool(campo.get("activo"))
     url = (campo.get("valor") or "").strip() if isinstance(campo.get("valor"), str) else ""
 

@@ -104,6 +104,7 @@ export const CAPA_KEYS = {
   marca: [
     'propuesta_valor', 'diferenciadores', 'prueba_social',
     'autoridad_tecnica', 'faq', 'promociones_activas',
+    'catalogo_pdf_url',
   ],
   limites: [
     'objeciones', 'prohibiciones', 'alcance_responsabilidad',

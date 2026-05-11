@@ -148,6 +148,24 @@ export default function Paso4Marca({ config, setCampo }) {
             disabled={!f('promociones_activas').activo}
           />
         </CampoToggle>
+
+        <CampoToggle
+          campo="catalogo_pdf_url"
+          label="Catálogo PDF (URL público)"
+          helpText="Link al PDF del catálogo de productos. El agente lo comparte por WhatsApp cuando el cliente pide ver opciones o no tiene claro qué busca. Debe ser un URL accesible sin login (Drive público, Vercel Blob, S3 público, etc.)."
+          activo={f('catalogo_pdf_url').activo}
+          onActivoChange={setActivo('catalogo_pdf_url')}
+        >
+          <input
+            id="via-catalogo-pdf"
+            type="url"
+            className="vom-input"
+            placeholder="https://drive.google.com/.../catalogo.pdf"
+            value={f('catalogo_pdf_url').valor || ''}
+            disabled={!f('catalogo_pdf_url').activo}
+            onChange={(e) => setValor('catalogo_pdf_url')(e.target.value)}
+          />
+        </CampoToggle>
       </section>
     </div>
   );

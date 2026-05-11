@@ -30,7 +30,6 @@ const DEFAULT_INFO_EXTENDIDA = {
   email_contacto:   { activo: false, valor: '' },
   horario_atencion: { activo: false, valor: '' },
   redes_sociales:   { activo: false, valor: [] },
-  catalogo_pdf_url: { activo: false, valor: '' },
 };
 
 const SISTEMAS_CONTABLES = [
@@ -568,18 +567,6 @@ export default function ConfiguracionEmpresaScreen({ user, onOpenModules, onLogo
               valor={infoExtendida.redes_sociales.valor}
               onActivoChange={(v) => setActivo('redes_sociales', v)}
               onValorChange={(v) => setValor('redes_sociales', v)}
-            />
-
-            <CampoTexto
-              campo="catalogo_pdf_url"
-              label="URL del catálogo PDF (ventas)"
-              type="url"
-              placeholder="https://drive.google.com/.../catalogo.pdf"
-              helpText="Link público al PDF del catálogo. El agente de ventas lo comparte cuando el cliente no tiene claro qué busca. Tiene que ser un URL accesible sin login (Drive público, Vercel Blob, S3 público, etc.)."
-              activo={infoExtendida.catalogo_pdf_url.activo}
-              valor={infoExtendida.catalogo_pdf_url.valor}
-              onActivoChange={(v) => setActivo('catalogo_pdf_url', v)}
-              onValorChange={(v) => setValor('catalogo_pdf_url', v)}
             />
           </div>
 

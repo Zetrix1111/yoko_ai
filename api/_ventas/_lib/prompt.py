@@ -1247,9 +1247,10 @@ def build_prompt(config: dict, ctx: dict) -> str:
     ])
 
     # Tool `enviar_catalogo`: solo se anuncia al LLM si la empresa cargó un
-    # URL de catálogo y lo dejó activo. Si no, evitamos que el agent la
-    # invoque y reciba "disponible:false" — ruido innecesario.
-    _catalogo = info_extendida.get("catalogo_pdf_url") or {}
+    # URL de catálogo (capa 7 — Conocimiento de marca) y lo dejó activo. Si
+    # no, evitamos que el agent la invoque y reciba "disponible:false" —
+    # ruido innecesario.
+    _catalogo = ventas.get("catalogo_pdf_url") or {}
     if _catalogo.get("activo") and isinstance(_catalogo.get("valor"), str) and _catalogo["valor"].strip():
         lines.append(
             "- `enviar_catalogo()` → comparte el PDF del catálogo de la empresa con "

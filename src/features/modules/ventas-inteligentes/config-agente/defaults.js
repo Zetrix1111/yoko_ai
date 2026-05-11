@@ -40,6 +40,7 @@ export const DEFAULT_VENTAS_CONFIG_V2 = {
   autoridad_tecnica:      { activo: false, valor: [] },
   faq:                    { activo: false, valor: [] },
   promociones_activas:    { activo: false, valor: [] },
+  catalogo_pdf_url:       { activo: false, valor: '' },
 
   // CAPA 8 — Manejo de objeciones
   objeciones:             { activo: false, valor: [] },
