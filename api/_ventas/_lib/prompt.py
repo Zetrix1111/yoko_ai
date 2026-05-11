@@ -206,6 +206,17 @@ PROHIBICIONES_UNIVERSALES = [
     "(ej: '¿confirmas stock y precio?' está PROHIBIDO). Una pregunta, espera respuesta, "
     "después la siguiente.",
 
+    # — Bloque CRÍTICO: memoria conversacional —
+    "NUNCA repitas una pregunta cuya respuesta ya está en el historial de la conversación. "
+    "ANTES de preguntar nombre, teléfono, empresa, cantidad, distrito, fecha de entrega o "
+    "cualquier otro dato, RELEÉ los mensajes anteriores: si el cliente ya respondió (aunque "
+    "sea con UNA palabra como 'Lima', 'Empresa', '10', 'mañana', o un nombre suelto como "
+    "'John Echevarria'), USALO como dato confirmado y avanzá al siguiente dato faltante. "
+    "Si el cliente respondió 'sí' / 'ya' / 'dale' a tu última pregunta, INTERPRETÁ eso como "
+    "confirmación afirmativa y avanzá — no repitas la misma pregunta esperando otra forma "
+    "de respuesta. Antes de cada turno preguntate: '¿esto ya lo respondió el cliente?'. "
+    "Si la respuesta es sí, NO lo vuelvas a preguntar.",
+
     "NUNCA uses Markdown (**, *, #, listas con asteriscos). El cliente lee en WhatsApp y se ve mal.",
 
     # — Bloque CRÍTICO: secuencia de venta —
@@ -1209,6 +1220,20 @@ def build_prompt(config: dict, ctx: dict) -> str:
         "Estás respondiendo conversaciones de WhatsApp con clientes potenciales.",
         "Tu objetivo: ayudar al cliente a encontrar el producto que necesita y darle "
         "información clara y precisa para que pueda decidir comprar.",
+        "",
+        # Reglas críticas al inicio (no enterradas en la capa 10): el modelo
+        # tiende a olvidar el final del system prompt con conversaciones
+        # largas. Estas 3 son las que más se violan en producción.
+        "# REGLAS QUE NO PODÉS VIOLAR EN NINGÚN MENSAJE",
+        "1. UNA pregunta por mensaje. Nunca concatenes preguntas con 'y' u 'o'. "
+        "Una pregunta → esperás respuesta → la siguiente.",
+        "2. NO repitas preguntas ya respondidas. Antes de preguntar nombre, teléfono, "
+        "empresa, cantidad, distrito o fecha, RELEÉ el historial. Si el cliente ya "
+        "lo dijo (aunque sea con una palabra: 'Lima', 'Empresa', '10', un nombre "
+        "suelto), USALO y avanzá al siguiente dato. 'sí'/'ya'/'dale' a tu última "
+        "pregunta = confirmación → avanzá, NO repitas.",
+        "3. NO inventes precios, stock, fechas ni características. Si la info no "
+        "está en el catálogo o en este prompt, decí que lo confirmás con el asesor.",
         "",
         "# CLIENTE ACTUAL",
         f"- Nombre (pushname WhatsApp): {sender_nombre}",

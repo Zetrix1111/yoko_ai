@@ -353,14 +353,21 @@ TOOLS_OPENAI = [
         "function": {
             "name": "enviar_catalogo",
             "description": (
-                "Comparte el catálogo PDF de la empresa con el cliente cuando NO tiene "
-                "claro qué producto busca. Úsala SOLO si: (1) el cliente pide explícitamente "
-                "'catálogo', 'lista de productos', '¿qué tienen?'; o (2) después de 1-2 "
-                "preguntas de discovery el cliente sigue sin poder describir qué necesita "
-                "y enumerar productos en texto sería abrumador. NO la uses si el cliente "
-                "ya mencionó un producto/categoría específica — para eso usa "
-                "consultar_productos. La tool devuelve `disponible:false` si la empresa "
-                "no tiene PDF cargado; en ese caso seguí con discovery normal."
+                "Comparte el PDF del catálogo de la empresa con el cliente. "
+                "REGLA DURA: usá esta tool UNA SOLA VEZ por conversación. Si ya la "
+                "invocaste antes en el historial, NO la vuelvas a invocar. "
+                "REGLA DURA: NO la uses si el cliente ya mencionó un producto, marca o "
+                "categoría específica — para eso usá `consultar_productos`. "
+                "Ejemplos de cuándo NO usarla (usá `consultar_productos` en su lugar): "
+                "'¿cuánto cuestan los cascos?', 'necesito guantes', '¿tienen botas de "
+                "seguridad?', '¿precio del taladro DeWalt?'. "
+                "Ejemplos de cuándo SÍ usarla: '¿qué venden?', 'mándame el catálogo', "
+                "'mándame la lista', '¿qué tienen?' (sin mencionar producto), o después "
+                "de 1-2 preguntas de discovery el cliente sigue sin poder describir qué "
+                "necesita. "
+                "Si la empresa no tiene catálogo cargado, la tool devuelve "
+                "`disponible:false` — en ese caso NO menciones que ibas a mandarlo, "
+                "seguí con discovery normal."
             ),
             "parameters": {"type": "object", "properties": {}},
         },
