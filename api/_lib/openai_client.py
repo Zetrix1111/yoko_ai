@@ -16,12 +16,6 @@ quiera mover el frontend) devuelven con la forma:
     {"type": "navigate", "path": "/modulos/...", "params": {...}}
 La cliente captura la última y la incluye en la respuesta final para
 que el frontend pueda hacer el routing además de mostrar el texto.
-
-`_media_urls` es una lista de URLs públicas (imágenes) que las tools
-pueden devolver para que el caller las propague al cliente final.
-Lo usa el cerebro de ventas (tool `enviar_fotos_productos`) para que
-bot-baileys mande las imágenes nativas por WhatsApp. Si varias tools
-en un mismo turno emiten URLs, se acumulan en orden de aparición.
 """
 
 import json
@@ -87,7 +81,6 @@ def run_chat(
 
     client = _client()
     captured_action: dict | None = None
-    captured_media_urls: list[str] = []
 
     for iteration in range(max_iterations):
         kwargs = {
@@ -104,9 +97,8 @@ def run_chat(
         # Caso 1: el modelo respondió texto sin pedir tools → terminamos
         if not msg.tool_calls:
             return {
-                "text":       msg.content or "",
-                "action":     captured_action,
-                "media_urls": captured_media_urls,
+                "text":   msg.content or "",
+                "action": captured_action,
             }
 
         # Caso 2: el modelo pidió tools. Append del assistant turn (con
@@ -135,16 +127,9 @@ def run_chat(
 
             result = executor(tc.function.name, args, context)
 
-            # Captura señales que el caller debe propagar al frontend:
-            #   - _action: la última gana (siguiente sobrescribe).
-            #   - _media_urls: se acumulan en orden.
-            if isinstance(result, dict):
-                if "_action" in result:
-                    captured_action = result["_action"]
-                if "_media_urls" in result and isinstance(result["_media_urls"], list):
-                    for u in result["_media_urls"]:
-                        if isinstance(u, str) and u.strip():
-                            captured_media_urls.append(u.strip())
+            # Captura la última _action (la siguiente sobrescribe).
+            if isinstance(result, dict) and "_action" in result:
+                captured_action = result["_action"]
 
             full_messages.append({
                 "role":         "tool",
@@ -161,7 +146,6 @@ def run_chat(
         file=sys.stderr,
     )
     return {
-        "text":       _FALLBACK_MAX_ITER,
-        "action":     captured_action,
-        "media_urls": captured_media_urls,
+        "text":   _FALLBACK_MAX_ITER,
+        "action": captured_action,
     }

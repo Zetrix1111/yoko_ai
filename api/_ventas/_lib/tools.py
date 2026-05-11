@@ -243,124 +243,6 @@ def consultar_stock(args: dict, context: dict) -> dict:
     }
 
 
-# ─────────────────────────────────────────────────────────────────────────
-# Tool: enviar_fotos_productos
-# ─────────────────────────────────────────────────────────────────────────
-
-# Cap de fotos por turno. WhatsApp permite mandar más, pero >6 fotos
-# seguidas son spam para el cliente. Si el agent necesita mostrar más
-# variedad, mejor pide contexto antes (color/marca) y manda otra tanda.
-_MAX_FOTOS = 6
-
-
-def enviar_fotos_productos(args: dict, context: dict) -> dict:
-    """
-    Manda hasta _MAX_FOTOS fotos de productos al cliente por WhatsApp.
-
-    Mecánica:
-      - Busca productos en Airtable (reusa `consultar_productos` para
-        no duplicar la lógica de filtrado por query).
-      - Filtra los que tengan `foto` no vacía.
-      - Devuelve URLs en `_media_urls` (clave especial que captura el
-        orquestador `openai_client.run_chat`). El handler de ventas
-        las pasa en la response al bot-baileys, que las envía como
-        imágenes nativas de WhatsApp.
-
-    Args:
-      query:        texto a buscar (nombre/desc/keywords/categoría).
-      producto_ids: lista de recIds — si querés fotos específicas en
-                    vez de una búsqueda libre.
-
-    Sin `query` ni `producto_ids` → disponible:false (instrucción al
-    agente para que llame con un query).
-    """
-    empresa_id = (context or {}).get("empresa_id")
-    if not empresa_id:
-        return {
-            "disponible": False,
-            "instruccion_agente": "Error interno: falta empresa_id en el context.",
-        }
-
-    query = (args or {}).get("query") or ""
-    producto_ids = (args or {}).get("producto_ids") or []
-
-    if not query and not producto_ids:
-        return {
-            "disponible": False,
-            "instruccion_agente": (
-                "Llamame de nuevo indicando qué fotos enviar. Pasame `query` "
-                "(ej: 'cascos', 'guantes nitrilo') o `producto_ids` si ya "
-                "tenés ids específicos."
-            ),
-        }
-
-    # 1) Resolver lista de productos
-    if query:
-        result = consultar_productos(
-            {"query": query, "solo_disponibles": True},
-            context,
-        )
-        if "error" in result:
-            return {
-                "disponible": False,
-                "instruccion_agente": (
-                    f"No pude buscar productos en Airtable: "
-                    f"{result.get('detail', 'error desconocido')}. "
-                    "Decile al cliente que en un momento le mandás las opciones."
-                ),
-            }
-        productos = result.get("productos", [])
-    else:
-        # Búsqueda por IDs explícitos. Cap defensivo de 20 IDs.
-        productos = []
-        for pid in (producto_ids or [])[:20]:
-            try:
-                rec = airtable_client.get_record(_TABLA_PRODUCTOS, pid)
-            except AirtableError:
-                continue
-            if (rec.get("fields", {}) or {}).get("empresa_id") != empresa_id:
-                continue  # cross-tenant guard
-            productos.append(_normalize_producto(rec))
-
-    # 2) Filtrar productos con foto
-    con_foto = [p for p in productos if p.get("foto")]
-    if not con_foto:
-        return {
-            "disponible": False,
-            "instruccion_agente": (
-                "No encontré productos con foto para ese pedido. "
-                "Usá `consultar_productos` para listar opciones en texto."
-            ),
-        }
-
-    # 3) Cap y armado de la respuesta
-    seleccion = con_foto[:_MAX_FOTOS]
-
-    return {
-        "disponible":  True,
-        "n_fotos":     len(seleccion),
-        "fotos":       [
-            {
-                "nombre":  p.get("nombre"),
-                "precio":  p.get("precio"),
-                "url":     p.get("foto"),
-            }
-            for p in seleccion
-        ],
-        # Clave especial: el orquestador `openai_client.run_chat` la
-        # captura y el handler la pasa al bot-baileys en `media_urls`
-        # del response.
-        "_media_urls": [p["foto"] for p in seleccion],
-        "instruccion_agente": (
-            f"Le estoy mandando {len(seleccion)} foto(s) al cliente por WhatsApp. "
-            "Tu próximo mensaje debe ser BREVE — el cliente YA VE los nombres en "
-            "las fotos. NO los listes uno por uno otra vez. En su lugar: invitá "
-            "a elegir o pedí más contexto (color, marca, talla, certificación). "
-            "Si mencionás precios, usá rango ('desde S/X'), no uno por uno."
-        ),
-    }
-
-
 def enviar_catalogo(args: dict, context: dict) -> dict:
     """
     Devuelve el URL público del PDF del catálogo de la empresa para que el
@@ -469,45 +351,6 @@ TOOLS_OPENAI = [
     {
         "type": "function",
         "function": {
-            "name": "enviar_fotos_productos",
-            "description": (
-                "Manda hasta 6 fotos de productos al cliente por WhatsApp (imágenes "
-                "nativas, no URLs en texto). USALA cuando: (a) el cliente pregunta "
-                "por una categoría general ('¿qué cascos tienen?', 'muéstrame guantes', "
-                "'qué venden?'); (b) el cliente pide fotos explícitamente ('mándame "
-                "fotos', 'imágenes', 'una foto del producto'). "
-                "NO la uses si el cliente YA eligió un producto específico (ej: "
-                "'quiero el casco MSA blanco' → confirmá con texto y avanzá a "
-                "discovery, no spamees fotos). "
-                "Después de invocarla tu mensaje de texto DEBE ser BREVE: el cliente "
-                "YA ve los nombres en las fotos, no los repitas uno por uno."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": (
-                            "Texto de búsqueda. Match parcial en nombre, descripción, "
-                            "keywords y categoría. Ej: 'cascos', 'guantes nitrilo', 'lentes uv'."
-                        ),
-                    },
-                    "producto_ids": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": (
-                            "Lista de recIds de Airtable si querés fotos de productos "
-                            "específicos (por ejemplo, los IDs que devolvió "
-                            "`consultar_productos` antes). Si pasás esto, ignorá `query`."
-                        ),
-                    },
-                },
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
             "name": "enviar_catalogo",
             "description": (
                 "Comparte el PDF del catálogo de la empresa con el cliente. "
@@ -534,10 +377,9 @@ TOOLS_OPENAI = [
 
 # Dispatcher (lo usa /api/sales_chat para ejecutar la tool que el LLM eligió)
 _HANDLERS = {
-    "consultar_productos":     consultar_productos,
-    "consultar_stock":         consultar_stock,
-    "enviar_fotos_productos":  enviar_fotos_productos,
-    "enviar_catalogo":         enviar_catalogo,
+    "consultar_productos": consultar_productos,
+    "consultar_stock":     consultar_stock,
+    "enviar_catalogo":     enviar_catalogo,
 }
 
 
