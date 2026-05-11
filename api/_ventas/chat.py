@@ -15,6 +15,7 @@ import sys
 
 from _lib import config_loader, openai_client
 from _lib.airtable_client import AirtableError
+from _ventas._lib import history_loader
 from _ventas._lib import prompt as ventas_prompt
 from _ventas._lib import tools as ventas_tools
 
@@ -47,6 +48,18 @@ def sales_chat_post(req) -> None:
             "phone":  (body.get("phone") or "").strip(),
             "nombre": (body.get("nombre") or "").strip(),
         }
+
+        # Reconstruir history desde Airtable para evitar el cap=20 que
+        # impone bot-baileys (fuera de nuestro control). Si la tabla
+        # `mensajes` tiene la conversación de este cliente, esa es
+        # nuestra fuente de verdad — el LLM ve todo el contexto sin
+        # depender del truncado del bot. Si no hay conv en Airtable
+        # (cliente nuevo) o Airtable falla, caemos al body history.
+        airtable_history = history_loader.load_history(empresa_id, sender["phone"])
+        if airtable_history is not None:
+            history = history_loader.merge_with_latest_user_message(
+                airtable_history, history,
+            )
 
         # Cargar productos del tenant (catálogo para el prompt)
         try:
