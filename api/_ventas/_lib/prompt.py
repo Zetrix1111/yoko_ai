@@ -1271,12 +1271,24 @@ def build_prompt(config: dict, ctx: dict) -> str:
         "Para la cantidad real, deriva al asesor humano.",
     ])
 
-    # Tool `enviar_fotos_productos`: solo se anuncia al LLM si el catálogo
-    # del tenant tiene al menos 1 producto con foto. Si no hay fotos
-    # cargadas, evitamos que el agent invoque la tool y reciba
-    # `disponible:false` — ruido innecesario.
+    # Tool `enviar_fotos_productos`: solo se anuncia al LLM si:
+    #   (a) la empresa está en canal Meta Cloud API (hay fila activa en
+    #       `meta_connections` con access_token + phone_number_id); Y
+    #   (b) el catálogo tiene al menos 1 producto con foto.
+    # Sin (a), bot-baileys no soporta media_urls y el cliente recibe
+    # respuestas truncadas sin imágenes (efecto observado al revertir
+    # ec07455). Sin (b), la tool devolvería disponible:false.
+    # Import lazy para evitar circular imports al cargar el módulo.
+    _empresa_id = ctx.get("empresa_id") or ""
+    try:
+        from _lib import meta_connections  # noqa: WPS433
+        _meta_active = meta_connections.is_meta_active(_empresa_id)
+    except Exception:
+        # Si falla el lookup (Airtable down), preferimos NO anunciar la
+        # tool — fail-safe para que el agent no la invoque a ciegas.
+        _meta_active = False
     _hay_fotos = any((p.get("foto") or "").strip() for p in productos if isinstance(p, dict))
-    if _hay_fotos:
+    if _meta_active and _hay_fotos:
         lines.append(
             "- `enviar_fotos_productos(query?, producto_ids?)` → manda hasta 6 "
             "fotos de productos como imágenes nativas de WhatsApp (no URLs en texto). "

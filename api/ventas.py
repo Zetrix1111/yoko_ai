@@ -42,7 +42,7 @@ if _HERE not in sys.path:
 
 from _lib import auth                                                # noqa: E402
 from _lib.auth import AuthError                                      # noqa: E402
-from _ventas import wa, conversaciones, chat as ventas_chat, prompt_preview, productos  # noqa: E402
+from _ventas import wa, conversaciones, chat as ventas_chat, prompt_preview, productos, meta_webhook  # noqa: E402
 
 
 # Mapa: (resource, método) → función que recibe (req, empresa_id).
@@ -67,9 +67,12 @@ _DISPATCH_AUTH = {
     ("prompt_preview",      "GET"):    prompt_preview.prompt_preview_get,
 }
 
-# Recursos S2S (NO validan JWT). Reciben (req,) — empresa_id viene del body.
+# Recursos S2S (NO validan JWT). Reciben (req,) — empresa_id viene del body
+# (sales_chat) o del lookup contra meta_connections (whatsapp_webhook).
 _DISPATCH_PUBLIC = {
-    ("sales_chat", "POST"): ventas_chat.sales_chat_post,
+    ("sales_chat",       "POST"): ventas_chat.sales_chat_post,
+    ("whatsapp_webhook", "GET"):  meta_webhook.meta_webhook_get,
+    ("whatsapp_webhook", "POST"): meta_webhook.meta_webhook_post,
 }
 
 
