@@ -137,7 +137,17 @@ def sales_chat_post(req) -> None:
         if not reply:
             reply = "Disculpa, no entendí bien tu mensaje. ¿Podrías repetirlo?"
 
-        return req._json(200, {"reply": reply})
+        # `media_urls` viene si alguna tool (ej. enviar_fotos_productos) lo
+        # emitió. bot-baileys es responsable de mandar cada URL como imagen
+        # nativa de WhatsApp ANTES de mandar el texto del `reply`. Si
+        # bot-baileys todavía no soporta este campo, lo ignora y el flujo
+        # cae back al texto solamente — fail-safe.
+        resp: dict = {"reply": reply}
+        media_urls = result.get("media_urls") or []
+        if media_urls:
+            resp["media_urls"] = media_urls
+
+        return req._json(200, resp)
     except Exception as e:
         print(f"[ventas/sales_chat] Error inesperado: {type(e).__name__}: {e}", file=sys.stderr)
         return req._json(500, {"error": "Error interno del servidor."})

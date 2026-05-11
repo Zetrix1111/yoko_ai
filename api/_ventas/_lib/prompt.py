@@ -1271,6 +1271,23 @@ def build_prompt(config: dict, ctx: dict) -> str:
         "Para la cantidad real, deriva al asesor humano.",
     ])
 
+    # Tool `enviar_fotos_productos`: solo se anuncia al LLM si el catálogo
+    # del tenant tiene al menos 1 producto con foto. Si no hay fotos
+    # cargadas, evitamos que el agent invoque la tool y reciba
+    # `disponible:false` — ruido innecesario.
+    _hay_fotos = any((p.get("foto") or "").strip() for p in productos if isinstance(p, dict))
+    if _hay_fotos:
+        lines.append(
+            "- `enviar_fotos_productos(query?, producto_ids?)` → manda hasta 6 "
+            "fotos de productos como imágenes nativas de WhatsApp (no URLs en texto). "
+            "USALA cuando el cliente pregunta por una categoría general (\"¿qué cascos "
+            "tienen?\", \"muéstrame guantes\", \"¿qué venden?\") o pide fotos "
+            "explícitamente (\"mándame fotos\"). NO la uses si el cliente YA eligió un "
+            "producto específico — para eso confirmá con texto y avanzá a discovery. "
+            "Después de invocarla, tu mensaje de texto DEBE ser BREVE: el cliente YA "
+            "ve los nombres en las fotos, no los repitas."
+        )
+
     # Tool `enviar_catalogo`: solo se anuncia al LLM si la empresa cargó un
     # URL de catálogo (capa 7 — Conocimiento de marca) y lo dejó activo. Si
     # no, evitamos que el agent la invoque y reciba "disponible:false" —
