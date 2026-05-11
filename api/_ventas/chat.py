@@ -43,24 +43,6 @@ def sales_chat_post(req) -> None:
         if not isinstance(history, list) or not history:
             return req._json(400, {"error": "Falta 'history' o está vacío."})
 
-        # TEMP-DIAG: diagnosticar si bot-baileys manda el history completo o
-        # truncado. Si turnos altos llegan con history corto, los bugs de
-        # repetición se explican porque el LLM no ve los mensajes anteriores.
-        # QUITAR este bloque después de validar.
-        _diag_first = history[0] if history else {}
-        _diag_last = history[-1] if history else {}
-        _diag_first_role = (_diag_first.get("role") or "?") if isinstance(_diag_first, dict) else "?"
-        _diag_first_content = ((_diag_first.get("content") or "") if isinstance(_diag_first, dict) else "")[:80]
-        _diag_last_role = (_diag_last.get("role") or "?") if isinstance(_diag_last, dict) else "?"
-        _diag_last_content = ((_diag_last.get("content") or "") if isinstance(_diag_last, dict) else "")[:80]
-        print(
-            f"[ventas/sales_chat DIAG] empresa={empresa_id} "
-            f"history_len={len(history)} "
-            f"first=[{_diag_first_role}] {_diag_first_content!r} "
-            f"last=[{_diag_last_role}] {_diag_last_content!r}",
-            file=sys.stderr,
-        )
-
         sender = {
             "phone":  (body.get("phone") or "").strip(),
             "nombre": (body.get("nombre") or "").strip(),

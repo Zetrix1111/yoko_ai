@@ -76,13 +76,22 @@ def _cast(valor, tipo: str | None):
 
 def _safe_list(table: str, filter_formula: str) -> list[dict]:
     """
-    Intenta listar una tabla y, si falla (404 porque no existe aún, o
-    error de red), devuelve [] con un warning a stderr. El skeleton
-    debe poder correr aunque las tablas no estén creadas todavía.
+    Intenta listar una tabla y, si falla, devuelve [] sin romper el flujo.
+
+    Política de logging:
+      - 403 / 404: la tabla no existe en la base de esta empresa o el
+        token no tiene acceso. Es ESPERADO para tablas opcionales (ej:
+        empresas que no usan Caja Chica no tienen la tabla
+        'Aprobadores'). Devolvemos [] en silencio — el código que llama
+        ya tolera lista vacía.
+      - Resto (5xx, red caída, parseo): SÍ valen warning a stderr — son
+        señales de un problema real que merece atención.
     """
     try:
         return airtable_client.list_records(table, filter_formula=filter_formula)
     except AirtableError as e:
+        if e.status in (403, 404):
+            return []
         print(
             f"[config_loader] No se pudo leer la tabla '{table}' "
             f"(status={e.status}). Usando lista vacía. Detalle: {e}",
