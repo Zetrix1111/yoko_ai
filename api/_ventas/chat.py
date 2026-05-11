@@ -103,7 +103,13 @@ def sales_chat_post(req) -> None:
                 system_prompt=system,
                 messages=history,
                 tools=ventas_tools.TOOLS_OPENAI,
-                context={"empresa_id": empresa_id, "sender": sender},
+                context={
+                    "empresa_id":     empresa_id,
+                    "sender":         sender,
+                    # `enviar_catalogo` lo lee de acá en vez de re-consultar
+                    # Airtable: la config ya se cargó arriba con load_full_config.
+                    "info_extendida": config["empresa"].get("info_extendida") or {},
+                },
                 executor=ventas_tools.execute,
                 max_iterations=4,
             )

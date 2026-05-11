@@ -243,6 +243,53 @@ def consultar_stock(args: dict, context: dict) -> dict:
     }
 
 
+def enviar_catalogo(args: dict, context: dict) -> dict:
+    """
+    Devuelve el URL público del PDF del catálogo de la empresa para que el
+    agent lo comparta con el cliente en su próximo mensaje. Lee la config
+    `info_extendida.catalogo_pdf_url` que ya viene en el `context`
+    (cargada por `sales_chat_post`) — NO re-consultamos Airtable acá para
+    evitar un round trip extra por turno.
+
+    Patrón de respuesta:
+      - Si hay URL configurado y activo:
+          {"disponible": True, "url": "...", "instruccion_agente": "..."}
+        El agent compone el mensaje natural con su voz y embebe el URL.
+        WhatsApp genera preview automático del PDF.
+      - Si no hay URL (activo:false o vacío):
+          {"disponible": False, "instruccion_agente": "..."}
+        El agent sigue con discovery normal (preguntas, consultar_productos).
+
+    No postea al outbox directamente: el handler de ventas pone la `reply`
+    final en el outbox como texto plano (incluyendo el URL).
+    """
+    info_extendida = (context or {}).get("info_extendida") or {}
+    campo = info_extendida.get("catalogo_pdf_url") or {}
+    activo = bool(campo.get("activo"))
+    url = (campo.get("valor") or "").strip() if isinstance(campo.get("valor"), str) else ""
+
+    if not activo or not url:
+        return {
+            "disponible": False,
+            "instruccion_agente": (
+                "La empresa no tiene un catálogo PDF cargado. NO inventes un URL. "
+                "Seguí con discovery: preguntá qué tipo de producto busca, para qué lo "
+                "necesita, o usá `consultar_productos` para listar opciones por categoría."
+            ),
+        }
+
+    return {
+        "disponible": True,
+        "url": url,
+        "instruccion_agente": (
+            "Compartí este URL con el cliente en tu próximo mensaje, con tu tono natural "
+            "de vendedor. Ejemplo: 'Acá te paso nuestro catálogo completo: <url>. "
+            "Avísame si te interesa algo específico y vemos disponibilidad'. "
+            "NO modifiques el URL. Después invitá al cliente a contarte qué le interesa."
+        ),
+    }
+
+
 # ─────────────────────────────────────────────────────────────────────────
 # Definiciones para OpenAI function calling
 # ─────────────────────────────────────────────────────────────────────────
@@ -301,6 +348,23 @@ TOOLS_OPENAI = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "enviar_catalogo",
+            "description": (
+                "Comparte el catálogo PDF de la empresa con el cliente cuando NO tiene "
+                "claro qué producto busca. Úsala SOLO si: (1) el cliente pide explícitamente "
+                "'catálogo', 'lista de productos', '¿qué tienen?'; o (2) después de 1-2 "
+                "preguntas de discovery el cliente sigue sin poder describir qué necesita "
+                "y enumerar productos en texto sería abrumador. NO la uses si el cliente "
+                "ya mencionó un producto/categoría específica — para eso usa "
+                "consultar_productos. La tool devuelve `disponible:false` si la empresa "
+                "no tiene PDF cargado; en ese caso seguí con discovery normal."
+            ),
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
 ]
 
 
@@ -308,6 +372,7 @@ TOOLS_OPENAI = [
 _HANDLERS = {
     "consultar_productos": consultar_productos,
     "consultar_stock":     consultar_stock,
+    "enviar_catalogo":     enviar_catalogo,
 }
 
 

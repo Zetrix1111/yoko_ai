@@ -186,12 +186,17 @@ def load_dynamic_config(empresa_id: str) -> dict:
 # Schema fijo. Cada campo: {activo: bool, valor: <tipo>}. Los toggles arrancan
 # en false → el prompt no los menciona.
 _INFO_EXTENDIDA_SCHEMA = {
-    "rubro":            "",
-    "descripcion":      "",
-    "direccion":        "",
-    "email_contacto":   "",
-    "horario_atencion": "",
-    "redes_sociales":   [],  # array de {red, url}
+    "rubro":             "",
+    "descripcion":       "",
+    "direccion":         "",
+    "email_contacto":    "",
+    "horario_atencion":  "",
+    "redes_sociales":    [],   # array de {red, url}
+    # URL público al PDF del catálogo de productos. El cerebro de ventas
+    # lo invoca via tool `enviar_catalogo` cuando el cliente no tiene claro
+    # qué busca. Si activo:false o valor vacío, la tool responde "no
+    # disponible" y el agent sigue con discovery normal.
+    "catalogo_pdf_url":  "",
 }
 
 

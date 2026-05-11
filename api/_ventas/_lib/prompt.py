@@ -1244,6 +1244,22 @@ def build_prompt(config: dict, ctx: dict) -> str:
         "- `consultar_stock(producto_id | nombre)` → disponibilidad de un producto "
         "(disponible/bajo_stock/sin_stock/servicio). NO devuelve el número exacto. "
         "Para la cantidad real, deriva al asesor humano.",
+    ])
+
+    # Tool `enviar_catalogo`: solo se anuncia al LLM si la empresa cargó un
+    # URL de catálogo y lo dejó activo. Si no, evitamos que el agent la
+    # invoque y reciba "disponible:false" — ruido innecesario.
+    _catalogo = info_extendida.get("catalogo_pdf_url") or {}
+    if _catalogo.get("activo") and isinstance(_catalogo.get("valor"), str) and _catalogo["valor"].strip():
+        lines.append(
+            "- `enviar_catalogo()` → comparte el PDF del catálogo de la empresa con "
+            "el cliente. Úsala SOLO si el cliente pide explícitamente ver el catálogo "
+            "(\"qué tienen\", \"mándame la lista\", \"catálogo\") o si tras 1-2 preguntas "
+            "de discovery sigue sin describir qué necesita. NO la uses si el cliente ya "
+            "mencionó un producto/categoría — para eso usa `consultar_productos`."
+        )
+
+    lines.extend([
         "",
         "## REGLAS SOBRE EL CATÁLOGO",
         "- Si un producto está AGOTADO, dilo con claridad y ofrece alternativas similares del catálogo.",
