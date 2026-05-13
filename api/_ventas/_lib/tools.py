@@ -281,6 +281,20 @@ def enviar_fotos_productos(args: dict, context: dict) -> dict:
             "instruccion_agente": "Error interno: falta empresa_id en el context.",
         }
 
+    # Guard de canal: bot-baileys no soporta media_urls. Si la request
+    # llegó por ese canal y el LLM intenta invocar la tool (porque el
+    # prompt no la anunció pero el modelo improvisó), devolvemos
+    # disponible:false para que use texto.
+    channel = (context or {}).get("channel") or "baileys"
+    if channel != "meta":
+        return {
+            "disponible": False,
+            "instruccion_agente": (
+                "El canal actual (bot-baileys) no soporta envío de imágenes "
+                "nativas. Listá los productos en texto con `consultar_productos`."
+            ),
+        }
+
     query = (args or {}).get("query") or ""
     producto_ids = (args or {}).get("producto_ids") or []
 

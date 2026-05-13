@@ -17,7 +17,7 @@ API pública:
   - `verify_webhook_signature(payload_bytes, sig_header, app_secret) -> bool`
   - `class MetaError(Exception)`
 
-Endpoint base: https://graph.facebook.com/v18.0/{phone_number_id}/messages
+Endpoint base: https://graph.facebook.com/v23.0/{phone_number_id}/messages
 """
 
 import hashlib
@@ -30,7 +30,7 @@ import urllib.request
 from ._http_utils import read_http_error_body
 
 
-_BASE_URL = "https://graph.facebook.com/v18.0"
+_BASE_URL = "https://graph.facebook.com/v23.0"
 
 
 class MetaError(Exception):

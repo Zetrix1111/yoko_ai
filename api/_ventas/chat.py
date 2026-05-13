@@ -39,6 +39,7 @@ def process_message(
     phone: str,
     nombre: str,
     history: list[dict],
+    channel: str = "baileys",
 ) -> dict:
     """
     Lógica core del cerebro de ventas. Función pura: no toca request HTTP.
@@ -54,6 +55,11 @@ def process_message(
       history:    history del caller (body de Baileys o último mensaje
                   del webhook Meta). Sirve como fallback + merge con
                   Airtable.
+      channel:    "meta" si la request entró por Meta Cloud API (soporta
+                  imágenes nativas), "baileys" si por bot-baileys (solo
+                  texto). Define si el prompt anuncia
+                  `enviar_fotos_productos` al LLM y si la tool acepta
+                  invocaciones. Default "baileys" por compat.
 
     Returns:
       {
@@ -110,7 +116,12 @@ def process_message(
 
     system = ventas_prompt.build_prompt(
         config,
-        ctx={"productos": productos, "sender": sender, "empresa_id": empresa_id},
+        ctx={
+            "productos":  productos,
+            "sender":     sender,
+            "empresa_id": empresa_id,
+            "channel":    channel,
+        },
     )
 
     result = openai_client.run_chat(
@@ -123,6 +134,11 @@ def process_message(
             # `enviar_catalogo` lo lee de acá en vez de re-consultar
             # Airtable: la config ya se cargó arriba con load_full_config.
             "ventas":     config.get("ventas") or {},
+            # `enviar_fotos_productos` revisa este flag para rechazar
+            # si el canal no soporta imágenes nativas (defensa en
+            # profundidad por si el LLM la invoca aunque no esté en el
+            # prompt).
+            "channel":    channel,
         },
         executor=ventas_tools.execute,
         max_iterations=4,
@@ -163,7 +179,10 @@ def sales_chat_post(req) -> None:
         nombre = (body.get("nombre") or "").strip()
 
         try:
-            result = process_message(empresa_id, phone, nombre, history)
+            result = process_message(
+                empresa_id, phone, nombre, history,
+                channel="baileys",
+            )
         except OpenAIAPIError as e:
             print(f"[ventas/sales_chat] OpenAI API error: {e}", file=sys.stderr)
             return req._json(502, {"error": "Error del servicio IA."})

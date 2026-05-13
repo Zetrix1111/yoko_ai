@@ -23,6 +23,7 @@ import json
 import os
 import sys
 import time
+from collections import deque
 
 from _lib import airtable_client
 from _lib import meta_connections
@@ -39,11 +40,19 @@ except ImportError:
 _TABLA_CONV = "conversaciones"
 _TABLA_MSGS = "mensajes"
 
+# Dedup in-memory de wamid (Meta message id). Si Vercel responde tarde
+# por cold-start, Meta reintenta el mismo POST y el cerebro procesaría
+# el mensaje dos veces (respuesta duplicada al cliente). Esta cache
+# sobrevive mientras la lambda esté caliente — cold-start la resetea,
+# pero la ventana de retry de Meta es de segundos, suficiente.
+_PROCESSED_WAMIDS: deque = deque(maxlen=500)
+_PROCESSED_SET: set = set()
+
 # Mensaje genérico cuando el cerebro falla (OpenAI down, Airtable down).
 # Va al cliente final por WhatsApp. NO exponemos detalle técnico.
 _FALLBACK_REPLY = (
     "Disculpa, estoy con un problema técnico en este momento. "
-    "Por favor, escribime de nuevo en unos minutos."
+    "Por favor, escríbeme de nuevo en unos minutos."
 )
 
 
@@ -189,6 +198,11 @@ def _process_change(value: dict) -> None:
     Procesa un `entry.changes[].value` del webhook. Cada change puede
     traer múltiples messages.
     """
+    # Meta envía 'statuses' (delivery/read/error) por el mismo webhook.
+    # No son input del usuario — skip silencioso para no contaminar logs.
+    if value.get("statuses") and not value.get("messages"):
+        return
+
     metadata = value.get("metadata") or {}
     phone_number_id = (metadata.get("phone_number_id") or "").strip()
     if not phone_number_id:
@@ -259,6 +273,17 @@ def _handle_message(
     if not from_phone or not text_body:
         return
 
+    # Dedup por wamid: si ya procesamos este id, ignorar (reintento Meta).
+    wamid = (msg.get("id") or "").strip()
+    if wamid:
+        if wamid in _PROCESSED_SET:
+            print(f"[meta_webhook] wamid duplicado, skip: {wamid}", file=sys.stderr)
+            return
+        if len(_PROCESSED_WAMIDS) == _PROCESSED_WAMIDS.maxlen:
+            _PROCESSED_SET.discard(_PROCESSED_WAMIDS[0])
+        _PROCESSED_WAMIDS.append(wamid)
+        _PROCESSED_SET.add(wamid)
+
     # 1) Resolver/crear conversación
     conv_id = _ensure_conversation(empresa_id, from_phone, nombre)
 
@@ -270,7 +295,10 @@ def _handle_message(
     # merge defensivo si Airtable aún no tiene el último mensaje.
     last_user = [{"role": "user", "content": text_body}]
     try:
-        result = ventas_chat.process_message(empresa_id, from_phone, nombre, last_user)
+        result = ventas_chat.process_message(
+            empresa_id, from_phone, nombre, last_user,
+            channel="meta",
+        )
         reply = result["reply"]
         media_urls = result.get("media_urls") or []
     except (OpenAIAPIError, AirtableError, Exception) as e:

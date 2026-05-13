@@ -21,6 +21,7 @@ Recursos soportados (todos requieren JWT salvo `sales_chat`):
   PATCH  ?resource=productos&id=…       → actualizar producto
   DELETE ?resource=productos&id=…       → eliminar producto
   GET    ?resource=prompt_preview       → system prompt del agente IA
+  GET    ?resource=meta_status          → estado conexión Meta + ping a Graph
   POST   ?resource=sales_chat           → cerebro del bot-baileys (S2S)
 
 `sales_chat` es la única excepción que NO valida JWT: lo invoca el bot
@@ -42,7 +43,7 @@ if _HERE not in sys.path:
 
 from _lib import auth                                                # noqa: E402
 from _lib.auth import AuthError                                      # noqa: E402
-from _ventas import wa, conversaciones, chat as ventas_chat, prompt_preview, productos, meta_webhook  # noqa: E402
+from _ventas import wa, conversaciones, chat as ventas_chat, prompt_preview, productos, meta_webhook, meta_status  # noqa: E402
 
 
 # Mapa: (resource, método) → función que recibe (req, empresa_id).
@@ -65,6 +66,8 @@ _DISPATCH_AUTH = {
     ("productos",           "DELETE"): productos.productos_delete,
 
     ("prompt_preview",      "GET"):    prompt_preview.prompt_preview_get,
+
+    ("meta_status",         "GET"):    meta_status.meta_status_get,
 }
 
 # Recursos S2S (NO validan JWT). Reciben (req,) — empresa_id viene del body
