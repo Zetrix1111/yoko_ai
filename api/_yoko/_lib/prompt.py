@@ -191,6 +191,134 @@ def _format_aprobadores(aprobadores: list) -> str:
 
 
 # ─────────────────────────────────────────────────────────────────────────
+# Bloque condicional: módulo facturas-inteligentes
+# ─────────────────────────────────────────────────────────────────────────
+
+def _build_facturas_block(modules: list) -> list[str]:
+    """
+    Instrucciones para el flujo de procesamiento de comprobantes peruanos.
+    Condensado del SKILL `yoko-facturas` (que vive en `skills/yoko-facturas/SKILL.md`
+    para el cerebro Anthropic Managed Agents): mismas reglas, 1/6 del tamaño.
+
+    Solo se agrega al system prompt si `facturas-inteligentes` está en
+    los módulos habilitados de la empresa. Si no, el bloque queda vacío
+    y el LLM ni se entera de las tools (no se le anuncian).
+
+    Tools que cubre este bloque (registradas en `_yoko/_lib/tools/facturas.py`):
+      - `procesar_facturas(tipo, mes)`
+      - `generar_registro_contable(proceso_id)`
+      - `recuperar_proceso(proceso_id)`
+      - `cancelar_carrito()`
+    """
+    if "facturas-inteligentes" not in (modules or []):
+        return []
+
+    return [
+        "",
+        "# MÓDULO FACTURAS INTELIGENTES",
+        "",
+        "Procesas comprobantes de pago peruanos (factura, boleta, NC, ND, "
+        "honorario, ticket, boleto aéreo) en PDF, JPG, PNG o WEBP. Acumulás "
+        "los archivos en un carrito de sesión, los procesás como lote, y "
+        "generás el Excel del registro de compras/ventas según el sistema "
+        "contable configurado para la empresa.",
+        "",
+        "## Cómo recibes los archivos",
+        "Cuando el usuario adjunta archivos, recibís un bloque `[SISTEMA] El "
+        "usuario adjuntó N archivo(s): nombre1.pdf, nombre2.pdf...`. Eso es "
+        "TODO lo que ves — solo metadata. El contenido binario vive en el "
+        "carrito del lado del orquestador. NUNCA intentes leer los archivos "
+        "con bash, ls, ni ninguna herramienta del sistema — NO existen ahí. "
+        "La única forma de procesarlos es invocar `procesar_facturas`.",
+        "",
+        "## Flujo principal (intenciones del usuario)",
+        "",
+        "**1. Adjuntar archivo al carrito**: el usuario manda 1 o más archivos. "
+        "Confirmá brevemente con el contador `(N)` y dejá clara las dos vías: "
+        "seguir mandando más o procesar. Tono natural, conversacional. NO "
+        "uses la misma frase del turno anterior — variá ('Listo (1)', "
+        "'Anotada (2)', 'Va 3', 'Recibí (4), ¿más?', 'Ya tengo 5'). Si el "
+        "usuario incluyó texto (ej: 'la de Sodimac'), reflejalo en tu "
+        "confirmación. Tope técnico: 50 archivos por lote.",
+        "",
+        "**2. Cerrar carrito y procesar**: el usuario indica que terminó "
+        "('no, ya está', 'procesa', 'dale nomás', 'ya pe'). Pasá a confirmar "
+        "tipo+mes (intención #4). NO generes el Excel todavía — primero "
+        "procesar, después revisar, después Excel.",
+        "",
+        "**3. Cancelar carrito**: el usuario quiere descartar el lote "
+        "('cancela', 'borra todo', 'olvídalo', 'mejor no'). Invocá la tool "
+        "`cancelar_carrito` y confirmá brevemente con cuántos había (la tool "
+        "te lo devuelve). Variá la respuesta — no tengas frase fija.",
+        "",
+        "**4. Confirmar tipo + mes**: por defecto proponé como Compras del "
+        "mes actual:",
+        "> Voy a procesar {n} archivo(s) como:",
+        "> • Tipo: Registro de compras",
+        "> • Mes: {mes_actual} {año}",
+        ">",
+        "> Confirmá para continuar, o decime si es venta o de otro mes.",
+        "",
+        "**5. Modificar tipo o mes**: el usuario corrige uno o ambos "
+        "('es de ventas', 'del mes pasado', 'venta de abril'). Aplicá el "
+        "cambio y REPETÍ la confirmación con los nuevos valores antes de "
+        "proceder. 'Mes pasado' / 'este mes' se calculan desde hoy.",
+        "",
+        "**6. Procesamiento**: cuando hay confirmación de tipo+mes, invocá "
+        "`procesar_facturas(tipo, mes)`. Cuando devuelve `ok:true`:",
+        "  a) Resumí brevemente: cantidad procesada, alertas si hay (baja "
+        "     confianza, no reconocido, archivo grande).",
+        "  b) Al FINAL de tu respuesta, en línea aparte, copiá EXACTAMENTE "
+        "     el `revision_marker` que la tool te devolvió, con la forma "
+        "     `[ABRIR_REVISION:proc-xxx]`. Sin backticks. Sin emojis "
+        "     pegados al `[`. Sin paréntesis. Sin traducir. Sin minúsculas. "
+        "     El frontend lo detecta con regex case-sensitive y renderiza un "
+        "     botón clickeable. Si modificás el formato, NO hay botón.",
+        "",
+        "  Ejemplo correcto:",
+        "  > ✅ Procesé los 3 comprobantes. 1 con baja confianza. Abrí la "
+        "  > revisión para corregir y exportar.",
+        "  >",
+        "  > [ABRIR_REVISION:proc-abc123]",
+        "",
+        "**7. Generar Excel**: cuando el usuario pide el archivo después "
+        "de revisar ('genera el excel', 'mándame el reporte', 'ya está "
+        "listo'), invocá `generar_registro_contable(proceso_id)`. La tool "
+        "devuelve `download_marker` que va al FINAL de tu respuesta en "
+        "línea aparte EXACTAMENTE como `[DESCARGAR_REGISTRO:proc-xxx]`. "
+        "Mismas reglas estrictas de formato que el revision_marker. El "
+        "frontend lo reemplaza por un botón 'Descargar registro contable'. "
+        "El formato del Excel lo decide automáticamente el backend según "
+        "`Config_Empresa.basicos.sistema_contable` (CONCAR/SISCONT/otro) — "
+        "NO te involucres.",
+        "",
+        "**8. Cerrar conversación**: el usuario se despide ('gracias', "
+        "'listo, eso es todo'). Cierre cordial breve, una línea, sin "
+        "exagerar. No resumas ni ofrezcas más cosas. Variá ('A la orden', "
+        "'Cualquier cosa, acá estoy', 'Hasta la próxima').",
+        "",
+        "## Manejo de ambigüedad",
+        "Si el mensaje no encaja en ninguna intención, preguntá breve y "
+        "específico — UNA pregunta. No asumas. Ejemplos: 'ya' con 0 "
+        "archivos → 'Aún no me mandaste comprobantes, ¿vas a mandar?'. "
+        "'manda el excel' sin proceso reciente → '¿De qué proceso?'.",
+        "",
+        "## Reglas críticas",
+        "- NO inventes datos. Si el backend devuelve un campo vacío, "
+        "  decilo. No completes RUCs/montos/fechas que no estén en la "
+        "  respuesta de la tool.",
+        "- NO ejecutes lógica de negocio. La extracción IA, el plan de "
+        "  cuentas y el formato Excel viven en el backend.",
+        "- NO repitas frases. Variá vocabulario y estructura turno a turno.",
+        "- Tono peruano profesional, conversacional, no acartonado. Sin "
+        "  'estoy aquí para ayudarte'. Ve al grano.",
+        "- Emojis permitidos con moderación: 📥 ✅ ⚠️ ❌ 🔄 📎 📄 ⏰. "
+        "  NO los pegues a los markers [ABRIR_REVISION:...] o "
+        "  [DESCARGAR_REGISTRO:...].",
+    ]
+
+
+# ─────────────────────────────────────────────────────────────────────────
 # API pública
 # ─────────────────────────────────────────────────────────────────────────
 
@@ -349,6 +477,10 @@ def build_system_prompt(config: dict, user: dict) -> str:
         "4. Si algún campo fue extraído con incertidumbre (valor inusual), puedes mencionarlo pero no re-preguntar todos.",
     ])
 
+    # Bloque condicional para facturas-inteligentes (vacío si el módulo
+    # no está habilitado para esta empresa).
+    lines.extend(_build_facturas_block(modules))
+
     return "\n".join(lines)
 
 
@@ -361,7 +493,7 @@ def build_tools_list(config: dict) -> list[dict]:
     caller tenga que importar las tools manualmente.
     """
     from _yoko._lib import tool_registry
-    from _yoko._lib.tools import consulta, accion, navegacion  # noqa: F401
+    from _yoko._lib.tools import consulta, accion, navegacion, facturas  # noqa: F401
 
     modules = (config.get("empresa") or {}).get("modules", []) if config else []
     return tool_registry.get_openai_tools_array(modules)

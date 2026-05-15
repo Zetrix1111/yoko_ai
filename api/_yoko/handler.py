@@ -19,7 +19,7 @@ import json
 import os
 import sys
 
-from _lib import auth, config_loader, openai_client, session
+from _lib import auth, config_loader, openai_client, session, yoko_cart_store
 from _lib.airtable_client import AirtableError
 from _lib.auth import AuthError
 from _yoko._lib import prompt as yoko_prompt
@@ -113,7 +113,68 @@ def handle_post(req) -> None:
         if isinstance(modulos, list):
             config["empresa"]["modules"] = modulos
 
-        # 6) Armar system prompt + tools list
+        # 6) Adjuntos para módulo facturas-inteligentes — persistir al
+        # carrito server-side ANTES de armar el prompt, así el bloque
+        # `[SISTEMA]` que inyectamos al último user message refleja el
+        # total acumulado correcto.
+        #
+        # OpenAI es stateless (no tiene `session_id` nativo como
+        # Anthropic Managed Agents), pero igual necesitamos una clave
+        # para el carrito KV cross-turn. La derivamos de (empresa, dni)
+        # del usuario JWT. TTL 4h sliding como en Managed.
+        attachments = body.get("attachments") or None
+        if attachments is not None and not isinstance(attachments, list):
+            return req._json(400, {"error": "attachments debe ser una lista."})
+
+        user_id = (user.get("dni") or "anonymous").strip()
+        session_id = f"yoko-legacy:{empresa_id}:{user_id}"
+
+        if attachments:
+            try:
+                yoko_cart_store.add_files(session_id, attachments)
+            except Exception as e:
+                print(
+                    f"[chat] yoko_cart_store.add_files falló: "
+                    f"{type(e).__name__}: {e}",
+                    file=sys.stderr,
+                )
+                return req._json(502, {
+                    "error": "Error guardando los adjuntos.",
+                })
+
+        # Inyectar hint para el LLM con el total del carrito (mismo patrón
+        # que handler_managed.py:258-281). El bloque [SISTEMA] lo lee la
+        # capa "MÓDULO FACTURAS INTELIGENTES" del system prompt.
+        if attachments:
+            try:
+                total_carrito = yoko_cart_store.cart_size(session_id)
+            except Exception:
+                total_carrito = len(attachments)
+            nombres = ", ".join(
+                (a.get("filename") or "archivo") for a in attachments[:5]
+                if isinstance(a, dict)
+            )
+            if len(attachments) > 5:
+                nombres += f", ... y {len(attachments) - 5} más"
+            msg_adjuntos = (
+                f"[SISTEMA] El usuario adjuntó {len(attachments)} archivo(s) "
+                f"en este turno: {nombres}. Total acumulado en carrito: "
+                f"{total_carrito}. NO ves el contenido binario directamente, "
+                f"NI están en ningún path del filesystem. Cuando el usuario "
+                f"confirme tipo+mes, invocá `procesar_facturas` — el "
+                f"orquestador inyecta los archivos automáticamente."
+            )
+            msgs = list(body.get("messages") or [])
+            if msgs and isinstance(msgs[-1], dict) and msgs[-1].get("role") == "user":
+                msgs[-1] = dict(msgs[-1])
+                msgs[-1]["content"] = (
+                    str(msgs[-1].get("content") or "") + "\n\n" + msg_adjuntos
+                )
+            else:
+                msgs.append({"role": "user", "content": msg_adjuntos})
+            body["messages"] = msgs
+
+        # 7) Armar system prompt + tools list
         try:
             system = yoko_prompt.build_system_prompt(config, user)
             tools = yoko_prompt.build_tools_list(config)
@@ -121,15 +182,24 @@ def handle_post(req) -> None:
             print(f"[chat] Error armando prompt/tools: {type(e).__name__}: {e}", file=sys.stderr)
             return req._json(500, {"error": "Error interno del servidor."})
 
-        # 7) Loop de chat con OpenAI usando el executor de Yoko (no el de ventas).
+        # 8) Loop de chat con OpenAI usando el executor de Yoko (no el de ventas).
         # `empresa_id` viaja en el context para que las tools que escriben en
         # Airtable (acción) lo usen como filtro/poblamiento, sin leer env vars.
+        # `session_id_for_cart` + `auth_header` van para las tools de facturas
+        # (`procesar_facturas`, `cancelar_carrito`) que necesitan el carrito
+        # y el JWT del usuario para hacer HTTP loopback a /api/facturas?action=*.
         try:
             result = openai_client.run_chat(
                 system_prompt=system,
                 messages=body.get("messages", []) or [],
                 tools=tools,
-                context={"user": user, "config": config, "empresa_id": empresa_id},
+                context={
+                    "user":                user,
+                    "config":              config,
+                    "empresa_id":          empresa_id,
+                    "session_id_for_cart": session_id,
+                    "auth_header":         req.headers.get("Authorization") or "",
+                },
                 executor=tool_registry.execute_tool,
             )
         except OpenAIAPIError as e:

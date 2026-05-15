@@ -70,6 +70,14 @@ export function useChat(user) {
   const [currentBackend, setCurrentBackend] = useState(readInitialBackend);
   const isManaged = currentBackend === 'managed_agents';
 
+  // El módulo `facturas-inteligentes` también requiere mandar attachments
+  // en base64 (no parse_file), porque el backend legacy ahora soporta el
+  // mismo carrito server-side que Managed para facturas. parse_file sigue
+  // siendo el path para gestion-caja (extracción IA pre-mensaje).
+  const _modulos = (user?.empresa?.modulos) || [];
+  const isFacturas = _modulos.includes('facturas-inteligentes');
+  const useAttachmentsPath = isManaged || isFacturas;
+
   // Cambia el cerebro activo. Si la conversación tiene mensajes propios
   // (más que el greeting), pide confirmación porque el reset descarta el
   // contexto visible. La session vieja del backend anterior queda colgada
@@ -213,7 +221,10 @@ export function useChat(user) {
       }]);
 
       try {
-        if (isManaged) {
+        if (useAttachmentsPath) {
+          // Managed Agents O legacy + facturas-inteligentes: codificar
+          // base64 y mandar como attachments en el body. El backend
+          // (handler.py o handler_managed.py) persiste en el carrito KV.
           const encoded = [];
           for (let i = 0; i < files.length; i++) {
             const file = files[i];
@@ -228,7 +239,9 @@ export function useChat(user) {
           attachmentsForChat = encoded;
           setMessages((prev) => prev.filter((msg) => msg.id !== uploadMsgId));
         } else {
-          // Legacy openai: pre-procesa con parse_file.
+          // Legacy openai sin facturas (típicamente caja-chica):
+          // pre-procesa cada archivo con parse_file e inyecta los campos
+          // extraídos al texto del mensaje.
           const todosLosCampos = [];
           for (let i = 0; i < files.length; i++) {
             const file = files[i];
@@ -376,8 +389,11 @@ export function useChat(user) {
       sender: 'user',
     }]);
 
-    // Si caben en un solo POST, ruta directa.
-    if (!isManaged || safeFiles.length <= CHUNK_SIZE) {
+    // Auto-chunking aplica para flujos que mandan attachments en base64
+    // al body (Managed o legacy+facturas) — base64 infla el payload y
+    // Vercel impone 4.5MB por request. Caja chica usa parse_file y va
+    // por otra ruta, sin chunking.
+    if (!useAttachmentsPath || safeFiles.length <= CHUNK_SIZE) {
       await sendOneChunk({
         text,
         files: safeFiles,
@@ -403,7 +419,7 @@ export function useChat(user) {
         showLoadingBubble: true,            // cada chunk: bot confirma "Listo (N)"
       });
     }
-  }, [sendOneChunk, isManaged]);
+  }, [sendOneChunk, useAttachmentsPath]);
 
   return { messages, sendMessage, isUploading, currentBackend, switchBackend };
 }
