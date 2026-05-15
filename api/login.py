@@ -1,24 +1,34 @@
 """
+⚠️  MODO PRUEBA — login simplificado contra la tabla `Empleados`.
+   Cualquiera que figure en `Empleados` con `EMAIL` cargado puede
+   entrar usando la contraseña común "Love2026". El password hash
+   bcrypt de la tabla `Usuarios` se ignora durante esta fase.
+
+   Plan de rollback: `git revert <commit>` para volver al flujo
+   original (bcrypt + tabla Usuarios). Ver docstring abajo para el
+   contrato del JWT (no cambia).
+
 api/login.py — endpoint de autenticación multi-tenant.
 
-POST con `{"email": "...", "password": "..."}`. Si las credenciales son
-correctas y tanto el usuario como la empresa están activos, devuelve un
-JWT HS256 (TTL 30 días) + datos básicos del usuario y la empresa para
-que el frontend rendere su UI sin hacer un GET adicional.
+POST con `{"email": "...", "password": "..."}`. Si el email existe en
+`Empleados` y la password es "Love2026" Y la empresa del empleado está
+activa, devuelve un JWT HS256 (TTL 30 días) + datos básicos del usuario
+y la empresa para que el frontend rendere su UI sin hacer un GET
+adicional.
 
-El JWT es self-contained: incluye `empresa_id` y `modulos` para que los
-demás endpoints resuelvan el tenant del usuario sin tocar Airtable
-nuevamente. Cuando el JWT vence, el frontend re-loguea.
+El JWT es self-contained y mantiene el shape original: incluye
+`empresa_id` y `modulos` para que los demás endpoints resuelvan el
+tenant sin tocar Airtable. Cuando el JWT vence, el frontend re-loguea.
 
-Errores siempre genéricos al cliente — no filtrar si fue email o password
-lo que falló (anti-enumeration). Detalle interno solo a stderr.
+Errores siempre genéricos al cliente — no filtrar si fue email o
+password lo que falló (anti-enumeration). Detalle interno solo a stderr.
 
 Códigos:
   200  → login OK
   400  → JSON inválido o email mal formado
-  401  → email o password incorrectos / token issues
-  403  → cuenta o empresa desactivada
-  500  → JWT_SECRET no configurado, o inconsistencia en Airtable
+  401  → email o password incorrectos
+  403  → empresa desactivada
+  500  → JWT_SECRET no configurado o inconsistencia en Airtable
   502  → falla de Airtable
 """
 
@@ -40,9 +50,13 @@ from _lib.airtable_client import AirtableError          # noqa: E402
 from _lib.auth import AuthError                         # noqa: E402
 
 
-_TABLA_USUARIOS = "Usuarios"
-_TABLA_EMPRESAS = "Empresas"
 _TABLA_EMPLEADOS = "Empleados"
+_TABLA_EMPRESAS = "Empresas"
+
+# ⚠️ TEMP (modo prueba) — password compartido para todos los empleados.
+# Cuando se restablezca el flujo de Usuarios + bcrypt, eliminar esta
+# constante y volver al `auth.verify_password(...)` original.
+_TEMP_SHARED_PASSWORD = "Love2026"
 
 # Email validation conservadora — si el email tiene comillas o caracteres
 # raros lo rechazamos antes de construir el filterByFormula de Airtable
@@ -68,31 +82,29 @@ class handler(BaseHTTPRequestHandler):
             if not password:
                 return self._json(401, {"error": _GENERIC_INVALID_CREDS})
 
-            # ── 1. Buscar usuario por email ──────────────────────────────
+            # ── 1. Buscar empleado por email ─────────────────────────────
             try:
-                user_rec = self._find_usuario(email)
+                empleado_rec = self._find_empleado(email)
             except AirtableError as e:
-                print(f"[login] AirtableError buscando Usuarios: {e}", file=sys.stderr)
+                print(f"[login] AirtableError buscando Empleados: {e}", file=sys.stderr)
                 return self._json(502, {"error": "Error al consultar la base de datos."})
 
-            if user_rec is None:
+            if empleado_rec is None:
                 return self._json(401, {"error": _GENERIC_INVALID_CREDS})
 
-            user_fields = user_rec.get("fields", {}) or {}
-            password_hash = user_fields.get("password_hash") or ""
+            empleado_fields = empleado_rec.get("fields", {}) or {}
 
-            # ── 2. Verificar password ────────────────────────────────────
-            if not auth.verify_password(password, password_hash):
+            # ── 2. Verificar password (TEMP: comparación directa) ────────
+            # TODO: volver a `auth.verify_password(password, password_hash)`
+            # cuando se restablezca el flujo de Usuarios + bcrypt.
+            if password != _TEMP_SHARED_PASSWORD:
                 return self._json(401, {"error": _GENERIC_INVALID_CREDS})
 
-            # ── 3. Usuario activo? ───────────────────────────────────────
-            if not _coerce_bool(user_fields.get("activo"), default=True):
-                return self._json(403, {"error": "Tu cuenta está desactivada."})
-
-            empresa_id = (user_fields.get("empresa_id") or "").strip()
+            # ── 3. Resolver empresa_id ───────────────────────────────────
+            empresa_id = str(empleado_fields.get("empresa_id", "") or "").strip()
             if not empresa_id:
                 print(
-                    f"[login] Usuario {user_rec.get('id')} sin empresa_id asignado.",
+                    f"[login] Empleado {empleado_rec.get('id')} sin empresa_id asignado.",
                     file=sys.stderr,
                 )
                 return self._json(500, {"error": "Configuración de cuenta incompleta."})
@@ -106,8 +118,8 @@ class handler(BaseHTTPRequestHandler):
 
             if empresa_rec is None:
                 print(
-                    f"[login] Inconsistencia: usuario {user_rec.get('id')} apunta a "
-                    f"empresa_id='{empresa_id}' que no existe en la tabla Empresas.",
+                    f"[login] Inconsistencia: empleado {empleado_rec.get('id')} apunta "
+                    f"a empresa_id='{empresa_id}' que no existe en la tabla Empresas.",
                     file=sys.stderr,
                 )
                 return self._json(500, {"error": "Configuración de cuenta incompleta."})
@@ -120,18 +132,12 @@ class handler(BaseHTTPRequestHandler):
 
             modulos = _normalize_modulos(empresa_fields.get("modulos_habilitados"))
 
-            # ── 6. Enriquecimiento OPCIONAL: lookup en Empleados ────────
-            # Si el email tiene un Empleado asociado, copiamos dni / cargo /
-            # celular al user de la respuesta. Esto mantiene compat con el
-            # backend del chat (api/chat.py + session.extract_user) que
-            # todavía espera user.dni en el body. Si Empleados falla o no
-            # existe la fila, NO rompemos el login — es enriquecimiento.
-            empleado_extra = self._fetch_empleado_extra(email)
-
-            # ── 7. Emitir JWT ────────────────────────────────────────────
+            # ── 6. Emitir JWT ────────────────────────────────────────────
+            # sub = rec_id de Empleados (durante modo prueba). Cuando se
+            # restablezca Usuarios, vuelve a ser rec_id de Usuarios.
             try:
                 token = auth.issue_jwt(
-                    user_id=user_rec.get("id", ""),
+                    user_id=empleado_rec.get("id", ""),
                     email=email,
                     empresa_id=empresa_id,
                     modulos=modulos,
@@ -140,17 +146,26 @@ class handler(BaseHTTPRequestHandler):
                 # Casi siempre: JWT_SECRET mal configurado.
                 return self._json(e.status, {"error": str(e)})
 
-            # ── 8. Respuesta ─────────────────────────────────────────────
+            # ── 7. Respuesta ─────────────────────────────────────────────
+            # Nombre: preferimos NOMBRE CORTO (más amigable en UI),
+            # fallback NOMBRE COMPLETO si está vacío.
+            nombre_corto = str(empleado_fields.get("NOMBRE CORTO", "") or "").strip()
+            nombre_completo = str(empleado_fields.get("NOMBRE COMPLETO", "") or "").strip()
+            nombre = nombre_corto or nombre_completo
+
             user_payload: dict = {
-                "id":     user_rec.get("id", ""),
+                "id":     empleado_rec.get("id", ""),
                 "email":  email,
-                "nombre": user_fields.get("nombre", ""),
+                "nombre": nombre,
             }
-            # Merge enriquecimiento — solo agrega claves que existan y no estén vacías.
-            for k in ("dni", "cargo", "celular"):
-                v = empleado_extra.get(k, "")
-                if v:
-                    user_payload[k] = v
+            # Campos extra del empleado (vienen de la misma fila primaria,
+            # ya no hace falta un lookup secundario).
+            dni = str(empleado_fields.get("DNI", "") or "").strip()
+            cargo = str(empleado_fields.get("PUESTO", "") or "").strip()
+            celular = str(empleado_fields.get("CELULAR", "") or "").strip()
+            if dni:     user_payload["dni"] = dni
+            if cargo:   user_payload["cargo"] = cargo
+            if celular: user_payload["celular"] = celular
 
             return self._json(200, {
                 "token":   token,
@@ -170,11 +185,11 @@ class handler(BaseHTTPRequestHandler):
 
     # ── Airtable lookups ────────────────────────────────────────────────
 
-    def _find_usuario(self, email: str) -> dict | None:
+    def _find_empleado(self, email: str) -> dict | None:
         """email ya viene lowercase y validado contra `_EMAIL_RE`."""
-        formula = f"LOWER({{email}})='{email}'"
+        formula = f"LOWER({{EMAIL}})='{email}'"
         records = airtable_client.list_records(
-            _TABLA_USUARIOS, filter_formula=formula, max_records=1,
+            _TABLA_EMPLEADOS, filter_formula=formula, max_records=1,
         )
         return records[0] if records else None
 
@@ -186,36 +201,6 @@ class handler(BaseHTTPRequestHandler):
             _TABLA_EMPRESAS, filter_formula=formula, max_records=1,
         )
         return records[0] if records else None
-
-    def _fetch_empleado_extra(self, email: str) -> dict[str, str]:
-        """
-        Lookup opcional de la fila en Empleados que matchea el email del
-        usuario. Devuelve {dni, cargo, celular} con strings limpios.
-
-        Si Airtable falla o no hay fila, devuelve {} silenciosamente —
-        este enriquecimiento NO debe romper el login. Detalle a stderr.
-        """
-        try:
-            formula = f"LOWER({{EMAIL}})='{email}'"
-            records = airtable_client.list_records(
-                _TABLA_EMPLEADOS, filter_formula=formula, max_records=1,
-            )
-        except AirtableError as e:
-            print(
-                f"[login] No se pudo enriquecer desde Empleados ({email}): {e}",
-                file=sys.stderr,
-            )
-            return {}
-
-        if not records:
-            return {}
-
-        f = records[0].get("fields", {}) or {}
-        return {
-            "dni":     str(f.get("DNI", "") or "").strip(),
-            "cargo":   str(f.get("PUESTO", "") or "").strip(),
-            "celular": str(f.get("CELULAR", "") or "").strip(),
-        }
 
     # ── HTTP helpers ────────────────────────────────────────────────────
 
