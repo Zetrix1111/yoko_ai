@@ -1162,74 +1162,6 @@ body {
 .items-center { align-items: center; }
 
 /* ─────────────────────────────────────────────
-   Quick Links Rail (horizontal, arriba de la sidebar de módulos)
-   ───────────────────────────────────────────── */
-.quick-links-rail {
-  display: flex;
-  flex-direction: row;
-  justify-content: space-around;
-  align-items: center;
-  gap: 0.5rem;
-  width: 100%;
-  padding: 0.5rem;
-  margin-bottom: 1rem;
-  background: var(--md-surface-variant);
-  border-radius: 14px;
-}
-
-.quick-link-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  flex: 1;
-  min-width: 0;
-  padding: 6px 4px;
-  border-radius: 10px;
-  text-decoration: none;
-  color: var(--md-on-surface);
-  cursor: pointer;
-  transition: background-color 0.18s ease, transform 0.18s ease;
-}
-
-.quick-link-item:hover {
-  background: color-mix(in srgb, var(--md-primary) 10%, transparent);
-  transform: translateY(-1px);
-}
-
-.quick-link-item.disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.quick-link-item.disabled:hover {
-  background: transparent;
-  transform: none;
-}
-
-.quick-link-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #ffffff;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
-}
-
-.quick-link-label {
-  font-size: 0.625rem;
-  line-height: 1.15;
-  text-align: center;
-  font-weight: 500;
-  color: var(--md-on-surface);
-  max-width: 100%;
-  word-break: break-word;
-}
-
-/* ─────────────────────────────────────────────
    Mobile — ajustes finos para pantallas ≤640px
    ───────────────────────────────────────────── */
 @media (max-width: 640px) {
@@ -1329,19 +1261,5 @@ body {
   }
   .module-name {
     font-size: 0.95rem;
-  }
-
-  /* Quick-links rail dentro del modal móvil */
-  .quick-links-rail {
-    gap: 0.25rem;
-    padding: 0.4rem;
-    margin-bottom: 0.75rem;
-  }
-  .quick-link-icon {
-    width: 34px;
-    height: 34px;
-  }
-  .quick-link-label {
-    font-size: 0.6rem;
   }
 }

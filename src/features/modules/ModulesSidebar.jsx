@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { NavLink, Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { X, ChevronRight, ExternalLink } from 'lucide-react';
 import { MODULES } from './modulesConfig';
-import QuickLinksRail from '../quick-links/QuickLinksRail';
 
 // ─────────────────────────────────────
 // Accordion sub-components
@@ -141,7 +140,6 @@ export default function ModulesSidebar({ show, onClose, enabledModulos }) {
 
   return (
     <aside className={`modules-sidebar ${show ? 'show-mobile' : 'hidden lg:flex'}`}>
-      <QuickLinksRail />
       <div className="sidebar-header flex justify-between items-center">
         <div>
           <h2 className="sidebar-title">Procesos</h2>

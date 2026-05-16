@@ -54,18 +54,11 @@ function fileToBase64(file) {
   });
 }
 
-function buildGreetingMessage(user) {
-  const text = user?.nombre
-    ? `¡Hola, ${user.nombre}! Soy tu asistente inteligente. Puedo ayudarte a ejecutar procesos como rendiciones, caja chica y pagos. ¿Qué deseas hacer hoy?`
-    : `¡Hola! Soy tu asistente inteligente. Puedo ayudarte a ejecutar procesos como rendiciones, caja chica y pagos. ¿Qué deseas hacer hoy?`;
-  return { id: crypto.randomUUID(), text, sender: 'yoko' };
-}
-
 export function useChat(user) {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const [messages, setMessages] = useState(() => [buildGreetingMessage(user)]);
+  const [messages, setMessages] = useState(() => []);
   const [isUploading, setIsUploading] = useState(false);
   const [currentBackend, setCurrentBackend] = useState(readInitialBackend);
   const isManaged = currentBackend === 'managed_agents';
@@ -78,16 +71,15 @@ export function useChat(user) {
   const isFacturas = _modulos.includes('facturas-inteligentes');
   const useAttachmentsPath = isManaged || isFacturas;
 
-  // Cambia el cerebro activo. Si la conversación tiene mensajes propios
-  // (más que el greeting), pide confirmación porque el reset descarta el
-  // contexto visible. La session vieja del backend anterior queda colgada
-  // server-side y expira sola por el TTL de KV (4 hrs).
+  // Cambia el cerebro activo. Si ya hubo conversación, pide confirmación
+  // porque el reset descarta el contexto visible. La session vieja del
+  // backend anterior queda colgada server-side y expira sola por el TTL
+  // de KV (4 hrs).
   const switchBackend = useCallback((next) => {
     if (next !== 'managed_agents' && next !== 'openai') return;
     if (next === currentBackend) return;
 
-    // > 1 mensaje significa que ya hubo intercambio con el bot.
-    const hasConversation = messages.length > 1;
+    const hasConversation = messages.length > 0;
     if (hasConversation) {
       const proceed = window.confirm(
         'Cambiar de cerebro reseteará la conversación actual. ¿Continuar?'
@@ -101,8 +93,8 @@ export function useChat(user) {
       // ignoramos errores de localStorage (storage lleno, modo strict, etc.)
     }
     setCurrentBackend(next);
-    setMessages([buildGreetingMessage(user)]);
-  }, [currentBackend, messages.length, user]);
+    setMessages([]);
+  }, [currentBackend, messages.length]);
 
   // Cuando el usuario vuelve al chat tras descargar el registro contable
   // desde la pantalla de Revisión (`/chat?facturas_done=proc-xxx`),

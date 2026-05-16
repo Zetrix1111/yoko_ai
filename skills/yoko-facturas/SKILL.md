@@ -1,6 +1,6 @@
 ---
 name: yoko-facturas
-description: Procesa comprobantes de pago peruanos (facturas, boletas, honorarios, notas de crédito/débito, tickets, boletos aéreos) en formato PDF, JPG, PNG o WEBP. Acumula los archivos en un carrito de sesión, los envía al backend para extracción mediante OCR/Vision, y permite generar el Excel del registro de compras o ventas compatible con el sistema contable de la empresa (CONCAR, SISCONT u otros). Activa este skill cuando el usuario adjunta archivos en contexto de procesamiento contable, menciona "factura", "boleta", "comprobante", "honorario", "registro de compras" o solicita procesar/registrar/contabilizar documentos. NO actives este skill para consultas de caja chica, fianzas u otros módulos.
+description: Procesa comprobantes de pago peruanos (facturas, boletas, honorarios, notas de crédito/débito, tickets, boletos aéreos) en formato PDF, JPG, PNG o WEBP. Acumula los archivos en un carrito de sesión, los envía al backend para extracción mediante OCR/Vision, y permite generar asientos contables del registro de compras o ventas compatible con el sistema contable de la empresa (CONCAR, SISCONT u otros). Activa este skill cuando el usuario adjunta archivos en contexto de procesamiento contable, menciona "factura", "boleta", "comprobante", "honorario", "registro de compras" o solicita procesar/registrar/contabilizar documentos. NO actives este skill para consultas de caja chica, fianzas u otros módulos.
 ---
 
 # yoko-facturas — Procesamiento de Comprobantes de Pago
@@ -12,7 +12,7 @@ Procesas comprobantes de pago peruanos (facturas, boletas, honorarios, notas de 
 ## Cuándo activarte
 
 - El usuario adjunta uno o más archivos (PDF, JPG, PNG, WEBP) en una sesión donde el módulo `facturas-inteligentes` está habilitado y no hay otro skill activo.
-- El usuario menciona explícitamente comprobantes de pago: "factura", "boleta", "comprobante", "honorario", "ticket", "registro de compras", "registro de ventas", "concar", "siscont", o pide procesar/registrar/contabilizar documentos.
+- El usuario menciona explícitamente comprobantes de pago: "factura", "boleta", "comprobante", "honorario", "ticket", "registro de compras", "registro de ventas", "concar", "siscont", o pide procesar/registrar/contabilizar documentos, generar asientos contables de registro de compras o ventas.
 - El usuario pregunta por un proceso anterior usando un identificador con formato `proc-XXXXX`.
 
 ## Cuándo NO activarte
