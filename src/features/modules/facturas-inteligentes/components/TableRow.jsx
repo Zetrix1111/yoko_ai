@@ -18,12 +18,13 @@ const MONEDA_OPTIONS = ['PEN', 'USD', 'EUR', 'CNY'].map((m) => ({
 }));
 
 /**
- * Fila de tabla con 13 columnas editables.
+ * Fila de tabla con 14 columnas editables.
  *
- * Columnas 1-10: datos de la factura (editables inline).
- * Columna 11: obra/área (text input — el usuario debe completar).
- * Columna 12: estado (read-only por ahora).
- * Columna 13: acciones (botón eliminar + warning de confianza baja).
+ * Columnas 1-11: datos de la factura (editables inline), incluyendo Tipo
+ *   de cambio (campo SIRE #26, obligatorio si moneda ≠ PEN).
+ * Columna 12: cuenta contable (input libre con default por template).
+ * Columna 13: estado (read-only por ahora).
+ * Columna 14: acciones (botón eliminar + warning de confianza baja).
  */
 export default function TableRow({
   factura,
@@ -142,6 +143,20 @@ export default function TableRow({
           value={factura.moneda}
           options={MONEDA_OPTIONS}
           onChange={(val) => handleChange('moneda', val)}
+        />
+      </td>
+
+      {/* Tipo de cambio — solo relevante si moneda ≠ PEN. Obligatorio en
+          SIRE para monedas extranjeras (campo 26 de la estructura 8.4). */}
+      <td className="col-tipo-cambio">
+        <EditableCell
+          value={factura.tipo_cambio}
+          type="text"
+          isEditing={isEditing('tipo_cambio')}
+          onStartEdit={() => handleStartEdit('tipo_cambio')}
+          onStopEdit={handleStopEdit}
+          onChange={(val) => handleChange('tipo_cambio', val)}
+          placeholder={factura.moneda === 'PEN' ? '—' : 'Ej: 3.755'}
         />
       </td>
 

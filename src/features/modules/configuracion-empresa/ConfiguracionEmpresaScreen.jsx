@@ -37,6 +37,7 @@ const SISTEMAS_CONTABLES = [
   { id: 'siscont',  name: 'SISCONT',  description: 'Software contable empresarial multi-empresa.' },
   { id: 'starsoft', name: 'STARSOFT', description: 'ERP integral con módulo contable.' },
   { id: 'siigo',    name: 'SIIGO',    description: 'Software contable cloud para Latinoamérica.' },
+  { id: 'sire',     name: 'SIRE',     description: 'Sin software contable. TXT directo para cargar en SIRE.' },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────

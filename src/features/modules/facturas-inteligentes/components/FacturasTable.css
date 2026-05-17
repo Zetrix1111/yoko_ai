@@ -109,8 +109,9 @@
 .col-ruc       { min-width: 120px; }
 .col-proveedor { min-width: 200px; }
 .col-concepto  { min-width: 250px; }
-.col-moneda    { min-width:  90px; }
-.col-monto     { min-width: 120px; }
+.col-moneda      { min-width:  90px; }
+.col-tipo-cambio { min-width: 100px; }
+.col-monto       { min-width: 120px; }
 .col-tributo   { min-width: 120px; }
 .col-obra      { min-width: 180px; }
 .col-cuenta    { min-width: 130px; }

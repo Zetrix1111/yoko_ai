@@ -6,7 +6,7 @@ import useAutoSave from '../hooks/useAutoSave';
 import './FacturasTable.css';
 
 /**
- * Tabla editable de facturas con 13 columnas.
+ * Tabla editable de facturas con 14 columnas.
  *
  * Features:
  * - Edición inline de todas las celdas
@@ -74,6 +74,7 @@ export default function FacturasTable({ proceso, facturas, setFacturas }) {
               <th className="col-proveedor">Proveedor</th>
               <th className="col-concepto">Concepto</th>
               <th className="col-moneda">Moneda</th>
+              <th className="col-tipo-cambio">Tipo cambio</th>
               <th className="col-monto">Monto inc. IGV</th>
               <th className="col-tributo">Monto tributo</th>
               <th className="col-obra">Obra / área</th>

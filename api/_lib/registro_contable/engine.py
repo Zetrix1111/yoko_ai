@@ -133,9 +133,22 @@ def generate(
 
     content: bytes = template.build_xlsx(todas_las_filas)
 
+    # Extensión/mime/filename son opcionales en el template — defaults a xlsx
+    # para no romper CONCAR. Templates como SIRE (que sirve TXT) los exponen.
+    extension    = getattr(template, "OUTPUT_EXTENSION", "xlsx")
+    content_type = getattr(
+        template, "OUTPUT_CONTENT_TYPE",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    build_fname = getattr(template, "build_filename", None)
+    if callable(build_fname):
+        filename = build_fname(proceso_id, facturas, contab)
+    else:
+        filename = f"REGISTRO_{proceso_id}.{extension}"
+
     return {
-        "filename":     f"REGISTRO_{proceso_id}.xlsx",
-        "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "filename":     filename,
+        "content_type": content_type,
         "content":      content,
         "sistema":      sistema,
         "num_facturas": len(facturas),
@@ -188,6 +201,14 @@ def _prepare(proceso_id: str, empresa_id: str) -> tuple[List[Dict], Dict, str]:
         getattr(template, "DEFAULTS", {}),
         empresa_data.get("contabilidad") or {},
     )
+    # Datos básicos de la empresa (RUC, razón social) para templates que los
+    # necesitan en filename o contenido (ej: SIRE arma `LE<RUC>...`).
+    # Prefijo `_` para indicar que no es parte de DEFAULTS contables.
+    basicos = empresa_data.get("basicos") or {}
+    contab["_empresa"] = {
+        "ruc":          (basicos.get("ruc") or "").strip(),
+        "razon_social": (basicos.get("razon_social") or "").strip(),
+    }
     return facturas, contab, sistema
 
 

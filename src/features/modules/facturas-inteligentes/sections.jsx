@@ -32,7 +32,7 @@ const STATUS_LABELS = [
   { id: 1, done: 'Facturas procesadas',     current: 'Procesando facturas',    pending: 'Procesar facturas' },
   { id: 2, done: 'Validación completada',   current: 'Pendiente de validación', pending: 'Validación' },
   { id: 3, done: 'Asientos generados',      current: 'Generando asientos',      pending: 'Generar asientos contables' },
-  { id: 4, done: 'Archivo exportado',       current: 'Exportando',              pending: 'Exportar archivo CONCAR' },
+  { id: 4, done: 'Archivo exportado',       current: 'Exportando',              pending: 'Exportar archivo del registro' },
 ];
 
 const MES_LABELS = [
@@ -446,7 +446,7 @@ function DoneCard({ proceso, onDownloadAgain, onReset }) {
       <div className="fact-banner fact-banner-success">
         <Check size={20} className="fact-banner-icon" />
         <div>
-          <div className="fact-banner-title">Archivo CONCAR descargado</div>
+          <div className="fact-banner-title">Archivo descargado</div>
           <div>
             El archivo ya se descargó automáticamente. Si no lo encontrás,
             podés volver a generarlo con el botón de abajo.
@@ -759,7 +759,12 @@ export function RevisionSection({ user }) {
         throw new Error(errJson.error || `HTTP ${res.status}`);
       }
       const blob = await res.blob();
-      const filename = `REGISTRO_${proceso.proceso_id}.xlsx`;
+      // El backend ya pone el filename correcto en Content-Disposition
+      // (CONCAR → REGISTRO_<id>.xlsx, SIRE → LE<RUC>...txt). Si por algún
+      // motivo el header no llega, fallback genérico sin extensión.
+      const dispo = res.headers.get('Content-Disposition') || '';
+      const m = dispo.match(/filename="?([^"]+)"?/);
+      const filename = m ? m[1] : `REGISTRO_${proceso.proceso_id}`;
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;

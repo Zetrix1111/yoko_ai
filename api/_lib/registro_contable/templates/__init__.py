@@ -11,5 +11,6 @@ automáticamente. Para agregar un sistema contable nuevo:
 """
 
 from . import concar
+from . import sire
 
-__all__ = ["concar"]
+__all__ = ["concar", "sire"]
