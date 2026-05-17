@@ -110,10 +110,16 @@ def generate(
     # Contadores mutables por sub_diario (copia del input para no mutar al caller).
     contadores: Dict[str, int] = dict(correlativos or {})
 
+    # sub_diarios solo aplica a CONCAR (col C del Excel con correlativo
+    # MM+NNNN). Templates como SIRE no lo declaran — defensivamente damos
+    # un dict vacío y el `if sub_diario in contadores` más abajo cae a
+    # rama "sin correlativo", que es lo que SIRE quiere.
+    sub_diarios_map = contab.get("sub_diarios") or {}
+
     todas_las_filas: List[Dict] = []
     for f in facturas:
         tipo_doc = (f.get("tipo_doc_codigo") or "FT").upper()
-        sub_diario = contab["sub_diarios"].get(tipo_doc, "11")
+        sub_diario = sub_diarios_map.get(tipo_doc, "11")
 
         if sub_diario in contadores:
             n = contadores[sub_diario]
