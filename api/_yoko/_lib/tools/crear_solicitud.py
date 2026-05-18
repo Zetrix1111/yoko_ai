@@ -9,22 +9,17 @@ Si la validación falla, la ValidationError sube hasta `execute_tool` y
 se devuelve al LLM como `{"error": "validacion", "detail": "..."}` —
 sin haber escrito nada.
 
-Tablas Airtable que asume este módulo:
+Tabla principal que asume este módulo:
 
-  • Solicitudes      → empresa_id, dni, monto, tipo, origen, justificacion,
-                       destino, numero_cuenta, centro_costo?, estado, fecha
-  • Rendiciones      → empresa_id, dni, id_solicitud, periodo,
-                       estado, fecha_inicio
-  • ItemsRendicion   → empresa_id, id_rendicion, tipo_comprobante,
-                       ruc_emisor, razon_social_emisor, numero_comprobante,
-                       fecha_emision, monto, igv, concepto, centro_costo?
+  • solicitudes_caja → SOLICITANTE, RESIDENTE, APROBADOR, CENTRO_COSTO, PLAZO,
+                       MOTIVO, MONEDA, TOTAL_GENERAL, DETALLE_GASTO, ESTADO
 """
 
 import os
 import sys
 from datetime import datetime
 
-from _lib import airtable_client
+from _lib import airtable_client, solicitud_caja_processor
 from _yoko._lib.tool_registry import register
 from _lib.validators import (
     ValidationError,
@@ -80,11 +75,51 @@ def _hoy_iso() -> str:
 
 
 # ─────────────────────────────────────────────────────────────────────────
-# 1. crear_solicitud
+# 1. yoko_procesar_solicitud_caja
 # ─────────────────────────────────────────────────────────────────────────
 
 @register(
-    name="crear_solicitud",
+    name="yoko_procesar_solicitud_caja",
+    description=(
+        "Procesa documentos adjuntos de solicitud de caja chica usando el "
+        "template `caja_chica`. Devuelve campos extraídos para que el agente "
+        "los resuma y pida solo lo faltante antes de crear la solicitud."
+    ),
+    parameters={
+        "type": "object",
+        "properties": {
+            "files": {
+                "type": "array",
+                "description": (
+                    "Lista opcional de archivos con filename/content_b64. "
+                    "Normalmente se omite porque el backend inyecta el carrito "
+                    "de archivos de la sesión."
+                ),
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "filename": {"type": "string"},
+                        "content_b64": {"type": "string"},
+                    },
+                },
+            },
+        },
+    },
+    category="accion",
+)
+def procesar_solicitud_caja(args: dict, context: dict) -> dict:
+    tool_args = dict(args or {})
+    if not tool_args.get("files") and context.get("session_id_for_cart"):
+        tool_args["session_id_for_cart"] = context["session_id_for_cart"]
+    return solicitud_caja_processor.procesar_solicitud_caja(tool_args)
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# 2. yoko_crear_solicitud
+# ─────────────────────────────────────────────────────────────────────────
+
+@register(
+    name="yoko_crear_solicitud",
     description=(
         "Crea una nueva solicitud de caja chica. "
         "Valida el tope de monto antes de escribir. Si falla la validación, "
@@ -100,18 +135,13 @@ def _hoy_iso() -> str:
                 "enum": ["PEN", "USD", "EUR", "CNY"], 
                 "description": "Moneda de la solicitud."
             },
-            "obra":          {"type": "string", "description": "Nombre de la obra o area que pertenece el gasto."},
+            "centro_costo":  {"type": "string", "description": "Centro de costo asociado, si aplica en la empresa."},
             "total_general": {"type": "number", "description": "Monto total a solicitar (numérico)."},
-            "tipo_gasto":    {
-                "type": "string", 
-                "enum": ["CAJA CHICA", "PASAJES AEREOS", "CAJA EXTRAORDINARIA"], 
-                "description": "Clasificación del tipo de gasto."
-            },
             "detalle_gasto": {"type": "string", "description": "Descripción detallada del gasto a realizar."},
             "aprobador_id":  {"type": "string", "description": "Record ID del aprobador (APROBADOR_2) elegido por el usuario. SIEMPRE obligatorio."},
             "residente_id":  {"type": "string", "description": "Record ID del residente (APROBADOR_1) elegido por el usuario. Omitir si el usuario indica que no aplica."},
         },
-        "required": ["plazo", "motivo", "moneda", "obra", "total_general", "tipo_gasto", "detalle_gasto", "aprobador_id"],
+        "required": ["plazo", "motivo", "moneda", "total_general", "detalle_gasto", "aprobador_id"],
     },
     category="accion",
 )
@@ -119,9 +149,8 @@ def crear_solicitud(args: dict, context: dict) -> dict:
     plazo = args["plazo"]
     motivo = args["motivo"]
     moneda = args["moneda"]
-    obra = args["obra"]
+    centro_costo = args.get("centro_costo")
     total_general = args["total_general"]
-    tipo_gasto = args["tipo_gasto"]
     detalle_gasto = args["detalle_gasto"]
     aprobador_id = args["aprobador_id"]
     residente_id = args.get("residente_id")  # opcional
@@ -133,7 +162,7 @@ def crear_solicitud(args: dict, context: dict) -> dict:
     record_id = user.get("record_id")
 
     # ── Validaciones ANTES de tocar Airtable ──
-    # Usamos total_general como monto. Ya no existe origen (sede/obra).
+    # Usamos total_general como monto. Ya no existe origen separado.
     validar_monto_contra_tope(total_general, config)
 
     # ── Estado inicial según presencia de Residente ──
@@ -145,13 +174,14 @@ def crear_solicitud(args: dict, context: dict) -> dict:
         "PLAZO":         plazo,
         "MOTIVO":        motivo,
         "MONEDA":        moneda,
-        "OBRA":          obra,
         "TOTAL_GENERAL": float(total_general),
-        "TIPO_GASTO":    tipo_gasto,
         "DETALLE_GASTO": detalle_gasto,
         "APROBADOR":     [aprobador_id],
         "ESTADO":        estado,
     }
+
+    if centro_costo:
+        fields["CENTRO_COSTO"] = centro_costo
 
     if record_id:
         fields["SOLICITANTE"] = [record_id]
@@ -164,7 +194,7 @@ def crear_solicitud(args: dict, context: dict) -> dict:
 
 
 # ─────────────────────────────────────────────────────────────────────────
-# 2. iniciar_rendicion
+# 3. iniciar_rendicion
 # ─────────────────────────────────────────────────────────────────────────
 
 @register(

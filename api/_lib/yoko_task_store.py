@@ -60,6 +60,8 @@ def create(
     empresa_id: str,
     user_content: str,
     auth_header: str,
+    user: dict | None = None,
+    modulos: list[str] | None = None,
 ) -> bool:
     """
     Persiste un task nuevo con status=pending. Devuelve True si se grabó OK.
@@ -69,6 +71,8 @@ def create(
         "session_id":   session_id,
         "user_id":      user_id,
         "empresa_id":   empresa_id,
+        "user":         user or {},
+        "modulos":      list(modulos or []),
         "user_content": user_content,
         "auth_header":  auth_header,
         "accumulated":  "",

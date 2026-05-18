@@ -14,7 +14,7 @@ El bloque se arma con:
   - usuario (nombre + cargo) → del dict que devuelve session.extract_user.
   - módulos activos → del JWT (se pasan como argumento, NO se leen de Airtable
     porque el JWT es la fuente autoritativa post-Fase-4).
-  - obras activas → opcional, futuro.
+  - centros de costo activos → opcional, futuro.
 """
 
 from . import config_loader

@@ -142,9 +142,8 @@ def handle_post(req) -> None:
                     "error": "Error guardando los adjuntos.",
                 })
 
-        # Inyectar hint para el LLM con el total del carrito (mismo patrón
-        # que handler_managed.py:258-281). El bloque [SISTEMA] lo lee la
-        # capa "MÓDULO FACTURAS INTELIGENTES" del system prompt.
+        # Inyectar hint para el LLM con el total del carrito. El agente
+        # elige la tool según el skill activo: facturas o solicitud de caja.
         if attachments:
             try:
                 total_carrito = yoko_cart_store.cart_size(session_id)
@@ -160,9 +159,11 @@ def handle_post(req) -> None:
                 f"[SISTEMA] El usuario adjuntó {len(attachments)} archivo(s) "
                 f"en este turno: {nombres}. Total acumulado en carrito: "
                 f"{total_carrito}. NO ves el contenido binario directamente, "
-                f"NI están en ningún path del filesystem. Cuando el usuario "
-                f"confirme tipo+mes, invocá `procesar_facturas` — el "
-                f"orquestador inyecta los archivos automáticamente."
+                f"NI están en ningún path del filesystem. Si el flujo es "
+                f"`facturas-inteligentes`, cuando el usuario confirme tipo+mes "
+                f"invocá `yoko_procesar_archivos`. Si el flujo es "
+                f"`solicitud-caja`, invocá `yoko_procesar_solicitud_caja`. "
+                f"El orquestador inyecta los archivos automáticamente."
             )
             msgs = list(body.get("messages") or [])
             if msgs and isinstance(msgs[-1], dict) and msgs[-1].get("role") == "user":
@@ -185,9 +186,8 @@ def handle_post(req) -> None:
         # 8) Loop de chat con OpenAI usando el executor de Yoko (no el de ventas).
         # `empresa_id` viaja en el context para que las tools que escriben en
         # Airtable (acción) lo usen como filtro/poblamiento, sin leer env vars.
-        # `session_id_for_cart` + `auth_header` van para las tools de facturas
-        # (`procesar_facturas`, `cancelar_carrito`) que necesitan el carrito
-        # y el JWT del usuario para hacer HTTP loopback a /api/facturas?action=*.
+        # `session_id_for_cart` + `auth_header` van para tools que necesitan
+        # el carrito de adjuntos o HTTP loopback.
         try:
             result = openai_client.run_chat(
                 system_prompt=system,

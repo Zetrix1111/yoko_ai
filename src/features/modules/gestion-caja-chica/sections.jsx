@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import {
   STATS, SOLICITUDES, PAGOS, RENDICIONES,
-  REPORTE_AREAS, REPORTE_USUARIOS, TIPOS_GASTO,
+  REPORTE_AREAS, REPORTE_USUARIOS,
   AREAS, formatPEN, formatDate,
 } from './mockData';
 import { useEmpresaConfig } from '../../../shared/useEmpresaConfig';
@@ -436,7 +436,7 @@ export function PagosSection() {
 // 4 · RENDICIONES
 // ─────────────────────────────────────
 export function RendicionesSection() {
-  const [data, setData] = useState(RENDICIONES);
+  const [data] = useState(RENDICIONES);
   const [showModal, setShowModal] = useState(false);
 
   const submitRendicion = (e) => {
@@ -494,13 +494,6 @@ export function RendicionesSection() {
               <div className="gcc-field">
                 <label htmlFor="r-fecha">Fecha</label>
                 <input id="r-fecha" type="date" className="gcc-input" required defaultValue={new Date().toISOString().slice(0, 10)} />
-              </div>
-              <div className="gcc-field">
-                <label htmlFor="r-tipo">Tipo de gasto</label>
-                <select id="r-tipo" className="gcc-select" required defaultValue="">
-                  <option value="" disabled>Seleccionar</option>
-                  {TIPOS_GASTO.map((t) => <option key={t.id}>{t.nombre}</option>)}
-                </select>
               </div>
               <div className="gcc-field">
                 <label htmlFor="r-prov">Proveedor</label>
@@ -636,8 +629,6 @@ export function ConfiguracionSection() {
   const [maxMontoEnabled,     setMaxMontoEnabled]     = useState(false);
   const [maxMonto,            setMaxMonto]            = useState(0);
   const [aprobRendicionEnabled, setAprobRendicionEnabled] = useState(false);
-  const [aplicaCentroCosto,   setAplicaCentroCosto]   = useState(false);
-  const [aplicaTipoGasto,     setAplicaTipoGasto]     = useState(false);
   const [seguimientoIA,       setSeguimientoIA]       = useState(false);
 
   const [savedHint, setSavedHint] = useState(false);
@@ -652,8 +643,6 @@ export function ConfiguracionSection() {
     setMaxMontoEnabled(cc.monto_maximo_activo ?? false);
     setMaxMonto(cc.monto_maximo ?? 0);
     setAprobRendicionEnabled(cc.aprobacion_rendicion ?? false);
-    setAplicaCentroCosto(cc.aplica_centro_costo ?? false);
-    setAplicaTipoGasto(cc.aplica_tipo_gasto ?? false);
     setSeguimientoIA(cc.seguimiento_ia ?? false);
   }, [data]);
 
@@ -672,8 +661,6 @@ export function ConfiguracionSection() {
           monto_maximo_activo:  maxMontoEnabled,
           monto_maximo:         maxMonto,
           aprobacion_rendicion: aprobRendicionEnabled,
-          aplica_centro_costo:  aplicaCentroCosto,
-          aplica_tipo_gasto:    aplicaTipoGasto,
           seguimiento_ia:       seguimientoIA,
         },
       },
@@ -744,22 +731,6 @@ export function ConfiguracionSection() {
           summary={aprobRendicionEnabled ? 'Requiere aprobación' : 'Sin aprobación'}
           enabled={aprobRendicionEnabled}
           onToggle={setAprobRendicionEnabled}
-        />
-
-        <ConfigCard
-          title="Centros de costo"
-          description="Si está activo, las solicitudes y rendiciones requieren asignar un centro de costo (sincronizado desde la tabla 'obras'). Si está desactivado, ese campo se omite."
-          summary={aplicaCentroCosto ? 'Obligatorio' : 'No aplica'}
-          enabled={aplicaCentroCosto}
-          onToggle={setAplicaCentroCosto}
-        />
-
-        <ConfigCard
-          title="Tipo de gasto"
-          description="Si está activo, las solicitudes deben categorizarse por tipo de gasto. Si está desactivado, ese campo se omite."
-          summary={aplicaTipoGasto ? 'Obligatorio' : 'No aplica'}
-          enabled={aplicaTipoGasto}
-          onToggle={setAplicaTipoGasto}
         />
 
         <ConfigCard

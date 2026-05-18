@@ -252,13 +252,11 @@ def handle_post(req) -> None:
                 f"en este turno: {nombres}. Total acumulado en el carrito: "
                 f"{total_carrito}. IMPORTANTE: vos NO ves el contenido binario "
                 f"de estos archivos directamente, NI están en ningún path del "
-                f"filesystem. NO uses bash ni intentes leer rutas. Cuando el "
-                f"usuario pida procesarlos, llamá la herramienta "
-                f"`yoko_procesar_archivos` con `tipo` y `mes` — los archivos "
-                f"se inyectan automáticamente en la llamada por el "
-                f"orquestador. Mientras tanto, seguí el flujo del skill "
-                f"yoko-facturas (confirmar recepción tipo \"Listo (N). ¿Más "
-                f"comprobantes?\")."
+                f"filesystem. NO uses bash ni intentes leer rutas. Si el flujo "
+                f"es `facturas-inteligentes`, llamá `yoko_procesar_archivos` "
+                f"con `tipo` y `mes`. Si el flujo es `solicitud-caja`, llamá "
+                f"`yoko_procesar_solicitud_caja`. Los archivos se inyectan "
+                f"automáticamente en la llamada por el orquestador."
             )
             last_user_content = (
                 f"{last_user_content}\n\n{msg_adjuntos}"
@@ -271,8 +269,10 @@ def handle_post(req) -> None:
             msg_carrito = (
                 f"[SISTEMA] Hay {total_carrito} archivo(s) acumulados en el "
                 f"carrito desde turnos anteriores. Si el usuario pide procesar, "
-                f"llamá `yoko_procesar_archivos` y los archivos se inyectan "
-                f"automáticamente."
+                f"llamá la tool correspondiente al skill activo: "
+                f"`yoko_procesar_archivos` para facturas o "
+                f"`yoko_procesar_solicitud_caja` para solicitud de caja. "
+                f"Los archivos se inyectan automáticamente."
             )
             last_user_content = (
                 f"{last_user_content}\n\n{msg_carrito}"
@@ -294,6 +294,8 @@ def handle_post(req) -> None:
                 empresa_id=empresa_id,
                 user_content=last_user_content,
                 auth_header=auth_header,
+                user=user,
+                modulos=modulos if isinstance(modulos, list) else [],
             )
         except Exception as e:
             print(

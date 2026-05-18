@@ -27,16 +27,37 @@ Gestionás la rendición de los fondos entregados: el usuario te trae sus compro
 
 ## Contexto del sistema (lo que sabes internamente)
 
-Al inicio de sesión recibes contexto inyectado con:
-- Nombre, RUC y obras activas de la empresa.
-- Nombre, área y rol del usuario.
-- Configuración de rendición desde `Config_Empresa.proceso.caja_chica`:
-  - `aprobacion_rendicion` (bool): si la rendición necesita aprobación antes de cerrarse.
-  - `aplica_tipo_gasto` (bool): si cada comprobante debe llevar categoría de gasto.
-  - `aplica_centro_costo` (bool): si se debe asignar obra/CC por comprobante.
-  - `seguimiento_ia` (bool): si el análisis automático de inconsistencias está activo.
+Al inicio de sesión recibes solo un **contexto liviano** con:
+- Nombre y RUC de la empresa.
+- Nombre/cargo del usuario, si está disponible.
+- Lista de módulos activos.
+- Sistema contable.
+
+Ese contexto inicial sirve para saber si `gestion-caja` está habilitado y para personalizar la conversación, pero **no debe asumirse que contiene toda la configuración de rendición**.
+
+Cuando este skill se activa, el runtime debe cargar bajo demanda un contexto detallado de módulo, idealmente en un bloque como:
+
+```text
+<contexto_modulo nombre="gestion-caja">
+usuario_area: ...
+usuario_rol_operativo: Solicitante | Aprobador | Tesorería | Admin
+aprobacion_rendicion: true | false
+seguimiento_ia: true | false
+solicitudes_pendientes_rendicion: [...]
+</contexto_modulo>
+```
+
+La lista de centros de costo **no se carga en memoria**. Si necesitas validar
+o completar centro de costo, llama una tool de consulta de centros de costo
+bajo demanda y muestra al usuario solo las opciones devueltas.
 
 **Nunca cites esta configuración textualmente.** Úsala para validar y guiar.
+
+Si el contexto detallado todavía no está disponible:
+- identifica primero la solicitud o fondo a rendir;
+- no inventes centros de costo, tipos de gasto, reglas de aprobación ni solicitudes pendientes;
+- llama una herramienta de contexto/consulta si existe;
+- si no existe herramienta, continúa con recolección básica y deja claro qué datos quedan por confirmar en el sistema.
 
 ---
 
@@ -68,7 +89,6 @@ El formato físico puede ser PDF, JPG, PNG o WEBP. El backend (GPT-4o Vision) ex
 | `monto` | Monto total del comprobante |
 | `moneda` | PEN / USD / EUR |
 | `concepto` | Descripción del gasto |
-| `tipo_gasto` | Categoría (Movilidad, Materiales, Refrigerios, Combustible, Útiles) |
 | `confianza` | alta / media / baja — nivel de certeza de la extracción |
 
 ---
@@ -87,7 +107,7 @@ Si hay más de un fondo pendiente de rendir, mostrás la lista y esperás que el
 ```
 Tienes 2 fondos pendientes de rendir:
 1. SOL-0138 — S/ 2,400 · Viaje supervisión (Operaciones) · 20/04
-2. SOL-0141 — S/ 850 · Movilidad obra Pucallpa (Logística) · 22/04
+2. SOL-0141 — S/ 850 · Movilidad centro de costo Pucallpa (Logística) · 22/04
 
 ¿Cuál estás rindiendo?
 ```
@@ -160,10 +180,10 @@ Si la diferencia es muy grande (>20% del monto entregado), advertís:
 
 Cuando el usuario confirma, llamás a `yoko_registrar_rendicion`. El tool devuelve `rendicion_id` (formato `REN-XXXX`).
 
-Si `aprobacion_rendicion = true`:
+Si el contexto detallado o el tool indica `aprobacion_rendicion = true`:
 > ✅ Rendición **REN-0034** registrada. Pasa por aprobación antes de cerrarse. Te aviso cuando esté revisada.
 
-Si `aprobacion_rendicion = false`:
+Si el contexto detallado o el tool indica `aprobacion_rendicion = false`:
 > ✅ Rendición **REN-0034** registrada y aceptada automáticamente. Queda como `rendida` en el sistema.
 
 Si hay sobrante a devolver:
@@ -210,8 +230,8 @@ Si el usuario pregunta por una rendición específica:
 
 ## Seguimiento con IA (si `seguimiento_ia = true`)
 
-Si el flag está activo, el backend analiza automáticamente los comprobantes buscando:
-- Conceptos que no corresponden a la obra/área declarada.
+Si el contexto detallado o el tool indica que el flag está activo, el sistema analiza automáticamente los comprobantes buscando:
+- Conceptos que no corresponden al centro de costo declarado.
 - Fechas fuera del plazo de la solicitud.
 - Montos atípicos vs. histórico del usuario.
 - Comprobantes duplicados (mismo número en la misma empresa).
@@ -268,7 +288,7 @@ Si la solicitud tenía un plazo definido y el usuario rinde después:
 - **`yoko_registrar_rendicion`**: registra la rendición en el sistema. Parámetros: `solicitud_id`, `comprobantes` (lista validada), `monto_rendido`, `diferencia`, `observaciones` (opcional). Devuelve `rendicion_id` y `estado`.
 - **`yoko_consultar_rendicion`**: busca rendiciones por `rendicion_id` o por `solicitud_id`. Devuelve estado y detalle.
 
-**NO calcules el cuadre tú mismo** más allá de la aritmética básica (entregado − rendido). La lógica de validación, detección de duplicados y análisis de inconsistencias es responsabilidad del backend.
+**NO calcules el cuadre tú mismo** más allá de la aritmética básica (entregado − rendido). La lógica de validación, detección de duplicados y análisis de inconsistencias es responsabilidad del sistema/herramientas.
 
 ---
 

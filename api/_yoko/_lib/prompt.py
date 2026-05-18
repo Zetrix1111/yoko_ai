@@ -197,7 +197,7 @@ def _format_aprobadores(aprobadores: list) -> str:
 def _build_facturas_block(modules: list) -> list[str]:
     """
     Instrucciones para el flujo de procesamiento de comprobantes peruanos.
-    Condensado del SKILL `yoko-facturas` (que vive en `skills/yoko-facturas/SKILL.md`
+    Condensado del SKILL `facturas-inteligentes` (que vive en `skills/facturas-inteligentes/SKILL.md`
     para el cerebro Anthropic Managed Agents): mismas reglas, 1/6 del tamaño.
 
     Solo se agrega al system prompt si `facturas-inteligentes` está en
@@ -205,9 +205,9 @@ def _build_facturas_block(modules: list) -> list[str]:
     y el LLM ni se entera de las tools (no se le anuncian).
 
     Tools que cubre este bloque (registradas en `_yoko/_lib/tools/facturas.py`):
-      - `procesar_facturas(tipo, mes)`
-      - `generar_registro_contable(proceso_id)`
-      - `recuperar_proceso(proceso_id)`
+      - `yoko_procesar_archivos(tipo, mes)`
+      - `yoko_generar_registro_contable(proceso_id)`
+      - `yoko_recuperar_proceso(proceso_id)`
       - `cancelar_carrito()`
     """
     if "facturas-inteligentes" not in (modules or []):
@@ -229,7 +229,7 @@ def _build_facturas_block(modules: list) -> list[str]:
         "TODO lo que ves — solo metadata. El contenido binario vive en el "
         "carrito del lado del orquestador. NUNCA intentes leer los archivos "
         "con bash, ls, ni ninguna herramienta del sistema — NO existen ahí. "
-        "La única forma de procesarlos es invocar `procesar_facturas`.",
+        "La única forma de procesarlos es invocar `yoko_procesar_archivos`.",
         "",
         "## Flujo principal (intenciones del usuario)",
         "",
@@ -265,7 +265,7 @@ def _build_facturas_block(modules: list) -> list[str]:
         "proceder. 'Mes pasado' / 'este mes' se calculan desde hoy.",
         "",
         "**6. Procesamiento**: cuando hay confirmación de tipo+mes, invocá "
-        "`procesar_facturas(tipo, mes)`. Cuando devuelve `ok:true`:",
+        "`yoko_procesar_archivos(tipo, mes)`. Cuando devuelve `ok:true`:",
         "  a) Resumí brevemente: cantidad procesada, alertas si hay (baja "
         "     confianza, no reconocido, archivo grande).",
         "  b) Al FINAL de tu respuesta, en línea aparte, copiá EXACTAMENTE "
@@ -283,7 +283,7 @@ def _build_facturas_block(modules: list) -> list[str]:
         "",
         "**7. Generar Excel**: cuando el usuario pide el archivo después "
         "de revisar ('genera el excel', 'mándame el reporte', 'ya está "
-        "listo'), invocá `generar_registro_contable(proceso_id)`. La tool "
+        "listo'), invocá `yoko_generar_registro_contable(proceso_id)`. La tool "
         "devuelve `download_marker` que va al FINAL de tu respuesta en "
         "línea aparte EXACTAMENTE como `[DESCARGAR_REGISTRO:proc-xxx]`. "
         "Mismas reglas estrictas de formato que el revision_marker. El "
@@ -330,8 +330,7 @@ def build_system_prompt(config: dict, user: dict) -> str:
       • monto_maximo_activo / monto_maximo  → tope por solicitud
       • requiere_aprobacion / num_aprobadores → si pasa por aprobación
       • aprobacion_rendicion                 → si las rendiciones se aprueban
-      • aplica_centro_costo                  → muestra lista de centros activos
-      • aplica_tipo_gasto                    → muestra lista de tipos
+      • config.centros_costo.activo          → si la empresa opera con centros de costo
     """
     empresa = (config or {}).get("empresa", {}) or {}
     proceso = ((config or {}).get("proceso", {}) or {}).get("caja_chica", {}) or {}
@@ -466,10 +465,8 @@ def build_system_prompt(config: dict, user: dict) -> str:
         "- IMPORTANTE: Cuando necesites pedir varios datos obligatorios (ej. para crear una solicitud), NO pidas todos los campos de golpe. Pídelos de forma conversacional y natural, preguntando máximo 1 o 2 cosas a la vez.",
         "",
         "# MANEJO DE ARCHIVOS ADJUNTOS",
-        "Cuando el usuario adjunta un archivo (foto, PDF, Excel, Word), el sistema ya lo procesa automáticamente y te entrega los datos extraídos en formato:",
-        "  [Datos extraídos del archivo adjunto:",
-        "    - campo: valor",
-        "    ...]",
+        "Cuando el usuario adjunta un archivo de solicitud de caja chica, llama `yoko_procesar_solicitud_caja` para extraer los datos con el template `caja_chica`.",
+        "La tool devuelve un objeto con `campos` y `archivos`. Usa esos datos como base del resumen.",
         "REGLAS OBLIGATORIAS al recibir datos de un archivo:",
         "1. Trata esos datos como CONFIRMADOS por el usuario. NO vuelvas a preguntar por ellos.",
         "2. Presenta un resumen de los datos encontrados y pregunta SOLO por los campos que FALTEN.",
@@ -493,7 +490,7 @@ def build_tools_list(config: dict) -> list[dict]:
     caller tenga que importar las tools manualmente.
     """
     from _yoko._lib import tool_registry
-    from _yoko._lib.tools import consulta, accion, navegacion, facturas  # noqa: F401
+    from _yoko._lib.tools import consulta, crear_solicitud, facturas, navegacion  # noqa: F401
 
     modules = (config.get("empresa") or {}).get("modules", []) if config else []
     return tool_registry.get_openai_tools_array(modules)

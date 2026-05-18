@@ -196,12 +196,12 @@ def _run_turn_streaming(
 
                     # Pass-by-reference del cart (mismo patrón que
                     # handler_managed actual).
-                    if tool_name == "yoko_procesar_archivos":
+                    if tool_name in ("yoko_procesar_archivos", "yoko_procesar_solicitud_caja"):
                         tool_input["session_id_for_cart"] = session_id
                         try:
                             cart_n = yoko_cart_store.cart_size(session_id)
                             print(
-                                f"[chat/worker] yoko_procesar_archivos invocado; "
+                                f"[chat/worker] {tool_name} invocado; "
                                 f"carrito tiene {cart_n} archivo(s)",
                                 file=sys.stderr,
                             )
@@ -216,11 +216,22 @@ def _run_turn_streaming(
                             file=sys.stderr,
                         )
                     else:
-                        result = execute_local_tool(action, tool_input, auth_header)
+                        tool_context = {
+                            "user": task.get("user") or {},
+                            "empresa_id": task.get("empresa_id") or "",
+                            "modulos": task.get("modulos") or [],
+                            "session_id_for_cart": session_id,
+                        }
+                        result = execute_local_tool(
+                            action,
+                            tool_input,
+                            auth_header,
+                            tool_context=tool_context,
+                        )
 
-                    # Si yoko_procesar_archivos terminó OK, vaciar el carrito.
+                    # Si una tool de procesamiento de archivos terminó OK, vaciar el carrito.
                     if (
-                        tool_name == "yoko_procesar_archivos"
+                        tool_name in ("yoko_procesar_archivos", "yoko_procesar_solicitud_caja")
                         and isinstance(result, dict)
                         and result.get("ok") is True
                     ):

@@ -10,7 +10,7 @@ export const STATS = {
 
 export const SOLICITUDES = [
   { id: 'SOL-0142', solicitante: 'Juan Pérez',     area: 'Operaciones', monto: 1200, tipo: 'caja-chica', estado: 'pendiente',  fecha: '2026-04-22', motivo: 'Compra de materiales eléctricos' },
-  { id: 'SOL-0141', solicitante: 'María Quispe',   area: 'Logística',   monto: 850,  tipo: 'rendir',     estado: 'aprobada',   fecha: '2026-04-22', motivo: 'Movilidad obra Pucallpa' },
+  { id: 'SOL-0141', solicitante: 'María Quispe',   area: 'Logística',   monto: 850,  tipo: 'rendir',     estado: 'aprobada',   fecha: '2026-04-22', motivo: 'Movilidad centro de costo Pucallpa' },
   { id: 'SOL-0140', solicitante: 'Carlos Ruiz',    area: 'Ventas',      monto: 350,  tipo: 'caja-chica', estado: 'pagada',     fecha: '2026-04-21', motivo: 'Refrigerio reunión cliente' },
   { id: 'SOL-0139', solicitante: 'Ana Torres',     area: 'Contabilidad',monto: 500,  tipo: 'caja-chica', estado: 'aprobada',   fecha: '2026-04-21', motivo: 'Útiles de oficina' },
   { id: 'SOL-0138', solicitante: 'Luis Mendoza',   area: 'Operaciones', monto: 2400, tipo: 'rendir',     estado: 'pendiente',  fecha: '2026-04-20', motivo: 'Viaje supervisión' },
@@ -53,21 +53,6 @@ export const REPORTE_USUARIOS = [
   { usuario: 'María Quispe',   monto: 2900 },
   { usuario: 'Roberto Silva',  monto: 2400 },
   { usuario: 'Carlos Ruiz',    monto: 1500 },
-];
-
-export const TIPOS_GASTO = [
-  { id: 1, nombre: 'Movilidad',    activo: true },
-  { id: 2, nombre: 'Materiales',   activo: true },
-  { id: 3, nombre: 'Refrigerios',  activo: true },
-  { id: 4, nombre: 'Combustible',  activo: true },
-  { id: 5, nombre: 'Útiles',       activo: true },
-];
-
-export const CENTROS_COSTO = [
-  { id: 'CC-001', nombre: 'Obra Pucallpa',     activo: true },
-  { id: 'CC-002', nombre: 'Obra Lima Norte',   activo: true },
-  { id: 'CC-003', nombre: 'Administración',    activo: true },
-  { id: 'CC-004', nombre: 'Comercial',         activo: false },
 ];
 
 export const USUARIOS = [

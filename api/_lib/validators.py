@@ -61,7 +61,7 @@ def validar_monto_contra_tope(monto: float, config: dict) -> None:
 def validar_plazo_rendicion(id_solicitud: str, config: dict) -> None:
     """
     Verifica que la solicitud `id_solicitud` no haya excedido el plazo
-    de rendición configurado para su origen (sede / obra).
+    de rendición configurado para su origen (sede / centro_costo).
 
     Lee la solicitud desde Airtable para obtener `origen` y `fecha_pago`
     (o `fecha` como fallback). Compara contra el plazo en
@@ -91,10 +91,10 @@ def validar_plazo_rendicion(id_solicitud: str, config: dict) -> None:
     origen = fields.get("origen")
     fecha_pago_raw = fields.get("fecha_pago") or fields.get("fecha")
 
-    if origen not in ("sede", "obra"):
+    if origen not in ("sede", "centro_costo"):
         raise ValidationError(
             f"La solicitud '{id_solicitud}' no tiene un 'origen' válido "
-            f"(esperado 'sede' u 'obra', encontrado {origen!r})."
+            f"(esperado 'sede' o 'centro_costo', encontrado {origen!r})."
         )
 
     if not fecha_pago_raw:

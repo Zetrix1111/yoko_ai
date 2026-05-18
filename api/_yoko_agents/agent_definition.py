@@ -38,8 +38,39 @@ _SYSTEM_PROMPT_FILE = _SKILLS_DIR / "_system_prompts" / "yoko-empresarial.md"
 # Cada vez que sumamos un skill nuevo (yoko-caja, yoko-fianzas, etc.),
 # se agrega acá la entrada y se suma la env var en Vercel.
 _SKILL_ENV_VARS: dict[str, str] = {
-    "yoko-facturas": "YOKO_SKILL_FACTURAS_ID",
+    "facturas-inteligentes": "YOKO_SKILL_FACTURAS_ID",
+    "solicitud-caja": "YOKO_SKILL_SOLICITUD_CAJA_ID",
+    "rendicion-caja": "YOKO_SKILL_RENDICION_CAJA_ID",
 }
+
+
+_MANAGED_SOLICITUD_CAJA_GUIDANCE = """
+
+# Runtime Managed Agents: solicitud-caja
+
+Cuando el skill `solicitud-caja` esté activo, usa el contexto detallado de
+`gestion-caja` para decidir si necesitas consultar aprobadores.
+
+Reglas para aprobadores:
+- Si `requiere_aprobacion = false`, no llames `consultar_aprobador`.
+- Si `requiere_aprobacion = true` y `num_aprobadores = 1`, llama una sola vez:
+  `consultar_aprobador({"rol": "APROBADOR_2"})`.
+- Si `requiere_aprobacion = true` y `num_aprobadores >= 2`, llama una sola vez:
+  `consultar_aprobador({"rol": "todos"})`.
+- `APROBADOR_1` corresponde al residente opcional y se usa como
+  `residente_id` solo si el usuario elige uno.
+- `APROBADOR_2` corresponde al aprobador obligatorio y se usa como
+  `aprobador_id`.
+- Muestra al usuario nombres, no record ids. Usa internamente el `id` devuelto
+  por la tool al llamar `yoko_crear_solicitud`.
+
+Reglas para centros de costo:
+- No esperes recibir centros de costo en el contexto.
+- Si necesitas completar o validar `centro_costo`, llama
+  `consultar_centros_costo`.
+- Muestra al usuario nombres de centros de costo y usa internamente el valor
+  elegido al llamar `yoko_crear_solicitud`.
+""".strip()
 
 
 def _load_system_prompt() -> str:
@@ -57,7 +88,7 @@ def _load_system_prompt() -> str:
         raise ValueError(
             f"{_SYSTEM_PROMPT_FILE.relative_to(_REPO_ROOT)} está vacío."
         )
-    return text
+    return f"{text}\n\n{_MANAGED_SOLICITUD_CAJA_GUIDANCE}"
 
 
 def _load_skills() -> list[dict]:
@@ -92,7 +123,7 @@ def _load_skills() -> list[dict]:
 def _custom_tools_enabled() -> bool:
     """
     Controla si los CUSTOM tools (`yoko_procesar_archivos`,
-    `yoko_generar_registro_contable`) se adjuntan al agent. Default true
+    `yoko_generar_registro_contable`, `yoko_recuperar_proceso`) se adjuntan al agent. Default true
     porque ya pasamos la fase conversacional pura.
     """
     raw = (os.environ.get("YOKO_AGENT_TOOLS_ENABLED") or "true").strip().lower()
@@ -112,7 +143,7 @@ def _custom_tools_enabled() -> bool:
 #     archivos llegan via custom tool injection del orquestador.
 #   - `write` y `edit`: el agent no debe modificar archivos.
 # Quedan habilitados `read`, `glob`, `grep` — necesarios para que el skill
-# yoko-facturas se cargue y se navegue.
+# facturas-inteligentes se cargue y se navegue.
 _BUILTIN_TOOLSET: dict = {
     "type": "agent_toolset_20260401",
     "configs": [

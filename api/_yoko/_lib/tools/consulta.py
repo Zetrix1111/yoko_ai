@@ -94,6 +94,14 @@ def _listar_por_dni(
     return [r["fields"] for r in records]
 
 
+def _tenant_id(context: dict) -> str:
+    eid = context.get("empresa_id")
+    if not eid:
+        config = context.get("config") or {}
+        eid = (config.get("empresa") or {}).get("id")
+    return str(eid or "").strip()
+
+
 # ─────────────────────────────────────────────────────────────────────────
 # 1. consultar_solicitudes_por_dni
 # ─────────────────────────────────────────────────────────────────────────
@@ -229,7 +237,7 @@ def consultar_pagos_por_dni(args: dict, context: dict) -> dict:
     name="consultar_tope_disponible",
     description=(
         "Consulta cuánto le queda al usuario del tope semanal de caja chica "
-        "según su origen (sede u obra). Devuelve {tope, usado, disponible}."
+        "según su origen (sede o centro_costo). Devuelve {tope, usado, disponible}."
     ),
     parameters={
         "type": "object",
@@ -237,8 +245,8 @@ def consultar_pagos_por_dni(args: dict, context: dict) -> dict:
             "dni":    {"type": "string", "description": "DNI del usuario."},
             "origen": {
                 "type": "string",
-                "enum": ["sede", "obra"],
-                "description": "Origen del fondo: 'sede' u 'obra'.",
+                "enum": ["sede", "centro_costo"],
+                "description": "Origen del fondo: 'sede' o 'centro_costo'.",
             },
         },
         "required": ["dni", "origen"],
@@ -283,69 +291,99 @@ def consultar_tope_disponible(args: dict, context: dict) -> dict:
 @register(
     name="consultar_aprobador",
     description=(
-        "Devuelve el/los aprobador(es) que deben autorizar una solicitud "
-        "según su monto, tipo, origen y opcionalmente el área."
+        "Consulta la tabla Empleados y devuelve solo empleados habilitados "
+        "como aprobadores de solicitud de caja chica. Úsala para mostrar "
+        "nombres al usuario y obtener el record id que requiere "
+        "`yoko_crear_solicitud`."
     ),
     parameters={
         "type": "object",
         "properties": {
-            "monto":  {"type": "number", "description": "Monto solicitado en soles."},
-            "tipo":   {
+            "rol": {
                 "type": "string",
-                "description": "Tipo de fondo: 'caja-chica' o 'rendir'.",
+                "enum": ["APROBADOR_1", "APROBADOR_2", "todos"],
+                "description": (
+                    "Rol a consultar. APROBADOR_1 corresponde al residente "
+                    "opcional; APROBADOR_2 corresponde al aprobador obligatorio. "
+                    "Usa 'todos' si necesitas ambas listas."
+                ),
             },
-            "origen": {
+            "buscar": {
                 "type": "string",
-                "enum": ["sede", "obra"],
+                "description": "Texto opcional para filtrar por nombre o cargo.",
             },
-            "area":   {"type": "string", "description": "Área del solicitante (opcional)."},
         },
-        "required": ["monto", "tipo", "origen"],
     },
     category="consulta",
 )
 def consultar_aprobador(args: dict, context: dict) -> dict:
-    monto = float(args["monto"])
-    tipo = args["tipo"]
-    origen = args["origen"]
-    area = args.get("area")
+    rol = (args.get("rol") or "APROBADOR_2").strip()
+    if rol not in ("APROBADOR_1", "APROBADOR_2", "todos"):
+        rol = "APROBADOR_2"
+    buscar = (args.get("buscar") or "").strip().lower()
 
-    config = context.get("config") or {}
-    aprobadores = (config.get("proceso") or {}).get("caja_chica", {}).get("aprobadores", []) or []
+    empresa_id = _tenant_id(context)
+    formula = f"AND({{empresa_id}}='{empresa_id}', NOT({{APROBADORES}} = ''))"
+    records = airtable_client.list_records("Empleados", filter_formula=formula, max_records=100)
 
-    matches = []
-    for a in aprobadores:
-        if a.get("tipo") and a["tipo"] != tipo:
-            continue
-        if a.get("origen") and a["origen"] != origen:
-            continue
-        if area and a.get("area") and a["area"] != area:
-            continue
-        try:
-            mmin = float(a["monto_min"]) if a.get("monto_min") is not None else None
-            mmax = float(a["monto_max"]) if a.get("monto_max") is not None else None
-        except (ValueError, TypeError):
-            mmin = mmax = None
-        if mmin is not None and monto < mmin:
-            continue
-        if mmax is not None and monto > mmax:
-            continue
-        matches.append(a)
+    residentes: list[dict] = []
+    aprobadores: list[dict] = []
 
-    matches.sort(key=lambda a: int(a.get("nivel") or 99))
+    for record in records:
+        fields = record.get("fields", {})
+        roles = fields.get("APROBADORES")
+        if not roles:
+            continue
+        if isinstance(roles, str):
+            roles = [roles]
 
-    aprobs = [
-        {
-            "dni":   a.get("aprobador_dni"),
-            "nivel": a.get("nivel"),
-            "tipo":  a.get("tipo"),
+        nombre = (
+            fields.get("NOMBRE CORTO")
+            or fields.get("Nombre")
+            or fields.get("NOMBRE")
+            or "Sin nombre"
+        )
+        cargo = fields.get("CARGO") or fields.get("Cargo") or fields.get("cargo") or ""
+        haystack = f"{nombre} {cargo}".lower()
+        if buscar and buscar not in haystack:
+            continue
+
+        item = {
+            "id": record.get("id"),
+            "nombre": nombre,
         }
-        for a in matches
-    ]
+        if cargo:
+            item["cargo"] = cargo
 
+        if "APROBADOR_1" in roles:
+            residentes.append({**item, "rol": "APROBADOR_1"})
+        if "APROBADOR_2" in roles:
+            aprobadores.append({**item, "rol": "APROBADOR_2"})
+
+    residentes.sort(key=lambda x: str(x.get("nombre") or ""))
+    aprobadores.sort(key=lambda x: str(x.get("nombre") or ""))
+
+    if rol == "APROBADOR_1":
+        return {
+            "rol": "APROBADOR_1",
+            "residentes": residentes,
+            "aprobadores": residentes,
+            "total": len(residentes),
+            "nota": "APROBADOR_1 corresponde al residente opcional.",
+        }
+    if rol == "todos":
+        return {
+            "rol": "todos",
+            "residentes": residentes,
+            "aprobadores": aprobadores,
+            "total_residentes": len(residentes),
+            "total_aprobadores": len(aprobadores),
+        }
     return {
-        "aprobadores": aprobs,
-        "total":       len(aprobs),
+        "rol": "APROBADOR_2",
+        "aprobadores": aprobadores,
+        "total": len(aprobadores),
+        "nota": "APROBADOR_2 corresponde al aprobador obligatorio de la solicitud.",
     }
 
 
@@ -367,42 +405,25 @@ def consultar_aprobador(args: dict, context: dict) -> dict:
 )
 def consultar_centros_costo(args: dict, context: dict) -> dict:
     config = context.get("config") or {}
-    centros = (config.get("proceso") or {}).get("caja_chica", {}).get("centros_costo", []) or []
-    activos = [
-        {"codigo": c.get("codigo"), "nombre": c.get("nombre")}
-        for c in centros if c.get("activo")
-    ]
-    return {"centros_costo": activos, "total": len(activos)}
+    centros_cfg = config.get("centros_costo") or {}
+    if not centros_cfg.get("activo", True):
+        return {"centros_costo": [], "total": 0, "activo": False}
 
+    empresa_id = _tenant_id(context)
+    formula = f"{{empresa_id}}='{empresa_id}'" if empresa_id else None
+    records = airtable_client.list_records("centros_costo", filter_formula=formula, max_records=100)
 
-# ─────────────────────────────────────────────────────────────────────────
-# 7. consultar_tipos_gasto
-# ─────────────────────────────────────────────────────────────────────────
-
-@register(
-    name="consultar_tipos_gasto",
-    description=(
-        "Devuelve la lista de tipos de gasto válidos de la empresa "
-        "(ej. movilidad, materiales, refrigerios)."
-    ),
-    parameters={
-        "type":       "object",
-        "properties": {},
-    },
-    category="consulta",
-)
-def consultar_tipos_gasto(args: dict, context: dict) -> dict:
-    config = context.get("config") or {}
-    tipos = (config.get("proceso") or {}).get("caja_chica", {}).get("tipos_gasto", []) or []
-    activos = [
-        {
-            "codigo":                t.get("codigo"),
-            "nombre":                t.get("nombre"),
-            "centro_costo_default":  t.get("centro_costo_default"),
-        }
-        for t in tipos if t.get("activo")
-    ]
-    return {"tipos_gasto": activos, "total": len(activos)}
+    activos = []
+    for record in records:
+        fields = record.get("fields", {})
+        centro_costo = fields.get("CENTRO_COSTO")
+        if not centro_costo:
+            continue
+        activos.append({
+            "codigo": fields.get("ID") or record.get("id"),
+            "nombre": centro_costo,
+        })
+    return {"centros_costo": activos, "total": len(activos), "activo": True}
 
 
 # ─────────────────────────────────────────────────────────────────────────
