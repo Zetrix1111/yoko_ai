@@ -14,8 +14,8 @@ finales, no requieren post-procesamiento.
 
 NAME = "caja_chica"
 DESCRIPTION = (
-    "Solicitud de caja chica: extrae motivo, obra, monto total, moneda, "
-    "plazo, tipo de gasto y detalle."
+    "Solicitud de caja chica: extrae motivo, centro de costo, monto total, moneda, "
+    "plazo y detalle."
 )
 MODEL = "gpt-4o"
 MAX_TOKENS_VISION = 1000
@@ -26,21 +26,19 @@ PROMPT = """Eres un asistente experto en extraer datos de documentos para solici
 
 Analiza el documento/imagen adjunto y extrae los siguientes campos si están presentes:
 - motivo: Descripción general del gasto o propósito de la solicitud
-- obra: Nombre del proyecto, obra o área
+- centro_costo: Centro de costo asociado
 - total_general: Monto total numérico (sin símbolos de moneda)
 - moneda: PEN, USD, EUR o CNY (infiere desde el contexto)
 - plazo: Período de tiempo o fechas (ej. "Del 01/05 al 31/05")
-- tipo_gasto: Uno de: CAJA CHICA, PASAJES AEREOS, CAJA EXTRAORDINARIA
 - detalle_gasto: Lista de ítems de gasto con montos
 
 Responde ÚNICAMENTE con un JSON con esta estructura exacta (usa null para campos no encontrados):
 {
   "motivo": "...",
-  "obra": "...",
+  "centro_costo": "...",
   "total_general": 0.0,
   "moneda": "PEN",
   "plazo": "...",
-  "tipo_gasto": "...",
   "detalle_gasto": "...",
   "confianza": "alta|media|baja"
 }

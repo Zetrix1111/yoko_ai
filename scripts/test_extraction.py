@@ -146,8 +146,8 @@ def main() -> int:
               "T5: enrich({}) → default 'FT'")
     r.assert_(out_default["estado"] == "Por implementar validación",
               "T5: enrich agrega 'estado' placeholder")
-    r.assert_(out_default["obra_area"] == "",
-              "T5: enrich agrega 'obra_area' vacío")
+    r.assert_(out_default["centro_costo"] == "",
+              "T5: enrich agrega 'centro_costo' vacío")
 
     # ── T6: register_template() — validaciones ─────────────────────────
     try:

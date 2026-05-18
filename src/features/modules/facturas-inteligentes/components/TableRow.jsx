@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Trash2, AlertCircle } from 'lucide-react';
-import DropdownObras from './DropdownObras';
+import DropdownCentrosCosto from './DropdownCentrosCosto';
 
 const TIPO_DOC_OPTIONS = [
   { codigo: 'FT', nombre: 'Factura' },
@@ -188,11 +188,11 @@ export default function TableRow({
         />
       </td>
 
-      {/* Obra / Área — dropdown con obras de Airtable (centros_costo) */}
-      <td className="col-obra">
-        <DropdownObras
-          value={factura.obra_area}
-          onChange={(val) => handleChange('obra_area', val)}
+      {/* Centro de costo */}
+      <td className="col-centro-costo">
+        <DropdownCentrosCosto
+          value={factura.centro_costo ?? ''}
+          onChange={(val) => handleChange('centro_costo', val)}
         />
       </td>
 

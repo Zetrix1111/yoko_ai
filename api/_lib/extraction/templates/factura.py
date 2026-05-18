@@ -103,7 +103,7 @@ def enrich(campos: dict) -> dict:
     Enriquece los datos extraídos de una factura con campos derivados:
       - tipo_doc_codigo: 2 letras (FT, BV, NC, ND, BA, RH, TK)
       - tipo_doc_nombre: nombre completo para display
-      - obra_area: vacío (lo completa el usuario)
+      - centro_costo: vacío (lo completa el usuario)
       - estado: placeholder hasta que se implemente validación SUNAT
       - confianza: float 0-1 (normalizado del enum alta/media/baja del LLM)
     """
@@ -130,7 +130,7 @@ def enrich(campos: dict) -> dict:
         "moneda":          campos.get("moneda", "PEN"),
         "monto_total":     campos.get("monto_total"),
         "monto_tributo":   campos.get("monto_tributo"),
-        "obra_area":       "",  # lo completa el usuario
+        "centro_costo":    "",  # lo completa el usuario
         "estado":          "Por implementar validación",  # futuro: SUNAT
         "confianza":       confianza_float,
     }

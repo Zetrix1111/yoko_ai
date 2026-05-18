@@ -28,6 +28,21 @@ TOOL_DEFINITION: dict = {
                 "pattern": r"^\d{4}-\d{2}$",
                 "description": "Mes contable de los comprobantes en formato YYYY-MM.",
             },
+            "files": {
+                "type": "array",
+                "description": (
+                    "Lista opcional de archivos con filename/content_b64. "
+                    "En Yoko normalmente se omite porque el orquestador "
+                    "inyecta el carrito de la sesión."
+                ),
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "filename": {"type": "string"},
+                        "content_b64": {"type": "string"},
+                    },
+                },
+            },
         },
         "required": ["tipo", "mes"],
     },

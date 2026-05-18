@@ -113,7 +113,7 @@
 .col-tipo-cambio { min-width: 100px; }
 .col-monto       { min-width: 120px; }
 .col-tributo   { min-width: 120px; }
-.col-obra      { min-width: 180px; }
+.col-centro-costo { min-width: 180px; }
 .col-cuenta    { min-width: 130px; }
 .col-estado    { min-width: 180px; }
 .col-actions   { width: 80px; text-align: center; }

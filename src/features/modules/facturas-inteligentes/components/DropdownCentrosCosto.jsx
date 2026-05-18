@@ -2,41 +2,41 @@ import { useEffect, useState } from 'react';
 import { API, getJsonAuth } from '../../../../shared/api';
 
 /**
- * Dropdown de Obras / Centros de Costo del tenant.
+ * Dropdown de Centros de Costo del tenant.
  *
  * Consume /api/config?tipo=centros_costo (definido en api/config.py),
- * que ya filtra por empresa_id del JWT y devuelve registros de la tabla
- * Airtable `obras`. Shape recibido:
+ * que ya filtra por empresa_id del JWT y devuelve registros de centros
+ * de costo. Shape recibido:
  *
- *   { centros: [{ id, obra, nombre, constituyen }] }
+ *   { centros: [{ id, centro_costo, nombre, constituyen }] }
  *
  * Donde:
- *   - `obra`   = código corto (ej. "OBR-001")
- *   - `nombre` = razón / descripción de la obra
+ *   - `centro_costo` = código corto (ej. "CC-001")
+ *   - `nombre`       = descripción del centro de costo
  *
  * Cache module-level KEYED por empresa_id: si la tabla tiene 30 facturas
- * y todas montan DropdownObras, sólo se hace UN fetch para ese tenant.
+ * y todas montan DropdownCentrosCosto, sólo se hace UN fetch para ese tenant.
  * Pero si el usuario cierra sesión y entra con otro tenant, la key del
  * cache cambia y se refetchea automáticamente — sin esto, el cache del
  * tenant anterior contaminaba la sesión nueva.
  *
- * `_obrasPromise` además dedupea fetches en vuelo para que N dropdowns
+ * La promesa en vuelo además dedupea fetches para que N dropdowns
  * montados al mismo tiempo no disparen N requests concurrentes.
  *
  * Si el fetch falla (red, 5xx), cae a un input text libre para que el
- * usuario pueda ingresar manualmente la obra.
+ * usuario pueda ingresar manualmente el centro de costo.
  *
  * Props:
- *   - value:    nombre de la obra seleccionada (string)
- *   - onChange: callback (nuevoNombre: string) => void
+ *   - value:    código de centro de costo seleccionado (string)
+ *   - onChange: callback (nuevoCentroCosto: string) => void
  */
 
-let _cache = { empresaId: null, obras: null };
+let _cache = { empresaId: null, centros: null };
 let _inFlightPromise = null;
 
 /**
  * Decodifica el JWT del localStorage para extraer empresa_id sin tener
- * que pasarlo como prop a DropdownObras. Si algo falla, devuelve null
+ * que pasarlo como prop a DropdownCentrosCosto. Si algo falla, devuelve null
  * (el cache nunca matchea con null y siempre refetchea — comportamiento
  * conservador y seguro).
  */
@@ -58,12 +58,12 @@ function _readEmpresaIdFromToken() {
   }
 }
 
-async function _fetchObrasCached() {
+async function _fetchCentrosCached() {
   const currentEmpresa = _readEmpresaIdFromToken();
 
   // Cache HIT solo si el empresa_id coincide con la sesión activa.
-  if (_cache.empresaId === currentEmpresa && _cache.obras !== null) {
-    return _cache.obras;
+  if (_cache.empresaId === currentEmpresa && _cache.centros !== null) {
+    return _cache.centros;
   }
 
   // Hay un fetch en vuelo para este (o cualquier) tenant — esperar ese.
@@ -73,11 +73,11 @@ async function _fetchObrasCached() {
   _inFlightPromise = (async () => {
     try {
       const data = await getJsonAuth(API.CENTROS_COSTO);
-      const obras = Array.isArray(data?.centros) ? data.centros : [];
-      _cache = { empresaId: currentEmpresa, obras };
-      return obras;
+      const centros = Array.isArray(data?.centros) ? data.centros : [];
+      _cache = { empresaId: currentEmpresa, centros };
+      return centros;
     } catch (err) {
-      console.error('[DropdownObras] error cargando obras:', err);
+      console.error('[DropdownCentrosCosto] error cargando centros de costo:', err);
       // No persistimos error en el cache → próximo render reintenta.
       throw err;
     } finally {
@@ -88,15 +88,15 @@ async function _fetchObrasCached() {
   return _inFlightPromise;
 }
 
-export default function DropdownObras({ value, onChange }) {
+export default function DropdownCentrosCosto({ value, onChange }) {
   // Helper para chequear si el cache aplica a la sesión actual sin
   // duplicar la lógica de _readEmpresaIdFromToken en cada render.
   const _cacheValidForCurrentSession = () => (
-    _cache.obras !== null && _cache.empresaId === _readEmpresaIdFromToken()
+    _cache.centros !== null && _cache.empresaId === _readEmpresaIdFromToken()
   );
 
-  const [obras, setObras] = useState(() =>
-    _cacheValidForCurrentSession() ? _cache.obras : []
+  const [centros, setCentros] = useState(() =>
+    _cacheValidForCurrentSession() ? _cache.centros : []
   );
   const [loading, setLoading] = useState(() => !_cacheValidForCurrentSession());
   const [error, setError] = useState(false);
@@ -107,15 +107,15 @@ export default function DropdownObras({ value, onChange }) {
     if (_cacheValidForCurrentSession()) {
       // Cache ya hidratado por otra instancia con el mismo empresa_id.
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setObras(_cache.obras);
+      setCentros(_cache.centros);
       setLoading(false);
       return;
     }
 
-    _fetchObrasCached()
+    _fetchCentrosCached()
       .then((list) => {
         if (cancelled) return;
-        setObras(list);
+        setCentros(list);
         setLoading(false);
       })
       .catch(() => {
@@ -130,7 +130,7 @@ export default function DropdownObras({ value, onChange }) {
   if (loading) {
     return (
       <select className="cell-select" disabled>
-        <option>Cargando obras...</option>
+        <option>Cargando centros de costo...</option>
       </select>
     );
   }
@@ -143,7 +143,7 @@ export default function DropdownObras({ value, onChange }) {
         className="cell-input"
         value={value ?? ''}
         onChange={(e) => onChange(e.target.value)}
-        placeholder="Ingresar obra manualmente..."
+        placeholder="Ingresar centro de costo..."
       />
     );
   }
@@ -154,15 +154,10 @@ export default function DropdownObras({ value, onChange }) {
       onChange={(e) => onChange(e.target.value)}
       className="cell-select"
     >
-      <option value="">Seleccionar obra...</option>
-      {obras.map((o) => (
-        // El `value` que persiste es el ID (ej. "CC-53", "9000") — sirve
-        // como código de centro de costo para el siguiente paso (CONCAR).
-        // El label visible en la UI es el campo OBRA (ej. "SATIPO").
-        // El campo NOMBRE OBRA (la descripción larga) lo dejamos como
-        // tooltip para que el usuario pueda confirmar al pasar el mouse.
-        <option key={o.id} value={o.id} title={o.nombre || ''}>
-          {o.obra}
+      <option value="">Seleccionar centro de costo...</option>
+      {centros.map((c) => (
+        <option key={c.id} value={c.id} title={c.nombre || ''}>
+          {c.centro_costo}
         </option>
       ))}
     </select>

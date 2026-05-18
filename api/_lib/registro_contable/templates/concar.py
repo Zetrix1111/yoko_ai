@@ -244,12 +244,12 @@ def factura_a_filas(
     (A, B, ..., AO) listas para escribir directo al Excel CONCAR.
 
     Cada dict representa una línea contable:
-      - Línea 1: GASTO (DEBE)        — cuenta gasto, base sin IGV, cc = obra_area.
+      - Línea 1: GASTO (DEBE)        — cuenta gasto, base sin IGV, cc = centro_costo.
       - Línea 2: IGV CRÉDITO (DEBE)  — cuenta IGV, monto = monto_tributo. Solo si > 0.
       - Línea 3: CXP PROVEEDOR (HABER) — cuenta cxp, total con IGV, anexo = ruc.
 
     Args:
-        factura:           dict con campos OCR-extraídos + obra_area.
+        factura:           dict con campos OCR-extraídos + centro_costo.
         contab:            dict resultado de engine.merge_config(DEFAULTS, overrides).
         fecha_hoy:         string DD/MM/YYYY para columna J ("Fecha Tipo de Cambio").
         numero_comprobante: string para columna C ("Número de Comprobante").
@@ -271,7 +271,7 @@ def factura_a_filas(
     base        = round(monto_total - monto_igv, 2)
 
     ruc = (factura.get("ruc") or "").strip()
-    cc  = (factura.get("obra_area") or "").strip()
+    cc  = (factura.get("centro_costo") or "").strip()
 
     fecha_emi   = factura.get("fecha_emision") or ""
     vencimiento = factura.get("vencimiento") or fecha_emi

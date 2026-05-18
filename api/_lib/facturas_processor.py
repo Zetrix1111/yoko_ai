@@ -287,7 +287,7 @@ def generate_mock_factura(filename: str) -> Dict:
         "moneda":          random.choice(monedas),
         "monto_total":     round(random.uniform(100, 5000), 2),
         "monto_tributo":   round(random.uniform(18, 900), 2),
-        "obra_area":       "",
+        "centro_costo":    "",
         "estado":          "Por implementar validación",
         "confianza":       round(random.uniform(0.7, 0.99), 2),
     }

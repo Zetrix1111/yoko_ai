@@ -13,7 +13,7 @@ Antes de empezar, confirmar que:
 
 - [ ] `provision_agent.py` corrió OK contra el agent `agent_017xab...`. La
   Console de Anthropic muestra el agent con: 3 tools (`yoko_procesar_archivos`,
-  `yoko_generar_excel`, `yoko_recuperar_proceso`), 1 skill (`yoko-facturas`),
+  `yoko_generar_registro_contable`, `yoko_recuperar_proceso`), 1 skill (`facturas-inteligentes`),
   system prompt actualizado.
 - [ ] En Vercel → Project Settings → Environment Variables → **Preview**:
   - `YOKO_BACKEND=managed_agents`
@@ -126,7 +126,7 @@ Resultado: [ ] ✅ / [ ] ⚠️ obs: ___ / [ ] ❌
 **Input** (después de T6 OK): "mándame el excel".
 
 **Esperado**:
-- Yoko llama `yoko_generar_excel` con el `proceso_id` de T6.
+- Yoko llama `yoko_generar_registro_contable` con el `proceso_id` de T6.
 - El handler `download-chat` devuelve el `.xlsx` en base64.
 - Yoko devuelve un link de descarga o confirma que el archivo está listo
   (la UI puede no mostrar el binario directamente — está OK si el agent

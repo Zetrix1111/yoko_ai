@@ -78,7 +78,7 @@ def factura_a_asientos(factura: Dict, contab: Dict) -> List[Dict]:
     semántico, NO el A-AO del Excel). Se usa para tests / debug.
 
     Args:
-        factura: dict con los campos OCR-extraídos + obra_area.
+        factura: dict con los campos OCR-extraídos + centro_costo.
         contab:  dict resultado de `get_contabilidad_config(empresa)`.
     """
     tipo_doc    = (factura.get("tipo_doc_codigo") or "FT").upper()
@@ -90,7 +90,7 @@ def factura_a_asientos(factura: Dict, contab: Dict) -> List[Dict]:
     base        = round(monto_total - monto_igv, 2)
 
     ruc         = (factura.get("ruc") or "").strip()
-    cc          = (factura.get("obra_area") or "").strip()
+    cc          = (factura.get("centro_costo") or "").strip()
 
     fecha_emi   = factura.get("fecha_emision") or ""
     vencimiento = factura.get("vencimiento") or fecha_emi

@@ -9,12 +9,12 @@ es solo el "wrapper": acá usamos `@register` (registry global de
 OpenAI) en vez de `TOOL_DEFINITION` (schema Anthropic).
 
 Diseño:
-  - `procesar_facturas(tipo, mes)` — lee el carrito de la sesión actual,
+  - `yoko_procesar_archivos(tipo, mes, files?)` — lee el carrito de la sesión actual,
     postea a `/api/facturas?action=procesar-chat` con los archivos en
     `session_id_for_cart`. Vacía el carrito si OK.
-  - `generar_registro_contable(proceso_id)` — confirma que el Excel
+  - `yoko_generar_registro_contable(proceso_id)` — confirma que el Excel
     está listo para descargar; devuelve `download_marker`.
-  - `recuperar_proceso(proceso_id)` — consulta detalles de un proceso
+  - `yoko_recuperar_proceso(proceso_id)` — consulta detalles de un proceso
     previo (estado, comprobantes, alertas).
   - `cancelar_carrito()` — vacía el carrito explícitamente cuando el
     usuario expresa intención #3 del SKILL.
@@ -49,11 +49,11 @@ def _get_context_auth(context: dict) -> str:
 
 
 # ─────────────────────────────────────────────────────────────────────────
-# 1. procesar_facturas
+# 1. yoko_procesar_archivos
 # ─────────────────────────────────────────────────────────────────────────
 
 @register(
-    name="procesar_facturas",
+    name="yoko_procesar_archivos",
     description=(
         "Procesa el lote de comprobantes acumulados en el carrito de la "
         "sesión actual (que el usuario adjuntó turno a turno). Invocala "
@@ -78,12 +78,27 @@ def _get_context_auth(context: dict) -> str:
                 "pattern": r"^\d{4}-\d{2}$",
                 "description": "Mes contable de los comprobantes en formato YYYY-MM.",
             },
+            "files": {
+                "type": "array",
+                "description": (
+                    "Lista opcional de archivos con filename/content_b64. "
+                    "En Yoko normalmente se omite porque el orquestador "
+                    "inyecta el carrito de la sesión."
+                ),
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "filename": {"type": "string"},
+                        "content_b64": {"type": "string"},
+                    },
+                },
+            },
         },
         "required": ["tipo", "mes"],
     },
     category="accion",
 )
-def procesar_facturas(args: dict, context: dict) -> dict:
+def yoko_procesar_archivos(args: dict, context: dict) -> dict:
     session_id = _get_context_session(context)
     auth_header = _get_context_auth(context)
 
@@ -112,11 +127,11 @@ def procesar_facturas(args: dict, context: dict) -> dict:
 
 
 # ─────────────────────────────────────────────────────────────────────────
-# 2. generar_registro_contable
+# 2. yoko_generar_registro_contable
 # ─────────────────────────────────────────────────────────────────────────
 
 @register(
-    name="generar_registro_contable",
+    name="yoko_generar_registro_contable",
     description=(
         "Confirma que el registro de compras o ventas (Excel del sistema "
         "contable de la empresa: CONCAR, SISCONT u otro) está listo para "
@@ -135,7 +150,7 @@ def procesar_facturas(args: dict, context: dict) -> dict:
             "proceso_id": {
                 "type": "string",
                 "description": (
-                    "ID del proceso devuelto por `procesar_facturas` "
+                    "ID del proceso devuelto por `yoko_procesar_archivos` "
                     "(formato proc-XXXXXXXXXXXX)."
                 ),
             },
@@ -144,7 +159,7 @@ def procesar_facturas(args: dict, context: dict) -> dict:
     },
     category="accion",
 )
-def generar_registro_contable(args: dict, context: dict) -> dict:
+def yoko_generar_registro_contable(args: dict, context: dict) -> dict:
     auth_header = _get_context_auth(context)
     return tool_executor.execute_local_tool(
         "registro-contable-chat", args, auth_header,
@@ -152,11 +167,11 @@ def generar_registro_contable(args: dict, context: dict) -> dict:
 
 
 # ─────────────────────────────────────────────────────────────────────────
-# 3. recuperar_proceso
+# 3. yoko_recuperar_proceso
 # ─────────────────────────────────────────────────────────────────────────
 
 @register(
-    name="recuperar_proceso",
+    name="yoko_recuperar_proceso",
     description=(
         "Consulta los detalles de un proceso de facturas ya creado "
         "(estado, comprobantes extraídos, totales, alertas). Útil cuando "
@@ -176,7 +191,7 @@ def generar_registro_contable(args: dict, context: dict) -> dict:
     },
     category="consulta",
 )
-def recuperar_proceso(args: dict, context: dict) -> dict:
+def yoko_recuperar_proceso(args: dict, context: dict) -> dict:
     auth_header = _get_context_auth(context)
     return tool_executor.execute_local_tool(
         "recuperar-chat", args, auth_header,

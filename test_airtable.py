@@ -71,7 +71,7 @@ fields = {
     'PLAZO':         'Del 01/05 al 31/05',
     'MOTIVO':        'Prueba automatizada con RESIDENTE y APROBADOR',
     'MONEDA':        'PEN',
-    'OBRA':          'Test Obra',
+    'CENTRO_COSTO':  'Test Centro Costo',
     'TOTAL_GENERAL': 500.0,
     'TIPO_GASTO':    'CAJA CHICA',
     'DETALLE_GASTO': 'Verificacion del flujo completo de campos',

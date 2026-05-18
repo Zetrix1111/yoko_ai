@@ -121,7 +121,7 @@ def _config_completo() -> dict:
             # capa 6
             "tipo_cliente":             {"activo": True, "valor": "mixto"},
             "discovery_preguntas":      {"activo": True, "valor": [
-                {"pregunta": "¿Para qué obra es?",   "obligatoria": True},
+                {"pregunta": "¿Para qué centro de costo es?",   "obligatoria": True},
                 {"pregunta": "¿Cuándo lo necesitas?", "obligatoria": False},
             ]},
             "datos_cierre_obligatorios": {"activo": True, "valor": ["nombre", "telefono", "direccion"]},
@@ -133,7 +133,7 @@ def _config_completo() -> dict:
             # capa 7
             "propuesta_valor":      {"activo": True, "valor": "Stock inmediato y asesoría técnica"},
             "diferenciadores":      {"activo": True, "valor": ["Stock 24h", "Asesoría especializada"]},
-            "prueba_social":        {"activo": True, "valor": ["Más de 200 obras atendidas en 2025"]},
+            "prueba_social":        {"activo": True, "valor": ["Más de 200 centros de costo atendidos en 2025"]},
             "autoridad_tecnica":    {"activo": True, "valor": ["10 años en el rubro"]},
             "faq":                  {"activo": True, "valor": [
                 {"titulo": "Aceptan facturas a 30 días", "respuesta": "Solo para clientes con línea aprobada."},
@@ -234,7 +234,7 @@ def main() -> int:
     r.assert_("Trata al cliente de tú" in p2, "T2: tratamiento aplicado")
     r.assert_("bacán" in p2, "T2: modismos peruanos presentes")
     r.assert_("Pedido mínimo" in p2 or "PEDIDO MÍNIMO" in p2, "T2: pedido mínimo en capa 5")
-    r.assert_("Para qué obra es?" in p2, "T2: discovery question presente")
+    r.assert_("Para qué centro de costo es?" in p2, "T2: discovery question presente")
     r.assert_("[obligatoria]" in p2, "T2: marca [obligatoria] en discovery")
     r.assert_("Stock inmediato y asesoría técnica" in p2, "T2: propuesta de valor presente")
     r.assert_("Está caro" in p2, "T2: objeción presente")

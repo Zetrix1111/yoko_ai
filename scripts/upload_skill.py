@@ -5,13 +5,13 @@ Sube un skill custom (carpeta con SKILL.md y archivos auxiliares) a la
 Skills API de Anthropic e imprime el `skill_id` resultante.
 
 Uso:
-    python scripts/upload_skill.py skills/yoko-facturas
+    python scripts/upload_skill.py skills/facturas-inteligentes
 
 Salida (ejemplo):
     OK skill subido
        skill_id:       skill_01ABC...
        latest_version: 1759178010641129
-       display_title:  yoko-facturas
+       display_title:  facturas-inteligentes
 
     Pegá esto en Vercel:
        YOKO_SKILL_FACTURAS_ID=skill_01ABC...
@@ -231,7 +231,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "skill_dir",
-        help="Carpeta del skill (debe contener SKILL.md). Ej: skills/yoko-facturas",
+        help="Carpeta del skill (debe contener SKILL.md). Ej: skills/facturas-inteligentes",
     )
     parser.add_argument(
         "--title",

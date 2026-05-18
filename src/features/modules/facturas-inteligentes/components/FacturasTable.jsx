@@ -77,7 +77,7 @@ export default function FacturasTable({ proceso, facturas, setFacturas }) {
               <th className="col-tipo-cambio">Tipo cambio</th>
               <th className="col-monto">Monto inc. IGV</th>
               <th className="col-tributo">Monto tributo</th>
-              <th className="col-obra">Obra / área</th>
+              <th className="col-centro-costo">Centro de costo</th>
               <th className="col-cuenta">Cuenta contable</th>
               <th className="col-estado">Estado</th>
               <th className="col-actions" aria-label="Acciones" />
