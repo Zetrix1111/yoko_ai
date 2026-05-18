@@ -165,7 +165,7 @@ function CampoRedes({ campo, label, helpText, activo, valor, onActivoChange, onV
   );
 }
 
-export default function ConfiguracionEmpresaScreen({ user, onOpenModules, onLogout }) {
+export default function ConfiguracionEmpresaScreen({ onOpenModules, onLogout }) {
   // Persistencia centralizada en Airtable (paso 6).
   // Esta pantalla lee y escribe la fila de Config_Empresa.data, que también
   // contiene `proceso` (lo edita Gestión Caja Chica). Al guardar hay que
@@ -506,7 +506,7 @@ export default function ConfiguracionEmpresaScreen({ user, onOpenModules, onLogo
             <CampoTexto
               campo="rubro"
               label="Rubro / actividad principal"
-              helpText="Texto corto que define a qué se dedica la empresa. Ej: 'Construcción civil y suministro de materiales para obras'."
+              helpText="Texto corto que define a qué se dedica la empresa. Ej: 'Construcción civil y suministro de materiales'."
               placeholder="Construcción civil y suministro de materiales..."
               activo={infoExtendida.rubro.activo}
               valor={infoExtendida.rubro.valor}
@@ -607,9 +607,10 @@ export default function ConfiguracionEmpresaScreen({ user, onOpenModules, onLogo
               <div>
                 <h3>Centros de costo</h3>
                 <p>
-                  Activa los centros de costo para asignarlos en solicitudes,
+                  Activa los centros de costo como configuración general de la
+                  empresa. Cuando está activo, se pueden usar en solicitudes,
                   facturas, rendiciones y demás procesos. La lista se sincroniza
-                  desde la tabla <strong>obras</strong> de Airtable.
+                  desde el maestro de centros de costo de Airtable.
                 </p>
               </div>
             </div>
@@ -660,7 +661,7 @@ export default function ConfiguracionEmpresaScreen({ user, onOpenModules, onLogo
 
               {!centrosLoading && !centrosError && centros.length === 0 && (
                 <div className="ce-list-status">
-                  No hay centros de costo registrados en la tabla <strong>obras</strong>.
+                  No hay centros de costo registrados.
                 </div>
               )}
 
@@ -670,7 +671,7 @@ export default function ConfiguracionEmpresaScreen({ user, onOpenModules, onLogo
                     {(centrosExpanded ? centros : centros.slice(0, 7)).map((c) => (
                       <li key={c.id} className="ce-cc-row">
                         <span className="ce-cc-id">{c.id}</span>
-                        <span className="ce-cc-name">{c.obra}</span>
+                        <span className="ce-cc-name">{c.centro_costo}</span>
                       </li>
                     ))}
                   </ul>
@@ -683,7 +684,7 @@ export default function ConfiguracionEmpresaScreen({ user, onOpenModules, onLogo
                       <ChevronDown size={16} />
                       {centrosExpanded
                         ? 'Ver menos'
-                        : `Ver todas las obras (${centros.length})`}
+                        : `Ver todos los centros (${centros.length})`}
                     </button>
                   )}
                 </>

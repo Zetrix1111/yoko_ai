@@ -413,7 +413,7 @@ def load_full_config(empresa_id: str) -> dict:
     Devuelve la config completa para una empresa leyendo SOLO desde Airtable
     (sin filesystem). Combina:
 
-      1. `Config_Empresa.data`: `basicos`, `info_extendida`, `proceso.caja_chica`.
+      1. `Config_Empresa.data`: `basicos`, `info_extendida`, `centros_costo`, `proceso.caja_chica`.
       2. `Config_Ventas.data`: bloque ventas completo.
       3. Aprobadores derivados de la tabla `Empleados` (load_dynamic_config).
       4. `agent` viene de `_AGENT_DEFAULTS` (siempre "Yoko").
@@ -429,6 +429,9 @@ def load_full_config(empresa_id: str) -> dict:
           "empresa": {
             "id", "name", "razon_social", "ruc", "sistema_contable",
             "agent", "modules", "info_extendida"
+          },
+          "centros_costo": {
+            "activo": true | false
           },
           "proceso": {
             "caja_chica": {
@@ -453,6 +456,12 @@ def load_full_config(empresa_id: str) -> dict:
 
     # info_extendida: defaults ← Config_Empresa.data.info_extendida
     info_extendida = _merge_info_extendida(cfg_empresa.get("info_extendida"))
+    centros_costo = cfg_empresa.get("centros_costo") if isinstance(cfg_empresa, dict) else None
+    if not isinstance(centros_costo, dict):
+        centros_costo = {}
+    centros_costo = {
+        "activo": bool(centros_costo.get("activo", True)),
+    }
 
     # proceso: defaults vacíos ← legacy Config_Procesos + Empleados →
     # ← Config_Empresa.data.proceso (gana sobre todo).
@@ -482,6 +491,7 @@ def load_full_config(empresa_id: str) -> dict:
 
     result = {
         "empresa": empresa,
+        "centros_costo": centros_costo,
         "proceso": proceso,
         "ventas":  ventas_block,
     }

@@ -71,7 +71,7 @@ export default function Paso3Cliente({ config, setCampo, setSubvalor }) {
             items={f('discovery_preguntas').valor || []}
             onChange={setValor('discovery_preguntas')}
             schema={[
-              { key: 'pregunta',    label: 'Pregunta',          type: 'text',   placeholder: 'Ej: ¿Para qué obra es?' },
+              { key: 'pregunta',    label: 'Pregunta',          type: 'text',   placeholder: 'Ej: ¿Para qué centro de costo es?' },
               { key: 'obligatoria', label: 'Obligatoria',       type: 'switch' },
             ]}
             maxItems={8}

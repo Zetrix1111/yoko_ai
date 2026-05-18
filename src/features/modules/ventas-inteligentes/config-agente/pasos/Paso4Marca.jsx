@@ -77,7 +77,7 @@ export default function Paso4Marca({ config, setCampo }) {
           <EditorListaSimple
             items={f('prueba_social').valor || []}
             onChange={setValor('prueba_social')}
-            placeholder="Ej: Más de 200 obras atendidas en 2025"
+            placeholder="Ej: Más de 200 centros de costo atendidos en 2025"
             maxItems={6}
             sugerencias={SUGERENCIAS_PRUEBA_SOCIAL}
             disabled={!f('prueba_social').activo}

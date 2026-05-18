@@ -279,7 +279,7 @@
   transform: translateX(18px);
 }
 
-/* ── Lista de centros de costo (compacta, una línea por obra) ── */
+/* ── Lista de centros de costo (compacta, una línea por centro) ── */
 .ce-cc-list {
   list-style: none;
   margin: 0;

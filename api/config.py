@@ -11,13 +11,13 @@ URLs:
   GET  /api/config?tipo=ventas         → {data: <objeto JSON o null>}
   POST /api/config?tipo=empresa        → {ok: true}
   POST /api/config?tipo=ventas         → {ok: true}
-  GET  /api/config?tipo=centros_costo  → {centros: [{id, obra, nombre, constituyen}]}
+  GET  /api/config?tipo=centros_costo  → {centros: [{id, centro_costo, nombre, constituyen}]}
 
 Body del POST: `{"data": {...objeto JSON...}}`. Validación blanda — que sea
 serializable y no exceda 100KB. No hay JSON Schema; las pantallas del
 frontend son responsables de mandar la forma correcta.
 
-`centros_costo` es read-only (lee tabla `obras`, no es config blob). POST
+`centros_costo` es read-only (lee el maestro de centros de costo, no es config blob). POST
 sobre ese tipo devuelve 405. El nombre `tipo=` se conserva por simetría
 con el dispatcher genérico, aunque semánticamente es un master-data lookup.
 """
@@ -43,7 +43,7 @@ _MAX_DATA_BYTES = 100_000
 ALLOWED_TIPOS = {"empresa", "ventas", "centros_costo"}
 
 # Solo los tipos "data blob" (fila por empresa con JSON en `data`).
-# `centros_costo` no entra acá: es un master-data lookup sobre la tabla `obras`
+# `centros_costo` no entra acá: es un master-data lookup.
 # y se maneja en una rama aparte.
 TABLE_BY_TIPO = {
     "empresa": "Config_Empresa",
@@ -65,7 +65,7 @@ class handler(BaseHTTPRequestHandler):
             if tipo is None:
                 return  # _get_tipo ya respondió 400
 
-            # Master-data lookup: lista de obras del tenant. NO sigue el patrón
+            # Master-data lookup: lista de centros de costo del tenant.
             # de "fila por empresa con JSON en data" — devuelve N records.
             if tipo == "centros_costo":
                 return self._get_centros_costo(empresa_id)
@@ -156,13 +156,13 @@ class handler(BaseHTTPRequestHandler):
 
     def _get_centros_costo(self, empresa_id: str):
         """
-        Devuelve la lista de centros de costo del tenant desde la tabla `obras`.
+        Devuelve la lista de centros de costo del tenant.
         No es un blob de config — es un master-data lookup. Se sirve por este
         dispatcher para evitar gastar una función serverless aparte.
         """
         try:
             records = airtable_client.list_records(
-                "obras",
+                "centros_costo",
                 filter_formula=f"{{empresa_id}}='{empresa_id}'",
                 max_records=100,
             )
@@ -173,13 +173,13 @@ class handler(BaseHTTPRequestHandler):
         centros = []
         for r in records:
             f = r.get("fields", {})
-            obra = f.get("OBRA")
-            if not obra:
+            centro_costo = f.get("CENTRO_COSTO")
+            if not centro_costo:
                 continue
             centros.append({
                 "id":          f.get("ID") or r.get("id"),
-                "obra":        obra,
-                "nombre":      f.get("NOMBRE OBRA", ""),
+                "centro_costo": centro_costo,
+                "nombre":      f.get("NOMBRE CENTRO COSTO", ""),
                 "constituyen": f.get("CONSTITUYEN", ""),
             })
         return self._json(200, {"centros": centros})

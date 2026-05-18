@@ -63,13 +63,13 @@ export function useChat(user) {
   const [currentBackend, setCurrentBackend] = useState(readInitialBackend);
   const isManaged = currentBackend === 'managed_agents';
 
-  // El módulo `facturas-inteligentes` también requiere mandar attachments
-  // en base64 (no parse_file), porque el backend legacy ahora soporta el
-  // mismo carrito server-side que Managed para facturas. parse_file sigue
-  // siendo el path para gestion-caja (extracción IA pre-mensaje).
+  // Los módulos con tools conversacionales de extracción mandan attachments
+  // en base64. El backend los acumula en carrito server-side y la tool del
+  // skill decide cuándo procesarlos.
   const _modulos = (user?.empresa?.modulos) || [];
   const isFacturas = _modulos.includes('facturas-inteligentes');
-  const useAttachmentsPath = isManaged || isFacturas;
+  const isGestionCaja = _modulos.includes('gestion-caja');
+  const useAttachmentsPath = isManaged || isFacturas || isGestionCaja;
 
   // Cambia el cerebro activo. Si ya hubo conversación, pide confirmación
   // porque el reset descarta el contexto visible. La session vieja del
@@ -214,9 +214,9 @@ export function useChat(user) {
 
       try {
         if (useAttachmentsPath) {
-          // Managed Agents O legacy + facturas-inteligentes: codificar
-          // base64 y mandar como attachments en el body. El backend
-          // (handler.py o handler_managed.py) persiste en el carrito KV.
+          // Managed Agents o legacy con módulos que exponen tools de
+          // extracción: codificar base64 y mandar como attachments. El
+          // backend persiste estos archivos en el carrito KV.
           const encoded = [];
           for (let i = 0; i < files.length; i++) {
             const file = files[i];
@@ -231,7 +231,7 @@ export function useChat(user) {
           attachmentsForChat = encoded;
           setMessages((prev) => prev.filter((msg) => msg.id !== uploadMsgId));
         } else {
-          // Legacy openai sin facturas (típicamente caja-chica):
+          // Legacy openai sin tool conversacional de extracción:
           // pre-procesa cada archivo con parse_file e inyecta los campos
           // extraídos al texto del mensaje.
           const todosLosCampos = [];
@@ -294,7 +294,7 @@ export function useChat(user) {
           .filter(([k, v]) => k !== 'confianza' && v !== null && v !== undefined && v !== '')
           .map(([k, v]) => `  - ${k}: ${v}`)
           .join('\n');
-        const instruccion = 'INSTRUCCIÓN SISTEMA: Los datos anteriores fueron extraídos automáticamente del archivo adjunto. Tratalos como CONFIRMADOS. NO vuelvas a preguntar por ellos. Identifica qué campos obligatorios faltan (plazo, motivo, moneda, obra, total_general, tipo_gasto, detalle_gasto, aprobador_id) y pregunta SOLO por los que no estén en la lista de arriba.';
+        const instruccion = 'INSTRUCCIÓN SISTEMA: Los datos anteriores fueron extraídos automáticamente del archivo adjunto. Tratalos como CONFIRMADOS. NO vuelvas a preguntar por ellos. Identifica qué campos obligatorios faltan (plazo, motivo, moneda, total_general, detalle_gasto, aprobador_id) y pregunta SOLO por los que no estén en la lista de arriba. Si necesitas centro de costo, usa la herramienta disponible para consultar centros de costo; no inventes centros de costo desde contexto.';
         mensajeConContexto = text
           ? `${text}\n\n[Datos extraídos del archivo adjunto:\n${camposStr}]\n\n${instruccion}`
           : `[Datos extraídos del archivo adjunto:\n${camposStr}]\n\n${instruccion}`;
@@ -357,7 +357,7 @@ export function useChat(user) {
         ));
       }
     }
-  }, [user, messages, navigate, pollTaskUntilDone, currentBackend, isManaged]);
+  }, [user, messages, navigate, pollTaskUntilDone, currentBackend, isManaged, useAttachmentsPath]);
 
   // ───────────────────────────────────────────────────────────────────
   // Entry point: el componente llama esto. Si hay >CHUNK_SIZE archivos,
@@ -382,9 +382,8 @@ export function useChat(user) {
     }]);
 
     // Auto-chunking aplica para flujos que mandan attachments en base64
-    // al body (Managed o legacy+facturas) — base64 infla el payload y
-    // Vercel impone 4.5MB por request. Caja chica usa parse_file y va
-    // por otra ruta, sin chunking.
+    // al body (Managed o legacy con tools de extracción) — base64 infla
+    // el payload y Vercel impone 4.5MB por request.
     if (!useAttachmentsPath || safeFiles.length <= CHUNK_SIZE) {
       await sendOneChunk({
         text,

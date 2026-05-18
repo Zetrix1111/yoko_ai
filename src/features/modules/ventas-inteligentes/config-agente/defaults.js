@@ -191,7 +191,7 @@ export const SUGERENCIAS_DIFERENCIADORES = [
 
 export const SUGERENCIAS_PRUEBA_SOCIAL = [
   'Más de 200 clientes en 2025',
-  'Atendemos en obras de Lima desde 2020',
+  'Atendemos centros de costo de Lima desde 2020',
   '95% de clientes recomiendan nuestro servicio',
 ];
 
