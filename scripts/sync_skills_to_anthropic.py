@@ -162,6 +162,11 @@ def main() -> int:
         print("DRY-RUN: no se aplicaron cambios.")
         return 0
 
+    # La API de Managed Agents exige `version` en el body del POST como control
+    # de optimistic locking — debe coincidir con la versión actual remota.
+    # Después del update incrementa automáticamente.
+    local_config["version"] = remote.get("version")
+
     try:
         updated = mac.update_agent(agent_id, local_config)
         print(f"OK Agent {agent_id} actualizado.")
