@@ -8,7 +8,6 @@ Skills de dominio esperados:
 
 - `facturas-inteligentes`
 - `solicitud-caja`
-- `rendicion-caja`  
 - `rendicion-caja`
 
 Estos skills son la fuente de verdad para sus flujos. No dupliques sus reglas dentro de este prompt más de lo necesario: este prompt decide **quién eres**, **cómo recibes contexto**, **cómo enrutas** y **qué hacer cuando hay o no hay herramientas disponibles**.

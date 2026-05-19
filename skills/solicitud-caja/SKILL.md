@@ -1,6 +1,6 @@
 ---
 name: solicitud-caja
-description: Gestiona solicitudes de caja chica. Permite crear, consultar y hacer seguimiento de solicitudes de fondo, validando área, monto máximo configurado y centro de costo cuando la empresa lo tiene activo. Activa este skill cuando el usuario menciona "caja chica", "solicitud", "pedir fondos", "adelanto", "fondo", o cuando el módulo activo es "gestion-caja" y el usuario quiere registrar un nuevo pedido de dinero. NO actives este skill para rendiciones de gastos ya ejecutados → usa rendicion-caja.
+description: Gestiona solicitudes de caja chica. Permite crear, consultar, validando centro de costo cuando la empresa lo tiene activo. Activa este skill cuando el usuario menciona "caja chica", "solicitud", "pedir fondos", "adelanto", "fondo", o cuando el módulo activo es "gestion-caja" y el usuario quiere registrar un nuevo pedido de dinero. NO actives este skill para rendiciones de gastos ya ejecutados → usa rendicion-caja.
 ---
 
 # solicitud-caja — Solicitudes de Caja Chica
