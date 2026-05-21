@@ -48,6 +48,20 @@ def _tool_names(items: list[dict]) -> set[str]:
     return out
 
 
+def _tool_schemas_by_name(items: list[dict]) -> dict[str, dict]:
+    """Indexa custom tools por nombre, devolviendo description + input_schema."""
+    out: dict[str, dict] = {}
+    for i in items:
+        name = i.get("name")
+        if not name:
+            continue
+        out[name] = {
+            "description": i.get("description") or "",
+            "input_schema": i.get("input_schema") or {},
+        }
+    return out
+
+
 def _skill_ids(items: list[dict]) -> set[str]:
     """Skills se referencian por skill_id (custom) o skill_id (anthropic)."""
     return {i.get("skill_id", "") for i in items if i.get("skill_id")}
@@ -74,9 +88,13 @@ def _diff_summary(local: dict, remote: dict | None) -> tuple[bool, list[str]]:
             f"  ~ system: {len(remote_sys)} chars -> {len(local_sys)} chars"
         )
 
-    # Tools
-    local_tools = _tool_names(local.get("tools") or [])
-    remote_tools = _tool_names(remote.get("tools") or [])
+    # Tools — diff por nombre + diff por schema (description/input_schema).
+    # Sin el diff de schema, cambiar el `required` o el enum de un campo
+    # quedaba como "sin cambios" porque el nombre del tool no cambia.
+    local_tools_list = local.get("tools") or []
+    remote_tools_list = remote.get("tools") or []
+    local_tools = _tool_names(local_tools_list)
+    remote_tools = _tool_names(remote_tools_list)
     added = sorted(local_tools - remote_tools)
     removed = sorted(remote_tools - local_tools)
     if added:
@@ -85,6 +103,13 @@ def _diff_summary(local: dict, remote: dict | None) -> tuple[bool, list[str]]:
     if removed:
         has_changes = True
         lines.append(f"  - tools: {', '.join(removed)}")
+
+    local_schemas = _tool_schemas_by_name(local_tools_list)
+    remote_schemas = _tool_schemas_by_name(remote_tools_list)
+    for name in sorted(local_schemas.keys() & remote_schemas.keys()):
+        if local_schemas[name] != remote_schemas[name]:
+            has_changes = True
+            lines.append(f"  ~ tool schema cambió: {name}")
 
     # Skills (por skill_id remoto)
     local_skills = _skill_ids(local.get("skills") or [])
