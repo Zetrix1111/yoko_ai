@@ -44,8 +44,11 @@ TOOL_DEFINITION: dict = {
             "aprobador_id": {
                 "type": "string",
                 "description": (
-                    "Record ID del APROBADOR_2 elegido por el usuario. "
-                    "Obtén este id con consultar_aprobador antes de crear la solicitud."
+                    "Record ID del APROBADOR_2. Obligatorio solo si la empresa "
+                    "tiene requiere_aprobacion=true (chequea el <contexto_modulo> "
+                    "de gestion-caja). Si la empresa NO requiere aprobación, "
+                    "omitir este campo: la solicitud se crea directamente con "
+                    "estado PENDIENTE_PAGO y pasa a Tesorería."
                 ),
             },
             "residente_id": {
@@ -56,6 +59,6 @@ TOOL_DEFINITION: dict = {
                 ),
             },
         },
-        "required": ["plazo", "motivo", "moneda", "total_general", "detalle_gasto", "aprobador_id"],
+        "required": ["plazo", "motivo", "moneda", "total_general", "detalle_gasto"],
     },
 }

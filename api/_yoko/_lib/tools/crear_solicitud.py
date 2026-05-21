@@ -138,10 +138,10 @@ def procesar_solicitud_caja(args: dict, context: dict) -> dict:
             "centro_costo":  {"type": "string", "description": "Centro de costo asociado, si aplica en la empresa."},
             "total_general": {"type": "number", "description": "Monto total a solicitar (numérico)."},
             "detalle_gasto": {"type": "string", "description": "Descripción detallada del gasto a realizar."},
-            "aprobador_id":  {"type": "string", "description": "Record ID del aprobador (APROBADOR_2) elegido por el usuario. SIEMPRE obligatorio."},
+            "aprobador_id":  {"type": "string", "description": "Record ID del aprobador (APROBADOR_2). Obligatorio solo si la empresa tiene requiere_aprobacion=true. Si la empresa NO requiere aprobación, omitir y la solicitud queda en PENDIENTE_PAGO."},
             "residente_id":  {"type": "string", "description": "Record ID del residente (APROBADOR_1) elegido por el usuario. Omitir si el usuario indica que no aplica."},
         },
-        "required": ["plazo", "motivo", "moneda", "total_general", "detalle_gasto", "aprobador_id"],
+        "required": ["plazo", "motivo", "moneda", "total_general", "detalle_gasto"],
     },
     category="accion",
 )
@@ -152,7 +152,7 @@ def crear_solicitud(args: dict, context: dict) -> dict:
     centro_costo = args.get("centro_costo")
     total_general = args["total_general"]
     detalle_gasto = args["detalle_gasto"]
-    aprobador_id = args["aprobador_id"]
+    aprobador_id = args.get("aprobador_id")  # opcional: solo si la empresa requiere aprobación
     residente_id = args.get("residente_id")  # opcional
 
     config = context.get("config") or {}
@@ -165,8 +165,14 @@ def crear_solicitud(args: dict, context: dict) -> dict:
     # Usamos total_general como monto. Ya no existe origen separado.
     validar_monto_contra_tope(total_general, config)
 
-    # ── Estado inicial según presencia de Residente ──
-    estado = "PENDIENTE_APROBACION_RESIDENTE" if residente_id else "PENDIENTE_APROBACION_JEFATURA_SEDE"
+    # ── Estado inicial ──
+    # Si la empresa no requiere aprobación (o el LLM no envía aprobador_id porque
+    # consultar_aprobador devolvió vacío), la solicitud salta el flujo de
+    # aprobación y queda directo lista para que Tesorería procese el pago.
+    if aprobador_id:
+        estado = "PENDIENTE_APROBACION_RESIDENTE" if residente_id else "PENDIENTE_APROBACION_JEFATURA_SEDE"
+    else:
+        estado = "PENDIENTE_PAGO"
 
     # ── Escritura ──
     fields = {
@@ -176,9 +182,11 @@ def crear_solicitud(args: dict, context: dict) -> dict:
         "MONEDA":        moneda,
         "TOTAL_GENERAL": float(total_general),
         "DETALLE_GASTO": detalle_gasto,
-        "APROBADOR":     [aprobador_id],
         "ESTADO":        estado,
     }
+
+    if aprobador_id:
+        fields["APROBADOR"] = [aprobador_id]
 
     if centro_costo:
         fields["CENTRO_COSTO"] = centro_costo

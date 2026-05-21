@@ -11,6 +11,9 @@ Acciones (managed_agents backend, async pattern):
                                             (handler_worker.handle_post)
   GET  /api/chat?action=status&task_id=X  → polling (auth user)
                                             (handler_status.handle_get)
+  POST /api/chat?action=reset             → descartar session cacheada y
+                                            forzar nueva (auth user)
+                                            (handler_reset.handle_post)
 
 Acción legacy (openai backend):
   Si `YOKO_BACKEND=openai`, el POST sin action sigue corriendo el flujo
@@ -42,8 +45,8 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 
-from _yoko import handler as yoko_handler          # noqa: E402
-from _yoko import handler_status, handler_worker   # noqa: E402
+from _yoko import handler as yoko_handler                          # noqa: E402
+from _yoko import handler_reset, handler_status, handler_worker    # noqa: E402
 
 
 def _get_action(req) -> str:
@@ -62,6 +65,8 @@ class handler(BaseHTTPRequestHandler):
             elif action == "status":
                 # GET-equivalent vía POST (algunos clients no soportan GET con body).
                 handler_status.handle_post(self)
+            elif action == "reset":
+                handler_reset.handle_post(self)
             else:
                 # Acción default: chat normal (managed_agents async o openai sync).
                 # `yoko_handler.handle_post` mira YOKO_BACKEND y delega a

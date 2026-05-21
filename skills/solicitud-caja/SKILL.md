@@ -148,6 +148,9 @@ Voy a crear esta solicitud:
 
 Cuando el usuario confirma, llamás al tool `yoko_crear_solicitud`. El tool devuelve el identificador interno del registro y el estado inicial.
 
+- Si `requiere_aprobacion = true`, pasaste `aprobador_id` (y opcionalmente `residente_id`). El backend la crea con estado `PENDIENTE_APROBACION_JEFATURA_SEDE` (o `PENDIENTE_APROBACION_RESIDENTE` si hay residente).
+- Si `requiere_aprobacion = false`, **no pases `aprobador_id`**. El backend crea la solicitud con estado `PENDIENTE_PAGO` y queda lista para que Tesorería procese el pago.
+
 Tu respuesta al usuario:
 
 > ✅ Solicitud creada — **SOL-0143**
