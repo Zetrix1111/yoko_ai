@@ -18,6 +18,7 @@ Tabla principal que asume este módulo:
 import json
 import os
 import sys
+import unicodedata
 from datetime import datetime
 
 from _lib import airtable_client, solicitud_caja_processor
@@ -32,6 +33,59 @@ from _lib.validators import (
 # Coincide exacto con los choices del singleSelect TIPO_SOLICITUD en Airtable.
 # Cualquier valor fuera del enum genera 422 al hacer create_record.
 _TIPOS_VALIDOS = ("CAJA CHICA", "EXTRAORDINARIO", "PASAJES AEREOS")
+
+
+def _slug_tipo(s) -> str:
+    """
+    Normaliza un string para matching: upper, sin tildes, solo letras
+    A-Z (sin espacios, guiones, números ni signos). Estable frente a
+    variantes del LLM ("Pasaje Aéreo" → "PASAJEAEREO").
+    """
+    if not isinstance(s, str):
+        return ""
+    # Quitar tildes/diacríticos.
+    nfkd = unicodedata.normalize("NFKD", s)
+    sin_tildes = "".join(c for c in nfkd if not unicodedata.combining(c))
+    return "".join(c for c in sin_tildes.upper() if c.isalpha())
+
+
+# Buckets de slugs aceptados → choice canónico de Airtable.
+# Cuando el LLM mande variantes ("Caja Extraordinaria", "extraordinaria",
+# "PASAJES AÉREOS", "pasaje-aereo", etc.) las llevamos al choice exacto.
+# Para sumar variantes nuevas: agregá el slug correspondiente.
+_TIPO_ALIAS_BUCKETS: dict[str, str] = {
+    # CAJA CHICA
+    "CAJACHICA":               "CAJA CHICA",
+    # EXTRAORDINARIO (acepta forma masculina y femenina, con y sin prefijo "caja")
+    "EXTRAORDINARIO":          "EXTRAORDINARIO",
+    "EXTRAORDINARIA":          "EXTRAORDINARIO",
+    "CAJAEXTRAORDINARIA":      "EXTRAORDINARIO",
+    "CAJAEXTRAORDINARIO":      "EXTRAORDINARIO",
+    # PASAJES AEREOS (singular, plural, con/sin "aereo")
+    "PASAJESAEREOS":           "PASAJES AEREOS",
+    "PASAJESAEREO":            "PASAJES AEREOS",
+    "PASAJEAEREO":             "PASAJES AEREOS",
+    "PASAJEAEREOS":            "PASAJES AEREOS",
+    "PASAJES":                 "PASAJES AEREOS",
+    "PASAJEAVION":             "PASAJES AEREOS",
+    "PASAJESAVION":            "PASAJES AEREOS",
+}
+
+
+def _resolver_tipo(raw) -> str:
+    """
+    Mapea cualquier variante razonable que mande el LLM al choice exacto del
+    singleSelect TIPO_SOLICITUD en Airtable. Lanza ValidationError si no
+    matchea ningún bucket — el LLM ve el mensaje y puede reintentar.
+    """
+    slug = _slug_tipo(raw)
+    if slug in _TIPO_ALIAS_BUCKETS:
+        return _TIPO_ALIAS_BUCKETS[slug]
+    raise ValidationError(
+        f"tipo inválido: {raw!r}. Esperaba alguno de "
+        f"{list(_TIPOS_VALIDOS)} (acepta variantes razonables: "
+        f"'caja chica', 'extraordinario'/'extraordinaria', 'pasajes aéreos', etc.)."
+    )
 
 
 def _normalizar_items(detalle_gasto) -> list[dict]:
@@ -204,11 +258,9 @@ def crear_solicitud(args: dict, context: dict) -> dict:
     record_id = user.get("record_id")
 
     # ── Validaciones ANTES de tocar Airtable ──
-    if tipo not in _TIPOS_VALIDOS:
-        raise ValidationError(
-            f"tipo inválido: {tipo!r}. Debe ser uno de {list(_TIPOS_VALIDOS)} "
-            f"(coincidir exacto con los choices del singleSelect TIPO_SOLICITUD)."
-        )
+    # Normalizamos tipo: aceptamos variantes que tira el LLM (Title Case,
+    # con tildes, masc/fem, singular/plural) y mapeamos al choice exacto.
+    tipo = _resolver_tipo(tipo)
 
     detalle_items = _normalizar_items(detalle_gasto_raw)
     if not detalle_items:
