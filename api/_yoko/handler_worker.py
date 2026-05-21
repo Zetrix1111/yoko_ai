@@ -75,6 +75,9 @@ def handle_post(req) -> None:
             session_id=task["session_id"],
             user_content=task["user_content"],
             auth_header=task.get("auth_header") or "",
+            user=task.get("user") or {},
+            empresa_id=task.get("empresa_id") or "",
+            modulos=task.get("modulos") or [],
         )
         yoko_task_store.mark_done(task_id, final_text)
         print(
@@ -98,6 +101,9 @@ def _run_turn_streaming(
     session_id: str,
     user_content: str,
     auth_header: str,
+    user: dict,
+    empresa_id: str,
+    modulos: list,
 ) -> str:
     """
     Versión del `_run_turn` original adaptada para escribir el texto
@@ -217,9 +223,9 @@ def _run_turn_streaming(
                         )
                     else:
                         tool_context = {
-                            "user": task.get("user") or {},
-                            "empresa_id": task.get("empresa_id") or "",
-                            "modulos": task.get("modulos") or [],
+                            "user": user or {},
+                            "empresa_id": empresa_id or "",
+                            "modulos": modulos or [],
                             "session_id_for_cart": session_id,
                         }
                         result = execute_local_tool(
