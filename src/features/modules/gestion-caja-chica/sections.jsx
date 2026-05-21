@@ -12,6 +12,8 @@ import {
 } from './mockData';
 import { useEmpresaConfig } from '../../../shared/useEmpresaConfig';
 import Toggle from '../../../shared/components/Toggle';
+import useSolicitudes from './hooks/useSolicitudes';
+import SolicitudDetalle from './components/SolicitudDetalle';
 
 // ─────────────────────────────────────
 // Helpers UI
@@ -194,58 +196,39 @@ export function InicioSection() {
 // 1 · SOLICITUDES
 // ─────────────────────────────────────
 export function SolicitudesSection() {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const autoOpen = searchParams.get('new') === '1';
-
-  const [data, setData] = useState(SOLICITUDES);
-  const [showModal, setShowModal] = useState(autoOpen);
+  const { solicitudes, loading, error, refetch } = useSolicitudes();
   const [filter, setFilter] = useState('');
+  const [selectedId, setSelectedId] = useState(null);
 
-  // Si llegamos con ?new=1, limpiamos ese flag de la URL después de abrir
-  // para que un refresh no vuelva a auto-abrir.
-  if (autoOpen) {
-    const next = new URLSearchParams(searchParams);
-    next.delete('new');
-    setSearchParams(next, { replace: true });
-  }
+  const filtered = solicitudes.filter((s) => {
+    if (!filter) return true;
+    const q = filter.toLowerCase();
+    return (
+      (s.nombre || '').toLowerCase().includes(q) ||
+      (s.motivo || '').toLowerCase().includes(q) ||
+      (s.numero || '').toLowerCase().includes(q) ||
+      (s.tipo || '').toLowerCase().includes(q)
+    );
+  });
 
-  const filtered = data.filter((s) =>
-    !filter || s.solicitante.toLowerCase().includes(filter.toLowerCase()) ||
-    s.area.toLowerCase().includes(filter.toLowerCase())
-  );
-
-  const handleCreate = (e) => {
-    e.preventDefault();
-    const f = new FormData(e.currentTarget);
-    const nueva = {
-      id: `SOL-${String(143 + data.length).padStart(4, '0')}`,
-      solicitante: f.get('solicitante'),
-      area: f.get('area'),
-      monto: Number(f.get('monto')),
-      tipo: f.get('tipo'),
-      motivo: f.get('motivo'),
-      fecha: f.get('fecha'),
-      estado: 'pendiente',
-    };
-    setData([nueva, ...data]);
-    setShowModal(false);
+  const handleCloseDetalle = () => {
+    setSelectedId(null);
+    // Refrescar el listado por si cambió TOTAL_GENERAL o items_count.
+    refetch();
   };
 
   return (
     <>
       <SectionHeader
         title="Solicitudes"
-        subtitle="Solicitudes de caja chica y entregas a rendir."
-        action={
-          <button className="gcc-btn gcc-btn-primary" onClick={() => setShowModal(true)}>
-            <Plus size={16} /> Nueva solicitud
-          </button>
-        }
+        subtitle="Solicitudes de caja chica. Para crear una nueva, usá el chat con Yoko."
       />
 
       <div className="gcc-table-wrap">
         <div className="gcc-table-toolbar">
-          <h3>{filtered.length} solicitudes</h3>
+          <h3>
+            {loading ? 'Cargando…' : `${filtered.length} solicitud${filtered.length === 1 ? '' : 'es'}`}
+          </h3>
           <div style={{ position: 'relative' }}>
             <Search size={14} style={{ position: 'absolute', left: 10, top: 9, color: 'var(--md-on-surface-variant)' }} />
             <input
@@ -258,86 +241,52 @@ export function SolicitudesSection() {
           </div>
         </div>
 
+        {error && (
+          <div style={{ padding: '1rem', color: 'var(--md-on-error-container)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <AlertCircle size={16} />
+            <span>{error}</span>
+            <button className="gcc-btn gcc-btn-ghost" onClick={refetch}>Reintentar</button>
+          </div>
+        )}
+
         <table className="gcc-table">
           <thead>
             <tr>
-              <th>ID</th>
+              <th>Número</th>
               <th>Solicitante</th>
-              <th>Área</th>
               <th>Tipo</th>
-              <th className="num">Monto</th>
+              <th>Motivo</th>
+              <th className="num">Total</th>
               <th>Estado</th>
-              <th>Fecha</th>
+              <th className="num">Ítems</th>
             </tr>
           </thead>
           <tbody>
-            {filtered.length === 0 ? (
-              <tr><td colSpan="7"><EmptyState message="Sin resultados" /></td></tr>
+            {!loading && filtered.length === 0 ? (
+              <tr><td colSpan="7"><EmptyState message={solicitudes.length === 0 ? 'Todavía no tenés solicitudes. Creá una desde el chat con Yoko.' : 'Sin resultados'} /></td></tr>
             ) : filtered.map((s) => (
-              <tr key={s.id}>
-                <td style={{ fontFamily: 'monospace', fontSize: '0.78rem', color: 'var(--md-on-surface-variant)' }}>{s.id}</td>
-                <td style={{ fontWeight: 500 }}>{s.solicitante}</td>
-                <td>{s.area}</td>
-                <td>{s.tipo === 'caja-chica' ? 'Caja chica' : 'Entrega a rendir'}</td>
-                <td className="num">{formatPEN(s.monto)}</td>
+              <tr
+                key={s.id}
+                onClick={() => setSelectedId(s.id)}
+                style={{ cursor: 'pointer' }}
+              >
+                <td style={{ fontFamily: 'monospace', fontSize: '0.78rem', color: 'var(--md-on-surface-variant)' }}>{s.numero || s.id}</td>
+                <td style={{ fontWeight: 500 }}>{s.nombre || '—'}</td>
+                <td>{s.tipo || '—'}</td>
+                <td style={{ maxWidth: '320px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {s.motivo || '—'}
+                </td>
+                <td className="num">{s.moneda === 'PEN' || !s.moneda ? formatPEN(s.total_general) : `${s.moneda} ${(Number(s.total_general) || 0).toFixed(2)}`}</td>
                 <td><Badge value={s.estado} /></td>
-                <td>{formatDate(s.fecha)}</td>
+                <td className="num">{s.items_count}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
 
-      {showModal && (
-        <Modal
-          title="Nueva solicitud"
-          onClose={() => setShowModal(false)}
-        >
-          <form onSubmit={handleCreate}>
-            <div className="gcc-form-grid">
-              <div className="gcc-field">
-                <label htmlFor="solicitante">Solicitante</label>
-                <input id="solicitante" name="solicitante" className="gcc-input" required />
-              </div>
-              <div className="gcc-field">
-                <label htmlFor="area">Área</label>
-                <select id="area" name="area" className="gcc-select" required defaultValue="">
-                  <option value="" disabled>Seleccionar</option>
-                  {AREAS.map((a) => <option key={a}>{a}</option>)}
-                </select>
-              </div>
-              <div className="gcc-field">
-                <label htmlFor="monto">Monto (S/)</label>
-                <input id="monto" name="monto" type="number" min="0" step="0.01" className="gcc-input" required />
-              </div>
-              <div className="gcc-field">
-                <label htmlFor="tipo">Tipo</label>
-                <select id="tipo" name="tipo" className="gcc-select" required defaultValue="caja-chica">
-                  <option value="caja-chica">Caja chica</option>
-                  <option value="rendir">Entrega a rendir</option>
-                </select>
-              </div>
-              <div className="gcc-field">
-                <label htmlFor="fecha">Fecha</label>
-                <input id="fecha" name="fecha" type="date" className="gcc-input" required defaultValue={new Date().toISOString().slice(0, 10)} />
-              </div>
-              <div className="gcc-field">
-                <label htmlFor="adjunto">Adjuntar archivo</label>
-                <input id="adjunto" name="adjunto" type="file" className="gcc-input" />
-              </div>
-              <div className="gcc-field full">
-                <label htmlFor="motivo">Motivo</label>
-                <textarea id="motivo" name="motivo" className="gcc-textarea" required />
-              </div>
-            </div>
-            <div className="gcc-modal-actions">
-              <button type="button" className="gcc-btn gcc-btn-ghost" onClick={() => setShowModal(false)}>Cancelar</button>
-              <button type="submit" className="gcc-btn gcc-btn-primary">
-                <Plus size={16} /> Crear solicitud
-              </button>
-            </div>
-          </form>
-        </Modal>
+      {selectedId && (
+        <SolicitudDetalle solicitudId={selectedId} onClose={handleCloseDetalle} />
       )}
     </>
   );

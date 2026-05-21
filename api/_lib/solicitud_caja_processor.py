@@ -36,8 +36,36 @@ def _decode_file(file_item: dict) -> tuple[str, bytes]:
         raise ValueError(f"No se pudo decodificar {filename}: {type(e).__name__}") from e
 
 
+def _is_empty(value: Any) -> bool:
+    """
+    Considera vacío: None, string vacío, lista vacía, dict vacío.
+    Listas/dicts no-vacíos NO son ignorados (caso `detalle_gasto`: array de
+    items que el agent necesita ver aunque solo aparezcan en un archivo).
+    """
+    if value is None:
+        return True
+    if isinstance(value, str) and not value.strip():
+        return True
+    if isinstance(value, (list, dict)) and len(value) == 0:
+        return True
+    return False
+
+
 def _merge_campos(resultados: list[dict]) -> dict:
+    """
+    Combina los campos extraídos de varios archivos en un solo dict.
+
+    Reglas:
+    - Para campos escalares (motivo, total_general, moneda, etc.): se queda
+      con el primero no-vacío.
+    - Para `detalle_gasto` (array de items): concatena los items de TODOS
+      los archivos. Si subiste 3 PDFs cada uno con sus ítems, el resultado
+      es el array completo unificado.
+    - `confianza` se promedia (gana la peor).
+    """
     merged: dict[str, Any] = {}
+    items_acumulados: list[dict] = []
+
     for item in resultados:
         campos = item.get("campos") or {}
         if not isinstance(campos, dict):
@@ -45,8 +73,16 @@ def _merge_campos(resultados: list[dict]) -> dict:
         for key, value in campos.items():
             if key == "confianza":
                 continue
-            if key not in merged and value not in (None, ""):
+            if key == "detalle_gasto" and isinstance(value, list):
+                items_acumulados.extend(v for v in value if isinstance(v, dict))
+                continue
+            if key not in merged and not _is_empty(value):
                 merged[key] = value
+
+    if items_acumulados:
+        merged["detalle_gasto"] = items_acumulados
+    elif "detalle_gasto" not in merged:
+        merged["detalle_gasto"] = []
 
     confianzas = [
         (item.get("campos") or {}).get("confianza")

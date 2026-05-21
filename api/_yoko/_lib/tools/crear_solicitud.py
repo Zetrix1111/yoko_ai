@@ -15,6 +15,7 @@ Tabla principal que asume este módulo:
                        MOTIVO, MONEDA, TOTAL_GENERAL, DETALLE_GASTO, ESTADO
 """
 
+import json
 import os
 import sys
 from datetime import datetime
@@ -26,6 +27,31 @@ from _lib.validators import (
     validar_monto_contra_tope,
     validar_plazo_rendicion,
 )
+
+
+# Coincide exacto con los choices del singleSelect TIPO_SOLICITUD en Airtable.
+# Cualquier valor fuera del enum genera 422 al hacer create_record.
+_TIPOS_VALIDOS = ("CAJA CHICA", "EXTRAORDINARIO", "PASAJES AEREOS")
+
+
+def _normalizar_items(detalle_gasto) -> list[dict]:
+    """
+    Filtra y normaliza el array de items. Acepta cualquier shape razonable
+    del LLM, pero solo deja los keys esperados y descarta items completamente
+    vacíos.
+    """
+    if not isinstance(detalle_gasto, list):
+        return []
+
+    permitidos = ("descripcion", "unidad", "cantidad", "precio_unitario", "total", "proveedor")
+    out: list[dict] = []
+    for item in detalle_gasto:
+        if not isinstance(item, dict):
+            continue
+        filtrado = {k: item.get(k) for k in permitidos if item.get(k) not in (None, "")}
+        if filtrado:
+            out.append(filtrado)
+    return out
 
 
 _TABLA_SOLICITUDES   = "solicitudes_caja"
@@ -128,30 +154,46 @@ def procesar_solicitud_caja(args: dict, context: dict) -> dict:
     parameters={
         "type": "object",
         "properties": {
+            "tipo":          {"type": "string", "enum": list(_TIPOS_VALIDOS), "description": "Tipo de solicitud según choices de Airtable. Pasalo EXACTO como aparece (mayúsculas, con espacio): 'CAJA CHICA', 'EXTRAORDINARIO' o 'PASAJES AEREOS'."},
             "plazo":         {"type": "string", "description": "Plazo para la caja chica (ej. cantidad de días, o fecha desde/hasta)."},
             "motivo":        {"type": "string", "description": "Motivo general de la solicitud (ej. Compra de utiles)."},
             "moneda":        {
-                "type": "string", 
-                "enum": ["PEN", "USD", "EUR", "CNY"], 
+                "type": "string",
+                "enum": ["PEN", "USD", "EUR", "CNY"],
                 "description": "Moneda de la solicitud."
             },
             "centro_costo":  {"type": "string", "description": "Centro de costo asociado, si aplica en la empresa."},
             "total_general": {"type": "number", "description": "Monto total a solicitar (numérico)."},
-            "detalle_gasto": {"type": "string", "description": "Descripción detallada del gasto a realizar."},
+            "detalle_gasto": {
+                "type": "array",
+                "description": "Array de ítems del gasto. Cada ítem tiene descripcion, unidad, cantidad, precio_unitario, total y proveedor.",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "descripcion":     {"type": "string"},
+                        "unidad":          {"type": "string"},
+                        "cantidad":        {"type": "string"},
+                        "precio_unitario": {"type": "string"},
+                        "total":           {"type": "string"},
+                        "proveedor":       {"type": "string"},
+                    },
+                },
+            },
             "aprobador_id":  {"type": "string", "description": "Record ID del aprobador (APROBADOR_2). Obligatorio solo si la empresa tiene requiere_aprobacion=true. Si la empresa NO requiere aprobación, omitir y la solicitud queda en PENDIENTE_PAGO."},
             "residente_id":  {"type": "string", "description": "Record ID del residente (APROBADOR_1) elegido por el usuario. Omitir si el usuario indica que no aplica."},
         },
-        "required": ["plazo", "motivo", "moneda", "total_general", "detalle_gasto"],
+        "required": ["tipo", "plazo", "motivo", "moneda", "total_general", "detalle_gasto"],
     },
     category="accion",
 )
 def crear_solicitud(args: dict, context: dict) -> dict:
+    tipo = args["tipo"]
     plazo = args["plazo"]
     motivo = args["motivo"]
     moneda = args["moneda"]
     centro_costo = args.get("centro_costo")
     total_general = args["total_general"]
-    detalle_gasto = args["detalle_gasto"]
+    detalle_gasto_raw = args["detalle_gasto"]
     aprobador_id = args.get("aprobador_id")  # opcional: solo si la empresa requiere aprobación
     residente_id = args.get("residente_id")  # opcional
 
@@ -162,6 +204,18 @@ def crear_solicitud(args: dict, context: dict) -> dict:
     record_id = user.get("record_id")
 
     # ── Validaciones ANTES de tocar Airtable ──
+    if tipo not in _TIPOS_VALIDOS:
+        raise ValidationError(
+            f"tipo inválido: {tipo!r}. Debe ser uno de {list(_TIPOS_VALIDOS)} "
+            f"(coincidir exacto con los choices del singleSelect TIPO_SOLICITUD)."
+        )
+
+    detalle_items = _normalizar_items(detalle_gasto_raw)
+    if not detalle_items:
+        raise ValidationError(
+            "detalle_gasto está vacío. Debe ser un array con al menos un ítem."
+        )
+
     # Usamos total_general como monto. Ya no existe origen separado.
     validar_monto_contra_tope(total_general, config)
 
@@ -176,13 +230,14 @@ def crear_solicitud(args: dict, context: dict) -> dict:
 
     # ── Escritura ──
     fields = {
-        "NOMBRE":        nombre,
-        "PLAZO":         plazo,
-        "MOTIVO":        motivo,
-        "MONEDA":        moneda,
-        "TOTAL_GENERAL": float(total_general),
-        "DETALLE_GASTO": detalle_gasto,
-        "ESTADO":        estado,
+        "NOMBRE":         nombre,
+        "TIPO_SOLICITUD": tipo,
+        "PLAZO":          plazo,
+        "MOTIVO":         motivo,
+        "MONEDA":         moneda,
+        "TOTAL_GENERAL":  float(total_general),
+        "DETALLE_GASTO":  json.dumps(detalle_items, ensure_ascii=False),
+        "ESTADO":         estado,
     }
 
     if aprobador_id:

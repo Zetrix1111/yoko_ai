@@ -16,6 +16,18 @@ TOOL_DEFINITION: dict = {
     "input_schema": {
         "type": "object",
         "properties": {
+            "tipo": {
+                "type": "string",
+                "enum": ["CAJA CHICA", "EXTRAORDINARIO", "PASAJES AEREOS"],
+                "description": (
+                    "Tipo de solicitud. Pasalo EXACTO (mayúsculas, con espacio) "
+                    "porque coincide con los choices del singleSelect "
+                    "TIPO_SOLICITUD en Airtable. Si el documento tiene pasajes "
+                    "aéreos → 'PASAJES AEREOS'. Si dice 'extraordinario' o el "
+                    "monto es inusualmente alto → 'EXTRAORDINARIO'. Default: "
+                    "'CAJA CHICA'."
+                ),
+            },
             "plazo": {
                 "type": "string",
                 "description": "Plazo para la caja chica, por ejemplo cantidad de días o fecha desde/hasta.",
@@ -38,8 +50,28 @@ TOOL_DEFINITION: dict = {
                 "description": "Monto total solicitado.",
             },
             "detalle_gasto": {
-                "type": "string",
-                "description": "Descripción detallada del gasto a realizar.",
+                "type": "array",
+                "description": (
+                    "Array de ítems individuales del gasto. Cada ítem es un "
+                    "objeto con descripcion, unidad, cantidad, precio_unitario, "
+                    "total y proveedor. Ejemplo: "
+                    '[{"descripcion":"LUZ","unidad":"UND","cantidad":"1",'
+                    '"precio_unitario":"40","total":"40.00","proveedor":"PLUZ"}]. '
+                    "Para edición posterior de ítems el usuario usa la pantalla "
+                    "de Caja Chica — no llames esta tool para editar; solo se "
+                    "usa para crear."
+                ),
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "descripcion":     {"type": "string"},
+                        "unidad":          {"type": "string"},
+                        "cantidad":        {"type": "string"},
+                        "precio_unitario": {"type": "string"},
+                        "total":           {"type": "string"},
+                        "proveedor":       {"type": "string"},
+                    },
+                },
             },
             "aprobador_id": {
                 "type": "string",
@@ -59,6 +91,6 @@ TOOL_DEFINITION: dict = {
                 ),
             },
         },
-        "required": ["plazo", "motivo", "moneda", "total_general", "detalle_gasto"],
+        "required": ["tipo", "plazo", "motivo", "moneda", "total_general", "detalle_gasto"],
     },
 }
