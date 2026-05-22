@@ -1,42 +1,29 @@
-import { ArrowLeft, LayoutGrid, LogOut } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import './ModuleLayout.css';
 
-// Wrapper común para pantallas de módulos. Usa la misma estética del chat.
-// La otra persona solo necesita pasar title + children (el formulario).
-export default function ModuleLayout({ title, subtitle, children, onOpenModules, onLogout }) {
-  const navigate = useNavigate();
-
+/**
+ * Wrapper de las pantallas de módulo dentro del shell ERP.
+ *
+ * El header viejo (con botón "atrás", logout y "abrir módulos") se quitó:
+ * el shell ahora aporta la navegación por la sidebar izquierda y el chat
+ * por el panel IA derecho. Este wrapper queda como un contenedor liviano
+ * con título + subtítulo opcionales arriba del contenido del módulo.
+ *
+ * Si una pantalla no necesita header (porque ya tiene el suyo propio),
+ * puede omitir `title` y este componente solo renderiza un `<section>`.
+ */
+export default function ModuleLayout({ title, subtitle, children, action }) {
   return (
-    <div className="chat-wrapper glass-panel">
-      <header className="chat-header border-b">
-        <div className="header-info">
-          <button className="icon-btn" onClick={() => navigate('/')} title="Volver al chat">
-            <ArrowLeft size={20} />
-          </button>
-          <div>
-            <h1 className="agent-name">{title}</h1>
-            {subtitle && <p className="agent-status">{subtitle}</p>}
+    <section className="erp-module">
+      {(title || action) && (
+        <header className="erp-module-header">
+          <div className="erp-module-titles">
+            {title && <h1 className="erp-module-title">{title}</h1>}
+            {subtitle && <p className="erp-module-subtitle">{subtitle}</p>}
           </div>
-        </div>
-        <div className="header-actions">
-          {onLogout && (
-            <button
-              className="icon-btn"
-              onClick={onLogout}
-              title="Cerrar sesión"
-              aria-label="Cerrar sesión"
-            >
-              <LogOut size={20} />
-            </button>
-          )}
-          <button className="icon-btn lg:hidden" onClick={onOpenModules}>
-            <LayoutGrid size={20} />
-          </button>
-        </div>
-      </header>
-      <main className="messages-area">
-        {children}
-      </main>
-    </div>
+          {action && <div className="erp-module-action">{action}</div>}
+        </header>
+      )}
+      <div className="erp-module-body">{children}</div>
+    </section>
   );
 }

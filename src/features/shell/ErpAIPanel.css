@@ -1,0 +1,142 @@
+/* ─────────────────────────────────────────────────────────────────────
+   ErpAIPanel — panel IA derecho.
+   Estilo: Claude desktop pegado a la derecha.
+   ───────────────────────────────────────────────────────────────────── */
+
+.erp-ai-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--md-surface-container, #f0f0f0);
+  overflow: hidden;
+}
+
+.erp-ai-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.625rem 0.875rem;
+  border-bottom: 1px solid var(--md-outline-variant, #e5e7eb);
+  background: var(--md-surface-container, #f0f0f0);
+  flex-shrink: 0;
+}
+
+.erp-ai-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.erp-ai-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: var(--md-primary-container, #d8ead9);
+}
+
+.erp-ai-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.erp-ai-brand-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.erp-ai-brand-name {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--md-on-surface, #1f2937);
+}
+
+.erp-ai-brand-status {
+  font-size: 0.7rem;
+  color: var(--md-on-surface-variant, #6b7280);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.erp-ai-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #10b981;
+  display: inline-block;
+}
+
+.erp-ai-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.erp-ai-empty {
+  margin: auto 0;
+  text-align: center;
+  padding: 1.5rem 1rem;
+  color: var(--md-on-surface-variant, #6b7280);
+}
+
+.erp-ai-empty-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--md-on-surface, #1f2937);
+  margin: 0 0 0.25rem;
+}
+
+.erp-ai-empty-sub {
+  font-size: 0.825rem;
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* Mensajes: forzar burbujas más estrechas que el chat clásico (que era 75%
+   en un workspace de 75%; ahora estamos en panel de 25-30% de viewport). */
+.erp-ai-messages .message-bubble {
+  max-width: 95%;
+}
+
+.erp-ai-footer {
+  border-top: 1px solid var(--md-outline-variant, #e5e7eb);
+  padding: 0.625rem 0.75rem;
+  background: var(--md-surface-container, #f0f0f0);
+  flex-shrink: 0;
+}
+
+/* ─── Drag & drop overlay ────────────────────────────────────────── */
+
+.erp-ai-drag-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  background: color-mix(in srgb, var(--md-primary, #4e7a5e) 12%, var(--md-surface-container, #f0f0f0) 88%);
+  border: 2px dashed var(--md-primary, #4e7a5e);
+  border-radius: 12px;
+  margin: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  color: var(--md-primary, #4e7a5e);
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.erp-ai-drag-overlay p {
+  margin: 0;
+  font-size: 0.875rem;
+}

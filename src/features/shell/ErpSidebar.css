@@ -1,0 +1,309 @@
+/* ─────────────────────────────────────────────────────────────────────
+   ErpSidebar — sidebar de navegación izquierda del shell ERP.
+   Variantes: full (con texto) y rail (solo íconos).
+   ───────────────────────────────────────────────────────────────────── */
+
+.erp-sb {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  font-size: 0.875rem;
+  color: var(--md-on-surface, #1f2937);
+}
+
+/* ─── Variante FULL ───────────────────────────────────────────────── */
+
+.erp-sb--full {
+  padding: 0.5rem 0;
+}
+
+.erp-sb-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.75rem 0.75rem;
+  border-bottom: 1px solid var(--md-outline-variant, #e5e7eb);
+  margin-bottom: 0.5rem;
+}
+
+.erp-sb-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-decoration: none;
+  color: inherit;
+  font-weight: 600;
+}
+
+.erp-sb-brand-logo {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.erp-sb-brand-name {
+  font-size: 1rem;
+  letter-spacing: -0.01em;
+}
+
+.erp-sb-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  color: var(--md-on-surface-variant, #6b7280);
+  cursor: pointer;
+}
+
+.erp-sb-close:hover {
+  background: var(--md-surface-container-high, #ececec);
+}
+
+.erp-sb-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.erp-sb-item {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 8px;
+  text-decoration: none;
+  color: var(--md-on-surface, #1f2937);
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.erp-sb-item > span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.erp-sb-item:hover {
+  background: var(--md-surface-container-high, #ececec);
+}
+
+.erp-sb-item.is-active {
+  background: var(--md-primary-container, #d8ead9);
+  color: var(--md-on-primary-container, #0c2f15);
+  font-weight: 600;
+  position: relative;
+}
+
+.erp-sb-item.is-active::before {
+  content: '';
+  position: absolute;
+  left: -0.5rem;
+  top: 0.5rem;
+  bottom: 0.5rem;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--md-primary, #4e7a5e);
+}
+
+.erp-sb-badge {
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--md-tertiary-container, #f3e8d3);
+  color: var(--md-on-tertiary-container, #4a3a1a);
+}
+
+.erp-sb-chev {
+  margin-left: auto;
+  transition: transform 0.15s ease;
+  color: var(--md-on-surface-variant, #6b7280);
+}
+
+.erp-sb-chev.open {
+  transform: rotate(90deg);
+}
+
+.erp-sb-ext {
+  margin-left: auto;
+  opacity: 0.6;
+  flex-shrink: 0;
+}
+
+.erp-sb-accordion {
+  display: flex;
+  flex-direction: column;
+}
+
+.erp-sb-submenu {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 2px 0 4px 1.5rem;
+}
+
+.erp-sb-subitem {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.625rem;
+  border-radius: 6px;
+  text-decoration: none;
+  color: var(--md-on-surface-variant, #4b5563);
+  font-size: 0.825rem;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.erp-sb-subitem:hover {
+  background: var(--md-surface-container-high, #ececec);
+  color: var(--md-on-surface, #1f2937);
+}
+
+.erp-sb-subitem.is-active {
+  background: var(--md-surface-container-highest, #e6e6e6);
+  color: var(--md-primary, #4e7a5e);
+  font-weight: 600;
+}
+
+.erp-sb-footer {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 0.75rem;
+  border-top: 1px solid var(--md-outline-variant, #e5e7eb);
+  margin-top: 0.5rem;
+}
+
+.erp-sb-user {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.erp-sb-user-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--md-primary, #4e7a5e);
+  color: white;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 0.825rem;
+  flex-shrink: 0;
+}
+
+.erp-sb-user-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.erp-sb-user-name {
+  font-size: 0.825rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.erp-sb-user-email {
+  font-size: 0.7rem;
+  color: var(--md-on-surface-variant, #6b7280);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.erp-sb-logout {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  color: var(--md-on-surface-variant, #6b7280);
+  cursor: pointer;
+}
+
+.erp-sb-logout:hover {
+  background: var(--md-error-container, #fce7e7);
+  color: var(--md-on-error-container, #6b1313);
+}
+
+/* ─── Variante RAIL ───────────────────────────────────────────────── */
+
+.erp-sb--rail {
+  width: 56px;
+  align-items: center;
+  padding: 0.5rem 0;
+  gap: 4px;
+}
+
+.erp-sb-rail-logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+}
+
+.erp-sb-rail-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.erp-sb-rail-item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: transparent;
+  border-radius: 10px;
+  color: var(--md-on-surface-variant, #4b5563);
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.erp-sb-rail-item:hover {
+  background: var(--md-surface-container-high, #ececec);
+  color: var(--md-on-surface, #1f2937);
+}
+
+.erp-sb-rail-item.is-active {
+  background: var(--md-primary-container, #d8ead9);
+  color: var(--md-on-primary-container, #0c2f15);
+}
+
+.erp-sb-rail-spacer {
+  flex: 1;
+}

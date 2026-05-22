@@ -1,0 +1,127 @@
+/* ─────────────────────────────────────────────────────────────────────
+   ErpShell — grid maestro de 3 paneles.
+   - Desktop (≥1280px):  15% sidebar | 60% workspace | 25% panel IA
+   - Tablet  (768-1279): 56px rail   | 1fr workspace | 30% panel IA
+   - Mobile  (<768px):   solo workspace
+   ───────────────────────────────────────────────────────────────────── */
+
+.erp-shell {
+  display: grid;
+  grid-template-columns: 15% 60% 25%;
+  height: 100vh;
+  width: 100%;
+  overflow: hidden;
+  background: var(--md-surface, #fafafa);
+}
+
+.erp-shell--tablet {
+  grid-template-columns: 56px 1fr 30%;
+}
+
+.erp-shell--mobile {
+  grid-template-columns: 1fr;
+}
+
+/* Slots: cada celda del grid contiene el componente correspondiente */
+.erp-sidebar-slot {
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--md-outline-variant, #e5e7eb);
+  background: var(--md-surface-container-low, #f5f5f5);
+  overflow: hidden;
+  min-width: 0;
+}
+
+.erp-workspace {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+  background: var(--md-surface, #fafafa);
+}
+
+.erp-workspace-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.5rem;
+}
+
+.erp-workspace-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--md-outline-variant, #e5e7eb);
+  background: var(--md-surface-container-low, #f5f5f5);
+}
+
+.erp-workspace-burger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  font-size: 1.25rem;
+  color: var(--md-on-surface, #1f2937);
+  cursor: pointer;
+}
+
+.erp-workspace-burger:hover {
+  background: var(--md-surface-container-high, #ececec);
+}
+
+.erp-ai-slot {
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--md-outline-variant, #e5e7eb);
+  background: var(--md-surface-container, #f0f0f0);
+  overflow: hidden;
+  min-width: 0;
+}
+
+/* ──────────────────────────────────────────────────────────────────
+   Overlay: sidebar completa por encima del workspace (tablet/mobile)
+   ────────────────────────────────────────────────────────────────── */
+
+.erp-sidebar-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 50;
+  display: flex;
+  animation: erp-fade-in 0.15s ease-out;
+}
+
+.erp-sidebar-overlay-panel {
+  width: 280px;
+  max-width: 85vw;
+  height: 100%;
+  background: var(--md-surface-container-low, #f5f5f5);
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  animation: erp-slide-in 0.2s ease-out;
+}
+
+@keyframes erp-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes erp-slide-in {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(0); }
+}
+
+/* ──────────────────────────────────────────────────────────────────
+   Reseteos defensivos: el shell ocupa toda la ventana.
+   ────────────────────────────────────────────────────────────────── */
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}

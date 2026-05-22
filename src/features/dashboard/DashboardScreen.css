@@ -1,0 +1,100 @@
+/* ─────────────────────────────────────────────────────────────────────
+   DashboardScreen — home placeholder con 6 KPI cards.
+   ───────────────────────────────────────────────────────────────────── */
+
+.erp-dashboard {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.erp-dashboard-header {
+  margin-bottom: 1.5rem;
+}
+
+.erp-dashboard-header h1 {
+  margin: 0 0 0.25rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--md-on-surface, #1f2937);
+}
+
+.erp-dashboard-header p {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--md-on-surface-variant, #6b7280);
+}
+
+.erp-dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.875rem;
+  margin-bottom: 1.5rem;
+}
+
+.erp-kpi-card {
+  background: var(--md-surface-container-low, #ffffff);
+  border: 1px solid var(--md-outline-variant, #e5e7eb);
+  border-radius: 14px;
+  padding: 1rem 1.125rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.erp-kpi-card:hover {
+  border-color: var(--md-primary, #4e7a5e);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 18px -8px rgba(0, 0, 0, 0.12);
+}
+
+.erp-kpi-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.erp-kpi-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: var(--md-primary-container, #d8ead9);
+  color: var(--md-on-primary-container, #0c2f15);
+}
+
+.erp-kpi-hint {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--md-on-surface-variant, #6b7280);
+  font-weight: 600;
+}
+
+.erp-kpi-value {
+  font-size: 1.875rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--md-on-surface, #1f2937);
+  line-height: 1.1;
+}
+
+.erp-kpi-label {
+  font-size: 0.825rem;
+  color: var(--md-on-surface-variant, #4b5563);
+  font-weight: 500;
+}
+
+.erp-dashboard-note {
+  font-size: 0.75rem;
+  color: var(--md-on-surface-variant, #6b7280);
+  padding: 0.625rem 0.875rem;
+  background: var(--md-surface-container-low, #ffffff);
+  border-radius: 10px;
+  border: 1px dashed var(--md-outline-variant, #e5e7eb);
+  margin: 0;
+}
