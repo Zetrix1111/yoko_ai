@@ -47,6 +47,7 @@ from _lib.db_manager import (                                        # noqa: E40
     init_db,
     save_proceso,
     get_proceso,
+    list_procesos,
     update_factura,
     delete_factura,
 )
@@ -184,6 +185,32 @@ def _actualizar(req, empresa_id: str) -> None:
     except Exception as e:
         print(f"[facturas/actualizar] Error: {type(e).__name__}: {e}", file=sys.stderr)
         return req._json(500, {"error": "Error al actualizar."})
+
+
+def _listar_procesos(req, empresa_id: str) -> None:
+    """
+    GET ?action=listar-procesos — lista los procesos de la empresa.
+
+    Devuelve un array agrupado por `proceso_id`, ordenado por última
+    actualización desc, con metadata para la UI (cantidad de
+    comprobantes, conteo de baja confianza, estado inferido).
+
+    Limitación: la DB es ephemera (`/tmp`, TTL 24h). Procesos viejos
+    no aparecen en el listado.
+
+    Response: { ok, procesos: [...], total }.
+    """
+    try:
+        init_db()
+        procesos = list_procesos(empresa_id)
+        return req._json(200, {
+            "ok":       True,
+            "procesos": procesos,
+            "total":    len(procesos),
+        })
+    except Exception as e:
+        print(f"[facturas/listar-procesos] Error: {type(e).__name__}: {e}", file=sys.stderr)
+        return req._json(500, {"error": "Error al listar procesos."})
 
 
 def _recuperar(req, empresa_id: str) -> None:
@@ -552,11 +579,12 @@ def _registro_contable_chat(req, empresa_id: str) -> None:
 
 _ACTIONS = {
     # Flujo web (UI clásica)
-    "procesar":      _procesar,
-    "actualizar":    _actualizar,
-    "recuperar":     _recuperar,
-    "eliminar-fila": _eliminar_fila,
-    "concar":        _concar,
+    "procesar":        _procesar,
+    "actualizar":      _actualizar,
+    "recuperar":       _recuperar,
+    "listar-procesos": _listar_procesos,
+    "eliminar-fila":   _eliminar_fila,
+    "concar":          _concar,
     # Flujo chat (Anthropic Managed Agents → custom tools)
     "procesar-chat":          _procesar_chat,
     "recuperar-chat":         _recuperar_chat,

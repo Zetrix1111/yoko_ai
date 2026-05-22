@@ -2,13 +2,20 @@ import { useCallback, useEffect, useState, useRef, Fragment } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Upload, X, Check, Clock, FileText, Download,
-  AlertCircle, Loader2, RotateCcw,
+  AlertCircle, AlertTriangle, Loader2, RotateCcw,
   TrendingUp, Wallet, ClipboardList, FileSpreadsheet,
-  MessageSquare, ArrowRight,
+  MessageSquare, ArrowRight, Sparkles,
 } from 'lucide-react';
 import { API, apiFetch, postFormAuth, getAuthToken } from '../../../shared/api';
 import FacturasTable from './components/FacturasTable';
 import useRecuperarSesion from './hooks/useRecuperarSesion';
+import useProcesos from './hooks/useProcesos';
+import {
+  ProcessTimeline,
+  FiltrosRevision,
+  AccionesMasivas,
+} from './components/RevisionAddons';
+import './fi-sections.css';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Constantes compartidas (replicadas del legacy FacturasInteligentesScreen)
@@ -384,13 +391,19 @@ function ValidationCard({
 
       {!compact && <StatusList stage={STAGES.VALIDATING} />}
 
+      <ProcessTimeline etapa="VALIDATING" />
+
       <MetaPanel proceso={proceso} />
+
+      <FiltrosRevision filtro="todas" />
 
       <FacturasTable
         proceso={proceso}
         facturas={facturas}
         setFacturas={setFacturas}
       />
+
+      <AccionesMasivas onDescargar={onConfirm} downloading={isLoading} />
 
       <CorrelativosPanel
         facturas={facturas}
@@ -480,121 +493,121 @@ function DoneCard({ proceso, onDownloadAgain, onReset }) {
 // Sub-pantalla 1 · Dashboard (placeholder)
 // ─────────────────────────────────────────────────────────────────────────
 
-const STAT_CARDS = [
-  { id: 'procesos',     label: 'Procesos este mes',          value: '12', hint: 'mock', Icon: TrendingUp },
-  { id: 'comprobantes', label: 'Comprobantes procesados',    value: '87', hint: 'mock', Icon: ClipboardList },
-  { id: 'pendientes',   label: 'Pendientes de revisión',     value: '3',  hint: 'mock', Icon: Wallet },
-  { id: 'excels',       label: 'Excel generados',            value: '9',  hint: 'mock', Icon: FileSpreadsheet },
-];
+// KPIs visuales del Dashboard. Los 4 primeros se calculan client-side
+// desde useProcesos(). Los 2 últimos son placeholder hasta que haya
+// tracking real de exportaciones y tiempo ahorrado.
+
+const focusChatInput = () => {
+  const el = document.querySelector('.chat-input');
+  if (el) el.focus();
+};
+
+function isThisMonth(ts) {
+  if (!ts) return false;
+  const d = new Date(ts * 1000);
+  const now = new Date();
+  return d.getUTCFullYear() === now.getUTCFullYear() && d.getUTCMonth() === now.getUTCMonth();
+}
 
 export function DashboardSection() {
-  return (
-    <div className="fact-screen">
-      <div style={{ marginBottom: '1.25rem' }}>
-        <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 600 }}>
-          Facturas Inteligentes
-        </h1>
-        <p style={{ marginTop: '0.25rem', color: 'var(--md-on-surface-variant)' }}>
-          Vista general del módulo. Las métricas son referenciales por ahora.
-        </p>
-      </div>
+  const { procesos, loading } = useProcesos();
 
-      <div
-        style={{
-          display: 'grid',
-          gap: '1rem',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-          marginBottom: '1.5rem',
-        }}
-      >
-        {STAT_CARDS.map(({ id, label, value, hint, Icon }) => (
-          <div
-            key={id}
-            className="fact-card"
-            style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', padding: '1rem' }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: 44, height: 44,
-                borderRadius: 12,
-                background: 'var(--md-primary-container, #e8def8)',
-                color: 'var(--md-on-primary-container, #21005d)',
-                flexShrink: 0,
-              }}
-            >
-              <Icon size={20} />
+  const procesosMes = procesos.filter((p) => isThisMonth(p.first_created));
+  const totalComprobantes = procesosMes.reduce((acc, p) => acc + (p.count || 0), 0);
+  const totalPendientes = procesos.filter((p) => p.estado_inferido === 'Pendiente revisión').length;
+  // Excels generados: hoy no se rastrean. Mostramos `—` para no inventar.
+
+  const cards = [
+    { id: 'procesos',     label: 'Procesos este mes',     value: loading ? '…' : procesosMes.length, hint: 'Mes en curso', Icon: TrendingUp },
+    { id: 'comprobantes', label: 'Comprobantes procesados', value: loading ? '…' : totalComprobantes, hint: 'Mes en curso', Icon: ClipboardList },
+    { id: 'pendientes',   label: 'Pendientes de revisión', value: loading ? '…' : totalPendientes,   hint: 'En cola', Icon: Wallet },
+    { id: 'excels',       label: 'Excel generados',        value: '—',                                hint: 'Mes en curso · pendiente tracking', Icon: FileSpreadsheet },
+    { id: 'tiempo',       label: 'Tiempo ahorrado',        value: '—',                                hint: 'Estimación', Icon: Sparkles },
+    { id: 'alertas',      label: 'Alertas detectadas',     value: '—',                                hint: 'Pendiente tracking', Icon: AlertTriangle },
+  ];
+
+  return (
+    <div className="fact-screen fi-section">
+      <header className="fi-section-header">
+        <div>
+          <h1 className="fi-section-title">Facturas Inteligentes</h1>
+          <p className="fi-section-subtitle">
+            Resumen del módulo. Procesa tus comprobantes desde el chat de Yoko.
+          </p>
+        </div>
+      </header>
+
+      <div className="fi-kpi-grid">
+        {cards.map(({ id, label, value, hint, Icon }) => (
+          <article key={id} className="fi-kpi-card">
+            <div className="fi-kpi-card-top">
+              <span className="fi-kpi-icon">
+                <Icon size={18} />
+              </span>
+              <span className="fi-kpi-hint">{hint}</span>
             </div>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: '0.75rem', color: 'var(--md-on-surface-variant)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                {label}
-              </div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.4rem' }}>
-                <span style={{ fontSize: '1.65rem', fontWeight: 600, lineHeight: 1.1 }}>{value}</span>
-                <span style={{ fontSize: '0.7rem', color: 'var(--md-on-surface-variant)' }}>({hint})</span>
-              </div>
-            </div>
-          </div>
+            <div className="fi-kpi-value">{value}</div>
+            <div className="fi-kpi-label">{label}</div>
+          </article>
         ))}
       </div>
 
-      <div
-        style={{
-          display: 'grid',
-          gap: '1rem',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-        }}
-      >
-        <Link
-          to="/chat"
-          className="fact-card"
-          style={{
-            textDecoration: 'none',
-            color: 'inherit',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '0.75rem',
-            padding: '1.1rem',
-          }}
+      <p className="fi-section-note">
+        ℹ️ Algunos indicadores aún están en modo maqueta. La conexión total con
+        los datos reales se habilitará en próximas iteraciones.
+      </p>
+
+      <h2 className="fi-section-subtitle-strong">Accesos rápidos</h2>
+      <div className="fi-quick-actions">
+        <button
+          type="button"
+          className="fi-quick-card"
+          onClick={focusChatInput}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--md-primary, #6750a4)' }}>
+          <div className="fi-quick-card-top">
             <MessageSquare size={20} />
-            <strong style={{ fontSize: '1rem' }}>Procesar desde el chat</strong>
+            <strong>Subir comprobantes</strong>
           </div>
-          <p style={{ margin: 0, color: 'var(--md-on-surface-variant)', fontSize: '0.9rem' }}>
-            Adjuntá los PDFs en el chat de Yoko. Te guía con el flujo de carrito y, al
-            terminar, te trae directo a Revisión de extracción.
+          <p>
+            Adjunta los PDFs en el chat de Yoko. Te guía con el flujo de carrito y,
+            al terminar, abre la revisión directamente.
           </p>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 'auto', color: 'var(--md-primary, #6750a4)', fontWeight: 500 }}>
+          <span className="fi-quick-card-cta">
             Abrir chat <ArrowRight size={16} />
+          </span>
+        </button>
+
+        <Link
+          to="/modulos/facturas-inteligentes?section=procesos"
+          className="fi-quick-card"
+        >
+          <div className="fi-quick-card-top">
+            <ClipboardList size={20} />
+            <strong>Revisar pendientes</strong>
+          </div>
+          <p>
+            Bandeja con todos los procesos. Filtra por compras, ventas o pendientes
+            y abre el que necesites editar.
+          </p>
+          <span className="fi-quick-card-cta">
+            Ir a Procesos <ArrowRight size={16} />
           </span>
         </Link>
 
         <Link
-          to="/modulos/facturas-inteligentes?section=revision"
-          className="fact-card"
-          style={{
-            textDecoration: 'none',
-            color: 'inherit',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '0.75rem',
-            padding: '1.1rem',
-          }}
+          to="/modulos/facturas-inteligentes?section=exportaciones"
+          className="fi-quick-card"
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--md-primary, #6750a4)' }}>
-            <ClipboardList size={20} />
-            <strong style={{ fontSize: '1rem' }}>Revisión de extracción</strong>
+          <div className="fi-quick-card-top">
+            <FileSpreadsheet size={20} />
+            <strong>Ver exportaciones</strong>
           </div>
-          <p style={{ margin: 0, color: 'var(--md-on-surface-variant)', fontSize: '0.9rem' }}>
-            Subí archivos directamente desde la web o continuá un proceso ya
-            extraído. Tabla editable de 13 columnas, auto-save, descarga del
-            registro contable.
+          <p>
+            Historial de los Excels y archivos contables generados a partir de tus
+            procesos.
           </p>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 'auto', color: 'var(--md-primary, #6750a4)', fontWeight: 500 }}>
-            Ir a revisión <ArrowRight size={16} />
+          <span className="fi-quick-card-cta">
+            Ir a Exportaciones <ArrowRight size={16} />
           </span>
         </Link>
       </div>

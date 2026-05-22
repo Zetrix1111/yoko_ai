@@ -177,6 +177,103 @@ def save_proceso(proceso_id: str, empresa_id: str, facturas: List[Dict]) -> None
 # CRUD: Leer
 # ─────────────────────────────────────────────────────────────────────────
 
+def list_procesos(empresa_id: str) -> List[Dict]:
+    """
+    Lista todos los procesos de una empresa agrupados por proceso_id.
+    Para cada proceso devuelve metadata derivada de las facturas que
+    contiene: count total, count de filas con baja confianza, count
+    con errores, fechas, y un `estado_inferido` para mostrar en la UI.
+
+    Devuelve los procesos ordenados por `updated_at DESC` (más recientes
+    primero). Si no hay procesos para la empresa, lista vacía.
+
+    Limitación: la DB es ephemera (`/tmp`, TTL 24h). Procesos viejos
+    no aparecen — la UI debe documentar esto al usuario.
+    """
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+
+        # Traemos todas las facturas y agregamos en memoria. Para los
+        # volúmenes esperados (cientos de facturas por empresa por día)
+        # esto es perfectamente aceptable y evita hacer JSON-extract en
+        # SQLite que no soporta funciones JSON sin extensiones.
+        cursor.execute(
+            """
+            SELECT proceso_id, factura_json, created_at, updated_at
+            FROM procesos_facturas
+            WHERE empresa_id = ?
+            ORDER BY proceso_id ASC, id ASC
+            """,
+            (empresa_id,),
+        )
+        rows = cursor.fetchall()
+        conn.close()
+    except Exception as e:
+        print(f"[db_manager] Error listando procesos: {e}", file=sys.stderr)
+        return []
+
+    if not rows:
+        return []
+
+    agrupados: Dict[str, Dict] = {}
+    for proceso_id, factura_json, created_at, updated_at in rows:
+        try:
+            f = json.loads(factura_json)
+        except Exception:
+            f = {}
+        bucket = agrupados.setdefault(
+            proceso_id,
+            {
+                "proceso_id":     proceso_id,
+                "count":          0,
+                "count_baja":     0,
+                "count_errores":  0,
+                "tipo":           None,
+                "mes":            None,
+                "first_created":  created_at,
+                "last_updated":   updated_at,
+            },
+        )
+        bucket["count"] += 1
+        # Confianza: el procesador la guarda como float 0..1. Si está
+        # debajo de 0.7 la contamos como "baja".
+        confianza = f.get("confianza")
+        try:
+            if confianza is not None and float(confianza) < 0.7:
+                bucket["count_baja"] += 1
+        except (TypeError, ValueError):
+            pass
+        # Error explícito: el procesador puede setear `estado=error` o
+        # algún flag. Lo contamos defensivamente.
+        if f.get("estado") in ("error", "rechazada"):
+            bucket["count_errores"] += 1
+        # Tipo / mes: tomamos del primer comprobante que los traiga.
+        if not bucket["tipo"] and f.get("_tipo_registro"):
+            bucket["tipo"] = f.get("_tipo_registro")
+        if not bucket["mes"] and f.get("_mes_contable"):
+            bucket["mes"] = f.get("_mes_contable")
+        # Updated_at: nos quedamos con el más reciente.
+        if updated_at and updated_at > (bucket["last_updated"] or 0):
+            bucket["last_updated"] = updated_at
+
+    # Inferir estado por proceso.
+    procesos = []
+    for bucket in agrupados.values():
+        if bucket["count_errores"] > 0:
+            estado = "Con errores"
+        elif bucket["count_baja"] > 0:
+            estado = "Pendiente revisión"
+        else:
+            estado = "Revisado"
+        bucket["estado_inferido"] = estado
+        procesos.append(bucket)
+
+    # Más reciente primero.
+    procesos.sort(key=lambda p: p.get("last_updated") or 0, reverse=True)
+    return procesos
+
+
 def get_proceso(proceso_id: str, empresa_id: str) -> Optional[Dict]:
     """
     Recupera todas las facturas de un proceso. Cross-tenant guard: si

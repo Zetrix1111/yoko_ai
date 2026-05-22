@@ -24,6 +24,7 @@ import {
   Users,
   MessageSquareText,
   Smartphone,
+  Download,
 } from 'lucide-react';
 
 export const MODULES = [
@@ -68,8 +69,10 @@ export const MODULES = [
     Icon: FileText,
     iconClass: 'invoice',
     submenus: [
-      { id: 'inicio',   label: 'Dashboard',              Icon: LayoutDashboard },
-      { id: 'revision', label: 'Revisión de extracción', Icon: Receipt },
+      { id: 'inicio',        label: 'Dashboard',     Icon: LayoutDashboard },
+      { id: 'procesos',      label: 'Procesos',      Icon: Package },
+      { id: 'revision',      label: 'Revisión',      Icon: Receipt },
+      { id: 'exportaciones', label: 'Exportaciones', Icon: Download },
     ],
   },
   {
