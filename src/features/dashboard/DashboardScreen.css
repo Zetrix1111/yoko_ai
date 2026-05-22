@@ -1,5 +1,5 @@
 /* ─────────────────────────────────────────────────────────────────────
-   DashboardScreen — home placeholder con 6 KPI cards.
+   DashboardScreen — tablero ERP con header de empresa + KPI cards + upsell.
    ───────────────────────────────────────────────────────────────────── */
 
 .erp-dashboard {
@@ -7,23 +7,100 @@
   margin: 0 auto;
 }
 
+/* ── Header: razón social + RUC + badge contable + tagline ─────────── */
+
 .erp-dashboard-header {
   margin-bottom: 1.5rem;
 }
 
-.erp-dashboard-header h1 {
+.erp-dashboard-empresa {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.erp-dashboard-empresa-text {
+  min-width: 0;
+  flex: 1;
+}
+
+.erp-dashboard-razon {
   margin: 0 0 0.25rem;
-  font-size: 1.5rem;
+  font-size: 1.625rem;
   font-weight: 700;
   letter-spacing: -0.01em;
   color: var(--md-on-surface, #1f2937);
+  line-height: 1.2;
 }
 
-.erp-dashboard-header p {
+.erp-dashboard-ruc {
   margin: 0;
   font-size: 0.875rem;
   color: var(--md-on-surface-variant, #6b7280);
 }
+
+.erp-dashboard-ruc-label {
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  opacity: 0.7;
+  margin-right: 0.125rem;
+}
+
+.erp-dashboard-badge-contable {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.75rem;
+  border-radius: 999px;
+  background: var(--md-secondary-container, #d8e4d4);
+  color: var(--md-on-secondary-container, #1b3320);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.erp-dashboard-tagline {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--md-on-surface-variant, #6b7280);
+  line-height: 1.45;
+  max-width: 720px;
+}
+
+/* Skeletons mientras carga la config de empresa */
+
+.erp-dashboard-skeleton {
+  background: linear-gradient(90deg,
+    var(--md-surface-container-low, #f5f5f5) 0%,
+    var(--md-surface-container-high, #ececec) 50%,
+    var(--md-surface-container-low, #f5f5f5) 100%);
+  background-size: 200% 100%;
+  animation: erp-skeleton 1.2s ease-in-out infinite;
+  border-radius: 6px;
+}
+
+.erp-dashboard-skeleton-title {
+  width: 260px;
+  height: 28px;
+  margin-bottom: 8px;
+}
+
+.erp-dashboard-skeleton-ruc {
+  width: 180px;
+  height: 14px;
+}
+
+@keyframes erp-skeleton {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ── KPI grid ──────────────────────────────────────────────────────── */
 
 .erp-dashboard-grid {
   display: grid;
@@ -73,6 +150,7 @@
   letter-spacing: 0.04em;
   color: var(--md-on-surface-variant, #6b7280);
   font-weight: 600;
+  text-align: right;
 }
 
 .erp-kpi-value {
@@ -96,5 +174,102 @@
   background: var(--md-surface-container-low, #ffffff);
   border-radius: 10px;
   border: 1px dashed var(--md-outline-variant, #e5e7eb);
+  margin: 0 0 1.5rem;
+}
+
+/* ── Upsell ───────────────────────────────────────────────────────── */
+
+.erp-upsell {
+  margin-top: 1.5rem;
+}
+
+.erp-upsell-title {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--md-on-surface, #1f2937);
+}
+
+.erp-upsell-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 0.875rem;
+}
+
+.erp-upsell-card {
+  background: var(--md-surface-container-low, #ffffff);
+  border: 1px dashed var(--md-outline-variant, #e5e7eb);
+  border-radius: 14px;
+  padding: 1rem 1.125rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  opacity: 0.7;
+  transition: opacity 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+
+.erp-upsell-card:hover {
+  opacity: 1;
+  border-color: var(--md-primary, #4e7a5e);
+  border-style: solid;
+  transform: translateY(-1px);
+}
+
+.erp-upsell-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.erp-upsell-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: var(--md-surface-container-high, #ececec);
+  color: var(--md-on-surface, #1f2937);
+}
+
+.erp-upsell-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--md-tertiary-container, #f3e8d3);
+  color: var(--md-on-tertiary-container, #4a3a1a);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.erp-upsell-card-title {
   margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--md-on-surface, #1f2937);
+}
+
+.erp-upsell-card-desc {
+  margin: 0;
+  font-size: 0.825rem;
+  color: var(--md-on-surface-variant, #4b5563);
+  line-height: 1.45;
+}
+
+.erp-upsell-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--md-primary, #4e7a5e);
+  text-decoration: none;
+  margin-top: 0.25rem;
+}
+
+.erp-upsell-cta:hover {
+  text-decoration: underline;
 }

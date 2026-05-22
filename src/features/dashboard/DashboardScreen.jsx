@@ -1,76 +1,69 @@
-import {
-  FileText,
-  CheckCircle2,
-  CreditCard,
-  Receipt,
-  Wallet,
-  ClipboardList,
-} from 'lucide-react';
+import { useMemo } from 'react';
+import { useEmpresa, formatSistemaContable } from '../empresa/EmpresaContext';
+import { selectKpisForModulos } from './dashboardKpis';
+import UpsellCards from './UpsellCards';
 import './DashboardScreen.css';
 
 /**
- * Pantalla de inicio del workspace (ruta `/`). Maqueta con 6 KPI cards
- * sin lógica — los números son `—` placeholder. Se conectan a fetches
- * reales en un plan futuro.
+ * Pantalla de inicio del workspace (ruta `/`).
  *
- * Cada card lleva un ícono pequeño, un valor grande y un label.
+ * Layout:
+ *   1. Header de empresa: razón social + RUC + badge contable + tagline.
+ *   2. Grid de 6 KPI cards dinámicos según los módulos contratados.
+ *   3. Sección "Sumá más capacidades a Yoko" con cards ghost de módulos
+ *      no contratados.
+ *
+ * Sin saludo personal — el panel IA derecho cumple ese rol. El Dashboard
+ * es un tablero corporativo que entra directo al contexto de la empresa.
  */
 export default function DashboardScreen({ user }) {
-  const nombre = (user?.nombre || '').split(' ')[0] || 'usuario';
+  const { basicos, loading } = useEmpresa();
 
-  const cards = [
-    {
-      id: 'solicitudes-pendientes',
-      label: 'Solicitudes pendientes',
-      value: '—',
-      Icon: FileText,
-      hint: 'Esperando aprobación',
-    },
-    {
-      id: 'aprobaciones-pendientes',
-      label: 'Aprobaciones pendientes',
-      value: '—',
-      Icon: CheckCircle2,
-      hint: 'En tu cola',
-    },
-    {
-      id: 'pagos-por-procesar',
-      label: 'Pagos por procesar',
-      value: '—',
-      Icon: CreditCard,
-      hint: 'Tesorería',
-    },
-    {
-      id: 'facturas-mes',
-      label: 'Facturas del mes',
-      value: '—',
-      Icon: Receipt,
-      hint: 'Mes en curso',
-    },
-    {
-      id: 'egresos-cc',
-      label: 'Egresos caja chica',
-      value: 'S/ —',
-      Icon: Wallet,
-      hint: 'Mes en curso',
-    },
-    {
-      id: 'rendiciones-revisar',
-      label: 'Rendiciones por revisar',
-      value: '—',
-      Icon: ClipboardList,
-      hint: 'Comprobantes pendientes',
-    },
-  ];
+  const modulosSet = useMemo(() => new Set(user?.empresa?.modulos || []), [user]);
+  const sistemaUpper = formatSistemaContable(basicos?.sistema_contable);
+
+  const cards = useMemo(
+    () => selectKpisForModulos(modulosSet, basicos?.sistema_contable),
+    [modulosSet, basicos?.sistema_contable]
+  );
+
+  const tagline = basicos?.sistema_contable
+    ? `Yoko es la parte inteligente que opera sobre tu ${sistemaUpper} y ayuda a reducir el tiempo operativo de tu equipo.`
+    : 'Yoko ayuda a reducir el tiempo operativo de tu equipo.';
 
   return (
     <div className="erp-dashboard">
       <header className="erp-dashboard-header">
-        <h1>Hola, {nombre} 👋</h1>
-        <p>Acá tenés un resumen de tu operación. Los datos se llenan automáticamente.</p>
+        <div className="erp-dashboard-empresa">
+          <div className="erp-dashboard-empresa-text">
+            {loading ? (
+              <>
+                <div className="erp-dashboard-skeleton erp-dashboard-skeleton-title" />
+                <div className="erp-dashboard-skeleton erp-dashboard-skeleton-ruc" />
+              </>
+            ) : (
+              <>
+                <h1 className="erp-dashboard-razon">
+                  {basicos?.razon_social || basicos?.name || 'Tu organización'}
+                </h1>
+                {basicos?.ruc && (
+                  <p className="erp-dashboard-ruc">
+                    <span className="erp-dashboard-ruc-label">RUC</span> {basicos.ruc}
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+          {!loading && basicos?.sistema_contable && (
+            <span className="erp-dashboard-badge-contable">
+              Contable: {sistemaUpper}
+            </span>
+          )}
+        </div>
+        <p className="erp-dashboard-tagline">{tagline}</p>
       </header>
 
-      <section className="erp-dashboard-grid" aria-label="KPIs">
+      <section className="erp-dashboard-grid" aria-label="Indicadores">
         {cards.map((card) => (
           <article key={card.id} className="erp-kpi-card">
             <div className="erp-kpi-card-top">
@@ -89,6 +82,11 @@ export default function DashboardScreen({ user }) {
         ℹ️ Los indicadores aún están en modo maqueta. La conexión con los datos reales se
         habilitará en próximas iteraciones.
       </p>
+
+      <UpsellCards
+        modulosSet={modulosSet}
+        sistemaContable={basicos?.sistema_contable}
+      />
     </div>
   );
 }

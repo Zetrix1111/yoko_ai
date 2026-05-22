@@ -13,7 +13,7 @@ import {
   LogOut,
   X,
 } from 'lucide-react';
-import { APP_NAME, APP_LOGO } from '../../shared/branding';
+import { APP_LOGO } from '../../shared/branding';
 import { MODULES } from '../modules/modulesConfig';
 import './ErpSidebar.css';
 
@@ -73,9 +73,9 @@ export default function ErpSidebar({
           type="button"
           className="erp-sb-rail-logo"
           onClick={onRailIconClick}
-          title={APP_NAME}
+          title="Procesos"
         >
-          <img src={APP_LOGO} alt={APP_NAME} />
+          <img src={APP_LOGO} alt="Procesos" />
         </button>
         <Link
           to="/"
@@ -164,8 +164,8 @@ export default function ErpSidebar({
     <nav className="erp-sb erp-sb--full" aria-label="Navegación principal">
       <div className="erp-sb-header">
         <Link to="/" className="erp-sb-brand" onClick={handleNavClick}>
-          <img src={APP_LOGO} alt={APP_NAME} className="erp-sb-brand-logo" />
-          <span className="erp-sb-brand-name">{APP_NAME}</span>
+          <img src={APP_LOGO} alt="Procesos" className="erp-sb-brand-logo" />
+          <span className="erp-sb-brand-name">Procesos</span>
         </Link>
         {showCloseButton && (
           <button

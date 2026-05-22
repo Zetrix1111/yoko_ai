@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { EmpresaProvider } from '../empresa/EmpresaContext';
 import ErpSidebar from './ErpSidebar';
 import ErpAIPanel from './ErpAIPanel';
 import './ErpShell.css';
@@ -43,61 +44,63 @@ export default function ErpShell({ user, onLogout, children }) {
   const closeOverlay = () => setSidebarOverlayOpen(false);
 
   return (
-    <div className={`erp-shell erp-shell--${breakpoint}`}>
-      {/* Sidebar inline: full en desktop, rail en tablet, oculta en mobile */}
-      {!isMobile && (
-        <aside className="erp-sidebar-slot">
-          <ErpSidebar
-            variant={isDesktop ? 'full' : 'rail'}
-            enabledModulos={enabledModulos}
-            user={user}
-            onLogout={onLogout}
-            onRailIconClick={openOverlay}
-          />
-        </aside>
-      )}
-
-      {/* Workspace central */}
-      <main className="erp-workspace">
-        {isMobile && (
-          <div className="erp-workspace-toolbar">
-            <button
-              type="button"
-              className="erp-workspace-burger"
-              onClick={openOverlay}
-              aria-label="Abrir navegación"
-            >
-              ☰
-            </button>
-          </div>
-        )}
-        <div className="erp-workspace-content">{children}</div>
-      </main>
-
-      {/* Panel IA derecho: visible en desktop y tablet */}
-      {!isMobile && (
-        <aside className="erp-ai-slot">
-          <ErpAIPanel user={user} />
-        </aside>
-      )}
-
-      {/* Overlay: la sidebar completa por encima cuando el usuario abre el rail/burger */}
-      {sidebarOverlayOpen && (
-        <div className="erp-sidebar-overlay" onClick={closeOverlay} role="presentation">
-          <div className="erp-sidebar-overlay-panel" onClick={(e) => e.stopPropagation()}>
+    <EmpresaProvider>
+      <div className={`erp-shell erp-shell--${breakpoint}`}>
+        {/* Sidebar inline: full en desktop, rail en tablet, oculta en mobile */}
+        {!isMobile && (
+          <aside className="erp-sidebar-slot">
             <ErpSidebar
-              variant="full"
+              variant={isDesktop ? 'full' : 'rail'}
               enabledModulos={enabledModulos}
               user={user}
               onLogout={onLogout}
-              onNavigate={closeOverlay}
-              showCloseButton
-              onClose={closeOverlay}
+              onRailIconClick={openOverlay}
             />
+          </aside>
+        )}
+
+        {/* Workspace central */}
+        <main className="erp-workspace">
+          {isMobile && (
+            <div className="erp-workspace-toolbar">
+              <button
+                type="button"
+                className="erp-workspace-burger"
+                onClick={openOverlay}
+                aria-label="Abrir navegación"
+              >
+                ☰
+              </button>
+            </div>
+          )}
+          <div className="erp-workspace-content">{children}</div>
+        </main>
+
+        {/* Panel IA derecho: visible en desktop y tablet */}
+        {!isMobile && (
+          <aside className="erp-ai-slot">
+            <ErpAIPanel user={user} />
+          </aside>
+        )}
+
+        {/* Overlay: la sidebar completa por encima cuando el usuario abre el rail/burger */}
+        {sidebarOverlayOpen && (
+          <div className="erp-sidebar-overlay" onClick={closeOverlay} role="presentation">
+            <div className="erp-sidebar-overlay-panel" onClick={(e) => e.stopPropagation()}>
+              <ErpSidebar
+                variant="full"
+                enabledModulos={enabledModulos}
+                user={user}
+                onLogout={onLogout}
+                onNavigate={closeOverlay}
+                showCloseButton
+                onClose={closeOverlay}
+              />
+            </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+    </EmpresaProvider>
   );
 }
 
