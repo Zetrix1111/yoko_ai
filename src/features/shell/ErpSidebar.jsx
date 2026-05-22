@@ -13,7 +13,6 @@ import {
   LogOut,
   X,
 } from 'lucide-react';
-import { APP_LOGO } from '../../shared/branding';
 import { MODULES } from '../modules/modulesConfig';
 import './ErpSidebar.css';
 
@@ -51,6 +50,16 @@ export default function ErpSidebar({
   const enabled = enabledModulos instanceof Set
     ? enabledModulos
     : new Set(Array.isArray(enabledModulos) ? enabledModulos : []);
+  // Mostramos:
+  //  - Módulos habilitados para la empresa (vienen en el JWT).
+  //  - Módulos `upcoming` aunque no estén contratados, atenuados y con
+  //    badge "Próximamente" — para comunicar la oferta completa del
+  //    producto y empujar la compra.
+  const visibleModules = MODULES.filter(
+    (m) => enabled.has(m.id) || m.upcoming
+  );
+  // Para la lógica de "módulo actualmente abierto" usamos solo los habilitados,
+  // porque los upcoming no son navegables.
   const enabledModules = MODULES.filter((m) => enabled.has(m.id));
 
   const [expandedId, setExpandedId] = useState(() => {
@@ -69,14 +78,6 @@ export default function ErpSidebar({
   if (variant === 'rail') {
     return (
       <nav className="erp-sb erp-sb--rail" aria-label="Navegación principal">
-        <button
-          type="button"
-          className="erp-sb-rail-logo"
-          onClick={onRailIconClick}
-          title="Procesos"
-        >
-          <img src={APP_LOGO} alt="Procesos" />
-        </button>
         <Link
           to="/"
           className={`erp-sb-rail-item ${location.pathname === '/' ? 'is-active' : ''}`}
@@ -85,8 +86,20 @@ export default function ErpSidebar({
         >
           <LayoutDashboard size={20} />
         </Link>
-        {enabledModules.map((m) => {
+        {visibleModules.map((m) => {
           const isActive = location.pathname.startsWith(m.path);
+          if (m.upcoming) {
+            return (
+              <span
+                key={m.id}
+                className="erp-sb-rail-item is-upcoming"
+                title={`${m.name} · Próximamente`}
+                aria-disabled="true"
+              >
+                <m.Icon size={20} />
+              </span>
+            );
+          }
           if (m.externalUrl) {
             return (
               <a
@@ -164,7 +177,6 @@ export default function ErpSidebar({
     <nav className="erp-sb erp-sb--full" aria-label="Navegación principal">
       <div className="erp-sb-header">
         <Link to="/" className="erp-sb-brand" onClick={handleNavClick}>
-          <img src={APP_LOGO} alt="Procesos" className="erp-sb-brand-logo" />
           <span className="erp-sb-brand-name">Procesos</span>
         </Link>
         {showCloseButton && (
@@ -191,7 +203,24 @@ export default function ErpSidebar({
           <span>Dashboard</span>
         </NavLink>
 
-        {enabledModules.map((m) => {
+        {visibleModules.map((m) => {
+          // Módulo aún no contratado / no disponible: render atenuado, no
+          // navegable, con badge "Próximamente". El usuario ve la oferta
+          // completa del producto pero no puede entrar.
+          if (m.upcoming) {
+            return (
+              <div
+                key={m.id}
+                className="erp-sb-item is-upcoming"
+                aria-disabled="true"
+                title={`${m.name} aún no está disponible para tu empresa.`}
+              >
+                <m.Icon size={18} />
+                <span>{m.name}</span>
+                <span className="erp-sb-badge erp-sb-badge-upcoming">Próximamente</span>
+              </div>
+            );
+          }
           if (m.externalUrl) {
             return (
               <a

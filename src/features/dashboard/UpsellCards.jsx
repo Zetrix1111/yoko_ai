@@ -27,25 +27,25 @@ export default function UpsellCards({ modulosSet, sistemaContable }) {
 
   // Facturas Inteligentes — upsell solo si no está contratado
   if (!has('facturas-inteligentes')) {
-    const sistemaUpper = sistemaContable ? String(sistemaContable).toUpperCase() : 'tu sistema contable';
+    const sistemaUpper = sistemaContable ? String(sistemaContable).toUpperCase() : 'su sistema contable';
     cards.push({
       id: 'facturas-inteligentes',
       title: 'Facturas Inteligentes',
       badge: null,
-      desc: `Procesá automáticamente facturas y boletas. Yoko extrae los datos y arma el asiento contable directo en ${sistemaUpper}.`,
+      desc: `Procese facturas y boletas automáticamente. Yoko extrae los datos y arma el asiento contable directamente en ${sistemaUpper}.`,
       Icon: FileText,
       ctaHref: ghostCardEmailLink('Facturas Inteligentes'),
     });
   }
 
-  // Planilla Inteligente — siempre upsell ("Próximamente")
+  // Planilla — siempre upsell ("Próximamente")
   cards.push({
     id: 'planilla-inteligente',
-    title: 'Planilla Inteligente',
+    title: 'Planilla',
     badge: 'Próximamente',
-    desc: 'Procesá planillas, detectá incidencias y generá boletas con IA. Avisame cuando esté disponible.',
+    desc: 'Procese planillas, detecte incidencias y genere boletas con IA. Solicite información para coordinar la activación.',
     Icon: Users,
-    ctaHref: ghostCardEmailLink('Planilla Inteligente'),
+    ctaHref: ghostCardEmailLink('Planilla'),
   });
 
   if (cards.length === 0) return null;

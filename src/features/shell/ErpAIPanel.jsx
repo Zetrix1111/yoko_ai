@@ -82,7 +82,7 @@ export default function ErpAIPanel({ user }) {
       {isDragging && (
         <div className="erp-ai-drag-overlay">
           <UploadCloud size={36} />
-          <p>Soltá los archivos acá</p>
+          <p>Suelte los archivos aquí</p>
         </div>
       )}
 
@@ -104,9 +104,9 @@ export default function ErpAIPanel({ user }) {
       <main className="erp-ai-messages">
         {messages.length === 0 ? (
           <div className="erp-ai-empty">
-            <p className="erp-ai-empty-title">¿En qué te ayudo hoy?</p>
+            <p className="erp-ai-empty-title">¿En qué puedo ayudarle hoy?</p>
             <p className="erp-ai-empty-sub">
-              Subí un PDF, hacé una consulta o pedíme una acción.
+              Suba un documento, realice una consulta o solicite una acción.
             </p>
           </div>
         ) : (

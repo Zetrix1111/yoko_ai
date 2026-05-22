@@ -45,7 +45,7 @@ export const MODULES = [
   {
     id: 'gestion-caja',
     path: '/modulos/gestion-caja',
-    name: 'Gestión de Caja Chica',
+    name: 'Caja Chica',
     Icon: PiggyBank,
     iconClass: 'finance',
     submenus: [
@@ -64,13 +64,24 @@ export const MODULES = [
   {
     id: 'facturas-inteligentes',
     path: '/modulos/facturas-inteligentes',
-    name: 'Facturas Inteligentes (BETA)',
+    name: 'Facturas Inteligentes',
     Icon: FileText,
     iconClass: 'invoice',
     submenus: [
       { id: 'inicio',   label: 'Dashboard',              Icon: LayoutDashboard },
       { id: 'revision', label: 'Revisión de extracción', Icon: Receipt },
     ],
+  },
+  {
+    // Módulo aún no disponible. Se muestra en la sidebar atenuado, con
+    // badge "Próximamente", para comunicar la oferta completa del producto.
+    // No es clickeable porque no tiene Screen en `MODULE_COMPONENTS`.
+    id: 'planilla-inteligente',
+    path: '/modulos/planilla-inteligente',
+    name: 'Planilla',
+    Icon: Users,
+    iconClass: 'sales',
+    upcoming: true,
   },
   {
     id: 'configuracion-empresa',

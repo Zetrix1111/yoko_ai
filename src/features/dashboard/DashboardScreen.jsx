@@ -28,8 +28,8 @@ export default function DashboardScreen({ user }) {
   );
 
   const tagline = basicos?.sistema_contable
-    ? `Yoko es la parte inteligente que opera sobre tu ${sistemaUpper} y ayuda a reducir el tiempo operativo de tu equipo.`
-    : 'Yoko ayuda a reducir el tiempo operativo de tu equipo.';
+    ? `Yoko es la capa inteligente que opera sobre su ${sistemaUpper} y reduce el tiempo operativo de su equipo.`
+    : 'Yoko es la capa inteligente que reduce el tiempo operativo de su equipo.';
 
   return (
     <div className="erp-dashboard">
@@ -55,9 +55,10 @@ export default function DashboardScreen({ user }) {
             )}
           </div>
           {!loading && basicos?.sistema_contable && (
-            <span className="erp-dashboard-badge-contable">
-              Contable: {sistemaUpper}
-            </span>
+            <div className="erp-dashboard-badge-contable">
+              <span className="erp-dashboard-badge-contable-label">Sistema contable</span>
+              <span className="erp-dashboard-badge-contable-value">{sistemaUpper}</span>
+            </div>
           )}
         </div>
         <p className="erp-dashboard-tagline">{tagline}</p>

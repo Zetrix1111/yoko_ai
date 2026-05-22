@@ -7,7 +7,6 @@ import {
   ClipboardList,
   Sparkles,
   TrendingUp,
-  Calculator,
   Inbox,
   FileCheck,
   Banknote,
@@ -85,13 +84,6 @@ const KPI_CATALOG = {
     hint:   'Por procesar',
     Icon:   Inbox,
   },
-  'facturas-asientos-generados': {
-    id:     'facturas-asientos-generados',
-    modulo: 'facturas-inteligentes',
-    label:  'Asientos contables generados',
-    hint:   'Listos para contabilizar',
-    Icon:   Calculator,
-  },
   'facturas-comprobantes-exportados': {
     id:     'facturas-comprobantes-exportados',
     modulo: 'facturas-inteligentes',
@@ -143,13 +135,13 @@ export function selectKpisForModulos(modulosSet, sistemaContable) {
   const hasFacturas = has('facturas-inteligentes');
 
   if (hasCaja && hasFacturas) {
-    // Mezcla 3 + 2 + 1 cross
+    // Mezcla 3 caja + 2 facturas + 1 cross
     ids = [
       'caja-solicitudes-pendientes',
       'caja-solicitudes-aprobadas-mes',
       'caja-egresos-mes',
       'facturas-procesadas-mes',
-      'facturas-asientos-generados',
+      'facturas-total-mes',
       'cross-documentos-ia',
     ];
   } else if (hasCaja) {
@@ -165,10 +157,10 @@ export function selectKpisForModulos(modulosSet, sistemaContable) {
     ids = [
       'facturas-procesadas-mes',
       'facturas-en-cola',
-      'facturas-asientos-generados',
       'facturas-comprobantes-exportados',
       'facturas-total-mes',
       'facturas-igv-mes',
+      'cross-documentos-ia',
     ];
   } else {
     // Sin módulos operativos: dejamos el catálogo cross + caja para que
@@ -178,8 +170,8 @@ export function selectKpisForModulos(modulosSet, sistemaContable) {
       'caja-solicitudes-pendientes',
       'caja-egresos-mes',
       'facturas-procesadas-mes',
-      'facturas-asientos-generados',
       'facturas-total-mes',
+      'facturas-igv-mes',
     ];
   }
 

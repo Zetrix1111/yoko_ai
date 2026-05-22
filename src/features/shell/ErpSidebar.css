@@ -130,6 +130,27 @@
   color: var(--md-on-tertiary-container, #4a3a1a);
 }
 
+.erp-sb-badge-upcoming {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: var(--md-surface-container-high, #ececec);
+  color: var(--md-on-surface-variant, #6b7280);
+}
+
+/* Módulo aún no contratado / no disponible — atenuado y no clickeable */
+.erp-sb-item.is-upcoming {
+  opacity: 0.6;
+  cursor: default;
+  pointer-events: none;
+}
+
+.erp-sb-rail-item.is-upcoming {
+  opacity: 0.45;
+  cursor: default;
+  pointer-events: none;
+}
+
 .erp-sb-chev {
   margin-left: auto;
   transition: transform 0.15s ease;
